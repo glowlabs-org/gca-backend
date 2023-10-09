@@ -4,9 +4,9 @@ import (
 	"crypto/ed25519"
 	"encoding/binary"
 	"fmt"
-	// "net"
+	"net"
 	"testing"
-	// "time"
+	"time"
 )
 
 func generateTestKeys() (ed25519.PublicKey, ed25519.PrivateKey) {
@@ -97,55 +97,74 @@ func TestParseReport(t *testing.T) {
 	}
 }
 
-
-/*
-func TestIntegrationReceiveReport(t *testing.T) {
-	// Generate test key for a device.
-	pubKey, privKey := generateTestKeys()
-
-	// Setup the GCAServer with the test key.
-	server := NewGCAServer()
-	server.loadDeviceKeys([]Device{{ShortID: 12345, Key: pubKey}})
-
-	// Use a channel to know when the server has processed the report.
-	reportProcessed := make(chan bool, 1)
-	originalHandler := server.handleEquipmentReport
-
-	// Overwrite handleEquipmentReport for this test to signal when report is processed.
-	server.handleEquipmentReport = func(report EquipmentReport) {
-		originalHandler(report) // Call original handler.
-		reportProcessed <- true
-	}
-
-	// Start the UDP server in a separate goroutine.
-	go server.startUDPServer()
-
-	// Create and send a mock valid report to the server.
-	reportData := make([]byte, 16) // excluding signature
-	// ... you can populate the reportData with specific values if needed
-	signature := ed25519.Sign(privKey, reportData)
-	fullReport := append(reportData, signature...)
-
-	conn, err := net.Dial("udp", "localhost:35030")
+func sendUDPReport(report []byte) error {
+	conn, err := net.Dial("udp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
-		t.Fatalf("Failed to dial server: %v", err)
+		return err
 	}
 	defer conn.Close()
 
-	_, err = conn.Write(fullReport)
-	if err != nil {
-		t.Fatalf("Failed to write to server: %v", err)
-	}
-
-	// Wait for report processing or timeout.
-	select {
-	case <-reportProcessed:
-		// Continue with any further checks or assertions on the report processing result.
-	case <-time.After(time.Second * 5): // 5-second timeout.
-		t.Fatal("Timeout waiting for report processing")
-	}
-
-	// Optionally, stop the server. If the startUDPServer function has a stop mechanism.
-	// server.stop()
+	_, err = conn.Write(report)
+	return err
 }
-*/
+
+func TestParseReportIntegration(t *testing.T) {
+	// Generate multiple test key pairs for devices.
+	numDevices := 3
+	devices := make([]Device, numDevices)
+	privKeys := make([]ed25519.PrivateKey, numDevices)
+
+	for i := 0; i < numDevices; i++ {
+		pubKey, privKey := generateTestKeys()
+		devices[i] = Device{ShortID: uint32(i), Key: pubKey}
+		privKeys[i] = privKey
+	}
+
+	// Setup the GCAServer with the test keys.
+	server := NewGCAServer()
+	server.loadDeviceKeys(devices)
+
+	for i, device := range devices {
+		reportData := make([]byte, 16)
+		binary.BigEndian.PutUint32(reportData[0:4], device.ShortID)
+		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))
+		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100))
+
+		// Correctly signed report
+		signature := ed25519.Sign(privKeys[i], reportData)
+		fullReport := append(reportData, signature...)
+
+		// Send the report over UDP
+		if err := sendUDPReport(fullReport); err != nil {
+			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
+		}
+
+		// Sleep for a bit to let server process the report.
+		time.Sleep(1000 * time.Millisecond)
+
+		// Check if the report was added to recentReports
+		if len(server.recentReports) != i+1 {
+			t.Fatalf("No reports in recentReports after sending valid report for device %d", i)
+		}
+
+		lastReport := server.recentReports[len(server.recentReports)-1]
+		if lastReport.ShortID != device.ShortID || lastReport.Timeslot != uint32(i*10) || lastReport.PowerOutput != uint64(i*100) {
+			t.Errorf("Unexpected report details for device %d: got %+v", i, lastReport)
+		}
+
+		// Report signed by the wrong device (using next device's private key for signature)
+		if i < numDevices-1 {
+			wrongSignature := ed25519.Sign(privKeys[i+1], reportData)
+			wrongFullReport := append(reportData, wrongSignature...)
+			if err := sendUDPReport(wrongFullReport); err != nil {
+				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
+			}
+			time.Sleep(100 * time.Millisecond)
+
+			// Since the report is invalid, it should not be added to recentReports
+			if len(server.recentReports) != i+1 {
+				t.Errorf("Unexpected number of reports in recentReports after sending wrongly signed report for device %d: got %d, expected %d", i, len(server.recentReports), i+1)
+			}
+		}
+	}
+}

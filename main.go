@@ -12,6 +12,7 @@ import (
 const (
 	maxBufferSize = 80
 	port          = 35030
+	maxRecentReports = 100e3
 )
 
 // EquipmentReport defines the structure of the report received from equipment.
@@ -31,13 +32,15 @@ type Device struct {
 // GCAServer is the main server structure.
 // It maintains a map of known device keys and handles incoming equipment reports.
 type GCAServer struct {
-	deviceKeys map[uint32]ed25519.PublicKey
+	deviceKeys    map[uint32]ed25519.PublicKey
+	recentReports []EquipmentReport
 }
 
 // NewGCAServer creates and initializes a new GCAServer instance.
 func NewGCAServer() *GCAServer {
 	return &GCAServer{
-		deviceKeys: make(map[uint32]ed25519.PublicKey),
+		deviceKeys:    make(map[uint32]ed25519.PublicKey),
+		recentReports: make([]EquipmentReport, 0, maxRecentReports),
 	}
 }
 
@@ -82,16 +85,28 @@ func (gca *GCAServer) parseReport(data []byte) (*EquipmentReport, error) {
 
 
 // handleEquipmentReport processes the received raw data.
-// It parses the report and logs the details if successful.
+// It parses the report, logs the details if successful, and stores the report in recentReports.
 func (gca *GCAServer) handleEquipmentReport(data []byte) {
 	report, err := gca.parseReport(data)
 	if err != nil {
+		println(err)
 		fmt.Println("Failed to process report:", err)
 		return
 	}
+	println("success")
 
 	fmt.Printf("Received Report:\nShortID: %d\nTimeslot: %d\nPowerOutput: %d\nSignature: %x\n",
 		report.ShortID, report.Timeslot, report.PowerOutput, report.Signature)
+
+	// Append the report to recentReports.
+	gca.recentReports = append(gca.recentReports, *report)
+
+	// If the length of recentReports exceeds maxRecentReports, reallocate and keep only the 50% latest reports.
+	if len(gca.recentReports) > maxRecentReports {
+		halfIndex := len(gca.recentReports) / 2
+		copy(gca.recentReports[:], gca.recentReports[halfIndex:])
+		gca.recentReports = gca.recentReports[:halfIndex]
+	}
 }
 
 // startUDPServer starts the UDP server to listen for incoming reports.
@@ -99,7 +114,7 @@ func (gca *GCAServer) handleEquipmentReport(data []byte) {
 func (gca *GCAServer) startUDPServer() {
 	addr := net.UDPAddr{
 		Port: port,
-		IP:   net.ParseIP("0.0.0.0"),
+		IP:   net.ParseIP("127.0.0.1"),
 	}
 
 	conn, err := net.ListenUDP("udp", &addr)
