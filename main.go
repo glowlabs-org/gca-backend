@@ -1,8 +1,9 @@
 package main
 
 import (
-	"bytes"
+	"crypto/ed25519"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -13,7 +14,7 @@ const (
 	port          = 35030
 )
 
-// EquipmentReport defines the structure of the received message.
+// EquipmentReport defines the structure of the report received from equipment.
 type EquipmentReport struct {
 	ShortID     uint32
 	Timeslot    uint32
@@ -21,30 +22,90 @@ type EquipmentReport struct {
 	Signature   [64]byte
 }
 
-func main() {
-	// Start the UDP listener in its own goroutine.
-	go func() {
-		err := startUDPServer()
-		if err != nil {
-			fmt.Println("Error:", err)
-			os.Exit(1)
-		}
-	}()
-
-	select {} // This keeps the main routine running indefinitely to keep the program alive.
+// Device represents a known device with its ShortID and corresponding public key.
+type Device struct {
+	ShortID uint32
+	Key     ed25519.PublicKey
 }
 
-func startUDPServer() error {
-	// Define the UDP address (any available address on port 35030).
+// GCAServer is the main server structure.
+// It maintains a map of known device keys and handles incoming equipment reports.
+type GCAServer struct {
+	deviceKeys map[uint32]ed25519.PublicKey
+}
+
+// NewGCAServer creates and initializes a new GCAServer instance.
+func NewGCAServer() *GCAServer {
+	return &GCAServer{
+		deviceKeys: make(map[uint32]ed25519.PublicKey),
+	}
+}
+
+// loadDeviceKeys populates the deviceKeys map using the provided array of Devices.
+func (gca *GCAServer) loadDeviceKeys(devices []Device) {
+	for _, device := range devices {
+		gca.deviceKeys[device.ShortID] = device.Key
+	}
+}
+
+// parseReport decodes the raw data into an EquipmentReport and verifies its signature.
+// It checks the ShortID in the report against known device keys and ensures the signature is valid.
+func (gca *GCAServer) parseReport(data []byte) (*EquipmentReport, error) {
+	report := &EquipmentReport{}
+
+	if len(data) != 80 { // 4 bytes for ShortID + 4 bytes for Timeslot + 8 bytes for PowerOutput + 64 bytes for Signature
+		return nil, fmt.Errorf("unexpected data length: got %d bytes, expected 80 bytes", len(data))
+	}
+
+	// Parse ShortID
+	report.ShortID = binary.BigEndian.Uint32(data[0:4])
+	// Parse Timeslot
+	report.Timeslot = binary.BigEndian.Uint32(data[4:8])
+	// Parse PowerOutput
+	report.PowerOutput = binary.BigEndian.Uint64(data[8:16])
+	// Copy Signature
+	copy(report.Signature[:], data[16:80])
+
+	// Look up the device's public key.
+	pubKey, ok := gca.deviceKeys[report.ShortID]
+	if !ok {
+		return nil, fmt.Errorf("unknown device ID: %d", report.ShortID)
+	}
+
+	// Verify the signature using the device's public key.
+	if !ed25519.Verify(pubKey, data[:16], report.Signature[:]) {
+		return nil, errors.New("signature verification failed")
+	}
+
+	return report, nil
+}
+
+
+// handleEquipmentReport processes the received raw data.
+// It parses the report and logs the details if successful.
+func (gca *GCAServer) handleEquipmentReport(data []byte) {
+	report, err := gca.parseReport(data)
+	if err != nil {
+		fmt.Println("Failed to process report:", err)
+		return
+	}
+
+	fmt.Printf("Received Report:\nShortID: %d\nTimeslot: %d\nPowerOutput: %d\nSignature: %x\n",
+		report.ShortID, report.Timeslot, report.PowerOutput, report.Signature)
+}
+
+// startUDPServer starts the UDP server to listen for incoming reports.
+// Each report is handled in its own goroutine.
+func (gca *GCAServer) startUDPServer() {
 	addr := net.UDPAddr{
 		Port: port,
 		IP:   net.ParseIP("0.0.0.0"),
 	}
 
-	// Start listening on the defined UDP address.
 	conn, err := net.ListenUDP("udp", &addr)
 	if err != nil {
-		return fmt.Errorf("Error starting UDP server: %v", err)
+		fmt.Println("Error starting UDP server:", err)
+		os.Exit(1)
 	}
 	defer conn.Close()
 
@@ -52,56 +113,34 @@ func startUDPServer() error {
 
 	buffer := make([]byte, maxBufferSize)
 	for {
-		// Read data from the UDP connection into the buffer.
 		n, _, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			fmt.Println("Error reading from UDP connection:", err)
 			continue
 		}
 
-		// Check if received data length matches the expected length.
 		if n != maxBufferSize {
 			fmt.Println("Received message of invalid length")
 			continue
 		}
 
-		// Start a new goroutine to handle the report, allowing for simultaneous processing of incoming data.
-		go handleEquipmentReport(buffer[:n])
+		go gca.handleEquipmentReport(buffer[:n])
 	}
-
-	return nil
 }
 
-func parseReport(data []byte) (*EquipmentReport, error) {
-	// Create a new bytes reader from the provided data.
-	reader := bytes.NewReader(data)
-	report := &EquipmentReport{}
+func main() {
+	gcaServer := NewGCAServer()
 
-	// Parse the individual fields from the data using the Big Endian format.
-	if err := binary.Read(reader, binary.BigEndian, &report.ShortID); err != nil {
-		return nil, err
+	// Sample device setup.
+	devices := []Device{
+		// Add devices here as per your requirement.
+		// Device{ShortID: 12345, Key: somePublicKey},
 	}
-	if err := binary.Read(reader, binary.BigEndian, &report.Timeslot); err != nil {
-		return nil, err
-	}
-	if err := binary.Read(reader, binary.BigEndian, &report.PowerOutput); err != nil {
-		return nil, err
-	}
-	copy(report.Signature[:], data[16:])
+	gcaServer.loadDeviceKeys(devices)
 
-	return report, nil
-}
+	// Start the UDP listener in its own goroutine.
+	go gcaServer.startUDPServer()
 
-func handleEquipmentReport(data []byte) {
-	// Parse the raw data into a structured report.
-	report, err := parseReport(data)
-	if err != nil {
-		fmt.Println("Failed to parse report:", err)
-		return
-	}
-
-	// Display the parsed report.
-	fmt.Printf("Received Report:\nShortID: %d\nTimeslot: %d\nPowerOutput: %d\nSignature: %x\n",
-		report.ShortID, report.Timeslot, report.PowerOutput, report.Signature)
+	select {} // This keeps the main routine running indefinitely to keep the program alive.
 }
 
