@@ -39,7 +39,7 @@ func TestParseReport(t *testing.T) {
 	}
 
 	// Setup the GCAServer with the test keys.
-	server := NewGCAServer()
+	server := NewGCAServer(generateTestDir(t.Name()))
 	defer server.Close()
 	server.loadDeviceKeys(devices)
 
@@ -119,7 +119,7 @@ func TestParseReportIntegration(t *testing.T) {
 	// Setup the GCAServer with the test keys. This happens first so that it has time to initialize
 	// before we generate all of the keypairs. We also sleep for 250ms because we found it decreases
 	// flaking.
-	server := NewGCAServer()
+	server := NewGCAServer(generateTestDir(t.Name()))
 	defer server.Close()
 	time.Sleep(250 * time.Millisecond)
 
@@ -224,7 +224,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	// Create test devices
 	var devices []Device
 	var privKeys []ed25519.PrivateKey
-	server := NewGCAServer()
+	server := NewGCAServer(generateTestDir(t.Name()))
 	defer server.Close()
 
 	// Create enough devices to fill out all the maxRecentReports in the current time period.

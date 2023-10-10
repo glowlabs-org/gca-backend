@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -21,31 +23,42 @@ type EquipmentReport struct {
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
-	deviceKeys    map[uint32]ed25519.PublicKey // Mapping from device ID to its public key
-	recentReports []EquipmentReport            // Storage for recently received equipment reports
-	gcaPubkey     ed25519.PublicKey            // Public key of the Grid Control Authority
-	logger        *Logger                      // Custom logger for the server
-	httpServer    *http.Server                 // Web server for handling API requests
-	mux           *http.ServeMux               // Routing for HTTP requests
-	conn          *net.UDPConn                 // UDP connection for listening to equipment reports
-	quit          chan bool                    // A channel to initiate server shutdown
+	baseDir      string                      // Base directory for server files
+	deviceKeys   map[uint32]ed25519.PublicKey // Mapping from device ID to its public key
+	recentReports []EquipmentReport           // Storage for recently received equipment reports
+	gcaPubkey    ed25519.PublicKey            // Public key of the Grid Control Authority
+	logger       *Logger                      // Custom logger for the server
+	httpServer   *http.Server                 // Web server for handling API requests
+	mux          *http.ServeMux               // Routing for HTTP requests
+	conn         *net.UDPConn                 // UDP connection for listening to equipment reports
+	quit         chan bool                    // A channel to initiate server shutdown
 }
 
 // NewGCAServer initializes a new instance of GCAServer and sets it up.
-func NewGCAServer() *GCAServer {
+//
+// baseDir specifies the directory where all server files will be stored.
+// The function will create this directory if it does not exist.
+func NewGCAServer(baseDir string) *GCAServer {
+	// Create the directory if it doesn't exist
+	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
+		os.MkdirAll(baseDir, 0755)
+	}
+
 	// Initialize the HTTP routing and logging functionalities
 	mux := http.NewServeMux()
-	logger, err := NewLogger(INFO, "server.log")
+	loggerPath := filepath.Join(baseDir, "server.log")
+	logger, err := NewLogger(INFO, loggerPath)
 	if err != nil {
 		logger.Fatal("Logger initialization failed: ", err)
 	}
 
 	// Populate GCAServer fields
 	server := &GCAServer{
-		deviceKeys:    make(map[uint32]ed25519.PublicKey),
+		baseDir:      baseDir,
+		deviceKeys:   make(map[uint32]ed25519.PublicKey),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
-		logger:        logger,
-		mux:           mux,
+		logger:       logger,
+		mux:          mux,
 		httpServer: &http.Server{
 			Addr:    httpPort,
 			Handler: mux,
@@ -54,6 +67,7 @@ func NewGCAServer() *GCAServer {
 	}
 
 	// Load device public keys
+	// This is just a placeholder, you might want to read the keys from a file
 	devices := make([]Device, 0)
 	server.loadDeviceKeys(devices)
 
