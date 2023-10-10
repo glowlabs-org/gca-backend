@@ -14,9 +14,9 @@ import (
 
 // EquipmentReport defines the structure of the report received from equipment.
 type EquipmentReport struct {
-	ShortID     uint32 // Unique identifier for the device
-	Timeslot    uint32 // Timestamp or other time-related field
-	PowerOutput uint64 // Measured power output
+	ShortID     uint32   // Unique identifier for the device
+	Timeslot    uint32   // Timestamp or other time-related field
+	PowerOutput uint64   // Measured power output
 	Signature   [64]byte // Digital signature to verify the report
 }
 
@@ -29,7 +29,7 @@ type GCAServer struct {
 	httpServer    *http.Server                 // HTTP server for any web API
 	mux           *http.ServeMux               // HTTP request multiplexer
 	conn          *net.UDPConn                 // UDP connection for receiving equipment reports
-	quit          chan bool                     // Channel to signal server to quit
+	quit          chan bool                    // Channel to signal server to quit
 }
 
 // NewGCAServer creates and initializes a new GCAServer instance and loads device keys.
@@ -49,7 +49,7 @@ func NewGCAServer() *GCAServer {
 		logger:        logger,
 		mux:           mux,
 		httpServer: &http.Server{
-			Addr:    ":35015",
+			Addr:    httpPort,
 			Handler: mux, // Set the handler to the custom multiplexer
 		},
 		quit: make(chan bool),
@@ -103,10 +103,10 @@ func (gca *GCAServer) parseReport(data []byte) (*EquipmentReport, error) {
 	}
 
 	// Parsing received data into the EquipmentReport
-	report.ShortID = binary.BigEndian.Uint32(data[0:4])       // First 4 bytes for ShortID
-	report.Timeslot = binary.BigEndian.Uint32(data[4:8])       // Next 4 bytes for Timeslot
-	report.PowerOutput = binary.BigEndian.Uint64(data[8:16])   // Next 8 bytes for PowerOutput
-	copy(report.Signature[:], data[16:80])                    // Final 64 bytes for Signature
+	report.ShortID = binary.BigEndian.Uint32(data[0:4])      // First 4 bytes for ShortID
+	report.Timeslot = binary.BigEndian.Uint32(data[4:8])     // Next 4 bytes for Timeslot
+	report.PowerOutput = binary.BigEndian.Uint64(data[8:16]) // Next 8 bytes for PowerOutput
+	copy(report.Signature[:], data[16:80])                   // Final 64 bytes for Signature
 
 	// Validate the ShortID and Signature
 	pubKey, ok := gca.deviceKeys[report.ShortID]
@@ -189,4 +189,3 @@ func (gca *GCAServer) startUDPServer() {
 		go gca.handleEquipmentReport(buffer[:n])
 	}
 }
-
