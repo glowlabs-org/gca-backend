@@ -99,7 +99,7 @@ func TestParseReport(t *testing.T) {
 }
 
 func sendUDPReport(report []byte) error {
-	conn, err := net.Dial("udp", fmt.Sprintf("0.0.0.0:%d", port))
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		return err
 	}
@@ -110,6 +110,13 @@ func sendUDPReport(report []byte) error {
 }
 
 func TestParseReportIntegration(t *testing.T) {
+	// Setup the GCAServer with the test keys. This happens first so that it has time to initialize
+	// before we generate all of the keypairs. We also sleep for 250ms because we found it decreases
+	// flaking.
+	server := NewGCAServer()
+	defer server.Close()
+	time.Sleep(250*time.Millisecond)
+	
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
 	devices := make([]Device, numDevices)
@@ -120,10 +127,6 @@ func TestParseReportIntegration(t *testing.T) {
 		devices[i] = Device{ShortID: uint32(i), Key: pubKey}
 		privKeys[i] = privKey
 	}
-
-	// Setup the GCAServer with the test keys.
-	server := NewGCAServer()
-	defer server.Close()
 	server.loadDeviceKeys(devices)
 
 	for i, device := range devices {
@@ -141,11 +144,19 @@ func TestParseReportIntegration(t *testing.T) {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 
-		// Sleep for a bit to let server process the report.
-		time.Sleep(100 * time.Millisecond)
-
-		// Check if the report was added to recentReports
-		if len(server.recentReports) != i+1 {
+		// Loop and check the server processing instead of a fixed sleep.
+		success := false
+		for retries := 0; retries < 100; retries++ {
+			if len(server.recentReports) == i+1 {
+				lastReport := server.recentReports[len(server.recentReports)-1]
+				if lastReport.ShortID == device.ShortID && lastReport.Timeslot == uint32(i*10) && lastReport.PowerOutput == uint64(i*100) {
+					success = true
+					break
+				}
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		if !success {
 			t.Fatalf("No reports in recentReports after sending valid report for device %d", i)
 		}
 
@@ -161,12 +172,102 @@ func TestParseReportIntegration(t *testing.T) {
 			if err := sendUDPReport(wrongFullReport); err != nil {
 				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
 			}
-			time.Sleep(100 * time.Millisecond)
 
-			// Since the report is invalid, it should not be added to recentReports
-			if len(server.recentReports) != i+1 {
+			// Loop and check the server processing after sending wrongly signed report.
+			success = false
+			for retries := 0; retries < 100; retries++ {
+				if len(server.recentReports) == i+1 {
+					success = true
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			if !success {
 				t.Errorf("Unexpected number of reports in recentReports after sending wrongly signed report for device %d: got %d, expected %d", i, len(server.recentReports), i+1)
 			}
+		}
+	}
+}
+
+func generateTestReport(shortID uint32, timeslot uint32, privKey ed25519.PrivateKey) []byte {
+	data := make([]byte, 80)
+	binary.BigEndian.PutUint32(data[0:4], shortID)
+	binary.BigEndian.PutUint32(data[4:8], timeslot)
+	// PowerOutput can remain as zero since they don't impact the behavior we're testing.
+
+	// Sign the data using the private key and insert the signature into the report
+	signature := ed25519.Sign(privKey, data[:16])
+	copy(data[16:], signature)
+
+	return data
+}
+
+func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
+	// This test has an implicit assumption about the constants. Panic if the assumption is not maintained.
+	if int(maxRecentReports)%50 != 0 {
+		panic("bad constant")
+	}
+
+	// Create test devices
+	var devices []Device
+	var privKeys []ed25519.PrivateKey
+	server := NewGCAServer()
+	defer server.Close()
+
+	// Create enough devices to fill out all the maxRecentReports in the current time period.
+	for i := 0; i < 1+(maxRecentReports/50); i++ {
+		pubKey, privKey, _ := ed25519.GenerateKey(nil)
+		device := Device{
+			ShortID: uint32(i),
+			Key:     pubKey,
+		}
+		devices = append(devices, device)
+		privKeys = append(privKeys, privKey)
+	}
+	server.loadDeviceKeys(devices)
+
+	// Submit enough reports to saturate the maxRecentReports field.
+	for i := 0; i < maxRecentReports/50; i++ {
+		for j := 0; j < 50; j++ {
+			timeslot := uint32(j)
+			report := generateTestReport(devices[i].ShortID, timeslot, privKeys[i])
+			server.handleEquipmentReport(report)
+		}
+	}
+
+	// Ensure we saturated the number of reports.
+	if len(server.recentReports) != int(maxRecentReports) {
+		t.Fatalf("Expected %f reports, but got %d", maxRecentReports, len(server.recentReports))
+	}
+
+	// Store a reference to the second half of the original recentReports list.
+	expectedReports := append([]EquipmentReport(nil), server.recentReports[maxRecentReports/2:]...)
+
+	// Submit another report, using the final device.
+	report := generateTestReport(devices[maxRecentReports/50].ShortID, 0, privKeys[maxRecentReports/50]) // Use a new device ID, timeslot = 0
+	server.handleEquipmentReport(report)
+
+	if len(server.recentReports) != int(maxRecentReports)/2 {
+		t.Fatalf("Expected %f reports after adding one more, but got %d", maxRecentReports/2+1, len(server.recentReports))
+	}
+
+	// Verify that the first half of the reports were removed
+	firstReport := server.recentReports[0]
+	if firstReport.ShortID != uint32(maxRecentReports)/50/2 || firstReport.Timeslot != uint32(maxRecentReports)%50 {
+		t.Fatalf("Expected first report to be ShortID %d and Timeslot %d, but got ShortID %d and Timeslot %d",
+			uint32(maxRecentReports/50/2), uint32(maxRecentReports)%50, firstReport.ShortID, firstReport.Timeslot)
+	}
+
+	// Now we'll iterate over the two slices (expectedReports and server.recentReports) and ensure they match.
+	for i, report := range server.recentReports {
+		if i == len(expectedReports) {
+			// This is the new report we added after trimming the original list. We should not try to compare it against the expectedReports.
+			break
+		}
+
+		expected := expectedReports[i]
+		if report.ShortID != expected.ShortID || report.Timeslot != expected.Timeslot || report.PowerOutput != expected.PowerOutput || report.Signature != expected.Signature {
+			t.Fatalf("Mismatch at index %d: Expected %+v, got %+v", i, expected, report)
 		}
 	}
 }
