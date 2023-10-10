@@ -38,13 +38,14 @@ func TestParseReport(t *testing.T) {
 
 	// Setup the GCAServer with the test keys.
 	server := NewGCAServer()
+	defer server.Close()
 	server.loadDeviceKeys(devices)
 
 	for i, device := range devices {
 		// Create a mock valid report for each device.
 		reportData := make([]byte, 16)
 		binary.BigEndian.PutUint32(reportData[0:4], device.ShortID) // Set ShortID
-		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))  // Example Timeslot based on i
+		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
 		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
 
 		// Correctly signed report
@@ -98,7 +99,7 @@ func TestParseReport(t *testing.T) {
 }
 
 func sendUDPReport(report []byte) error {
-	conn, err := net.Dial("udp", fmt.Sprintf("127.0.0.1:%d", port))
+	conn, err := net.Dial("udp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return err
 	}
@@ -122,6 +123,7 @@ func TestParseReportIntegration(t *testing.T) {
 
 	// Setup the GCAServer with the test keys.
 	server := NewGCAServer()
+	defer server.Close()
 	server.loadDeviceKeys(devices)
 
 	for i, device := range devices {
@@ -140,7 +142,7 @@ func TestParseReportIntegration(t *testing.T) {
 		}
 
 		// Sleep for a bit to let server process the report.
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Check if the report was added to recentReports
 		if len(server.recentReports) != i+1 {
