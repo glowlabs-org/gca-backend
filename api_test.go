@@ -24,8 +24,6 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	server := NewGCAServer(dir)
 	defer server.Close() // Ensure resources are cleaned up after the test.
 
-	time.Sleep(100 * time.Millisecond) // Give the server a bit of time to start.
-
 	// Create a mock request
 	body := EquipmentAuthorizationRequest{
 		ShortID:    12345,
