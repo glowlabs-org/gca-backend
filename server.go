@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -19,36 +21,50 @@ type EquipmentReport struct {
 	Signature   [64]byte
 }
 
-// Device represents a known device with its ShortID and corresponding public key.
-type Device struct {
-	ShortID uint32
-	Key     ed25519.PublicKey
-}
-
 // GCAServer is the main server structure.
 type GCAServer struct {
 	deviceKeys    map[uint32]ed25519.PublicKey
 	recentReports []EquipmentReport
-	conn          *net.UDPConn
-	quit          chan bool
+
+	gcaPubkey ed25519.PublicKey
+
+	httpServer *http.Server
+	mux        *http.ServeMux
+	conn       *net.UDPConn
+	quit       chan bool
 }
 
 // NewGCAServer creates and initializes a new GCAServer instance and loads device keys.
 func NewGCAServer() *GCAServer {
+	mux := http.NewServeMux()
 	server := &GCAServer{
 		deviceKeys:    make(map[uint32]ed25519.PublicKey),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
-		quit:          make(chan bool),
+		mux:           mux,
+		httpServer: &http.Server{
+			Addr:    ":35015",
+			Handler: mux, // Set the handler to the custom multiplexer
+		},
+		quit: make(chan bool),
 	}
 	devices := make([]Device, 0)
 	server.loadDeviceKeys(devices)
 	go server.startUDPServer()
+	server.startAPI()
 	return server
 }
 
 // Close method to close the UDP connection.
 func (gca *GCAServer) Close() {
 	close(gca.quit) // Signal the quit channel.
+
+	// Shutdown HTTP Server
+	if gca.httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		gca.httpServer.Shutdown(ctx)
+	}
+
 	// Wait for the listening loop to exit before closing the connection.
 	<-time.After(100 * time.Millisecond) // A small delay to allow the loop to exit. Adjust as necessary.
 	if gca.conn != nil {
@@ -56,11 +72,9 @@ func (gca *GCAServer) Close() {
 	}
 }
 
-// loadDeviceKeys populates the deviceKeys map using the provided array of Devices.
-func (gca *GCAServer) loadDeviceKeys(devices []Device) {
-	for _, device := range devices {
-		gca.deviceKeys[device.ShortID] = device.Key
-	}
+// LoadGCAPubkey loads the GCA's public key into the server.
+func (gca *GCAServer) LoadGCAPubkey(pubkey ed25519.PublicKey) {
+	gca.gcaPubkey = pubkey
 }
 
 // parseReport decodes the raw data into an EquipmentReport and verifies its signature.
