@@ -46,7 +46,7 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 
 	// Convert request to JSON
 	jsonBody, _ := json.Marshal(body)
-	resp, err := http.Post("http://localhost:35015/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post("http://localhost"+httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}

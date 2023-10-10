@@ -8,4 +8,5 @@ const (
 	port                = 35030
 	maxRecentReports    = 1e3
 	ip                  = "127.0.0.1"
+	httpPort            = ":35015"
 )

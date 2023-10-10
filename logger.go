@@ -120,4 +120,3 @@ func (l *Logger) Fatal(args ...interface{}) {
 func (l *Logger) Fatalf(format string, args ...interface{}) {
 	l.log(FATAL, fmt.Sprintf(format, args...))
 }
-
