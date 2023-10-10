@@ -48,7 +48,7 @@ func NewGCAServer(baseDir string) *GCAServer {
 	// Initialize the HTTP routing and logging functionalities
 	mux := http.NewServeMux()
 	loggerPath := filepath.Join(baseDir, "server.log")
-	logger, err := NewLogger(INFO, loggerPath)
+	logger, err := NewLogger(defaultLogLevel, loggerPath)
 	if err != nil {
 		logger.Fatal("Logger initialization failed: ", err)
 	}

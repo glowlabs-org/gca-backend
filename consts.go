@@ -9,4 +9,5 @@ const (
 	maxRecentReports    = 100e3
 	serverIP            = "0.0.0.0"
 	httpPort            = ":35015"
+	defaultLogLevel     = WARN
 )
