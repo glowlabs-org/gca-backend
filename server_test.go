@@ -115,8 +115,8 @@ func TestParseReportIntegration(t *testing.T) {
 	// flaking.
 	server := NewGCAServer()
 	defer server.Close()
-	time.Sleep(250*time.Millisecond)
-	
+	time.Sleep(250 * time.Millisecond)
+
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
 	devices := make([]Device, numDevices)
@@ -155,6 +155,9 @@ func TestParseReportIntegration(t *testing.T) {
 				}
 			}
 			time.Sleep(10 * time.Millisecond)
+
+			// TODO: Try sending the report again over UDP, but only after implmenting code that prevents
+			// two of the same report from being recorded twice.
 		}
 		if !success {
 			t.Fatalf("No reports in recentReports after sending valid report for device %d", i)

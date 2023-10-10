@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,19 +10,13 @@ import (
 func main() {
 	gcaServer := NewGCAServer()
 
-	devices := []Device{
-		// Sample device setup.
-		// Add devices here as per your requirement.
-		// Device{ShortID: 12345, Key: somePublicKey},
-	}
-	gcaServer.loadDeviceKeys(devices)
-
 	// Signal handling to call the Close method on termination.
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
 		gcaServer.Close()
+		fmt.Println()
 		os.Exit(0)
 	}()
 
