@@ -39,8 +39,14 @@ func TestParseReport(t *testing.T) {
 	}
 
 	// Setup the GCAServer with the test keys.
-	server := NewGCAServer(generateTestDir(t.Name()))
+	dir := generateTestDir(t.Name())
+	_, err := generateGCATestKeys(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewGCAServer(dir)
 	defer server.Close()
+
 	server.loadDeviceKeys(devices)
 
 	for i, device := range devices {
@@ -86,7 +92,7 @@ func TestParseReport(t *testing.T) {
 	invalidSignature := make([]byte, 64) // Just an example of an invalid signature
 	blankReport := make([]byte, 16)
 	fullReportInvalidSignature := append(blankReport, invalidSignature...)
-	_, err := server.parseReport(fullReportInvalidSignature)
+	_, err = server.parseReport(fullReportInvalidSignature)
 	if err == nil || err.Error() != "failed to verify signature" {
 		t.Errorf("Expected signature verification failed error, got: %v", err)
 	}
@@ -119,7 +125,12 @@ func TestParseReportIntegration(t *testing.T) {
 	// Setup the GCAServer with the test keys. This happens first so that it has time to initialize
 	// before we generate all of the keypairs. We also sleep for 250ms because we found it decreases
 	// flaking.
-	server := NewGCAServer(generateTestDir(t.Name()))
+	dir := generateTestDir(t.Name())
+	_, err := generateGCATestKeys(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewGCAServer(dir)
 	defer server.Close()
 	time.Sleep(250 * time.Millisecond)
 
@@ -224,8 +235,17 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	// Create test devices
 	var devices []Device
 	var privKeys []ed25519.PrivateKey
-	server := NewGCAServer(generateTestDir(t.Name()))
-	defer server.Close()
+
+	// Generate test directory and GCA keys
+	dir := generateTestDir(t.Name())
+	_, err := generateGCATestKeys(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the GCA Server
+	server := NewGCAServer(dir)
+	defer server.Close() // Ensure resources are cleaned up after the test.
 
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
