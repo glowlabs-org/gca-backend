@@ -28,6 +28,7 @@ type GCAServer struct {
 
 	gcaPubkey ed25519.PublicKey
 
+	logger     *Logger
 	httpServer *http.Server
 	mux        *http.ServeMux
 	conn       *net.UDPConn
@@ -37,9 +38,15 @@ type GCAServer struct {
 // NewGCAServer creates and initializes a new GCAServer instance and loads device keys.
 func NewGCAServer() *GCAServer {
 	mux := http.NewServeMux()
+	logger, err := NewLogger(INFO, "server.log")
+	if err != nil {
+		fmt.Println("Failed to initialize logger:", err)
+		os.Exit(1)
+	}
 	server := &GCAServer{
 		deviceKeys:    make(map[uint32]ed25519.PublicKey),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
+		logger:        logger,
 		mux:           mux,
 		httpServer: &http.Server{
 			Addr:    ":35015",
@@ -70,6 +77,9 @@ func (gca *GCAServer) Close() {
 	if gca.conn != nil {
 		gca.conn.Close()
 	}
+
+	// The logger is one of the last things you close, so that everything else shutting down can use the logger.
+	gca.logger.Close()
 }
 
 // LoadGCAPubkey loads the GCA's public key into the server.
