@@ -11,12 +11,6 @@ import (
 	"time"
 )
 
-const (
-	maxBufferSize    = 80
-	port             = 35030
-	maxRecentReports = 100e3
-)
-
 // EquipmentReport defines the structure of the report received from equipment.
 type EquipmentReport struct {
 	ShortID     uint32
@@ -110,10 +104,6 @@ func (gca *GCAServer) handleEquipmentReport(data []byte) {
 		fmt.Println("Failed to process report:", err)
 		return
 	}
-	println("success")
-
-	fmt.Printf("Received Report:\nShortID: %d\nTimeslot: %d\nPowerOutput: %d\nSignature: %x\n",
-		report.ShortID, report.Timeslot, report.PowerOutput, report.Signature)
 
 	// Append the report to recentReports.
 	gca.recentReports = append(gca.recentReports, *report)
@@ -130,7 +120,7 @@ func (gca *GCAServer) handleEquipmentReport(data []byte) {
 func (gca *GCAServer) startUDPServer() {
 	addr := net.UDPAddr{
 		Port: port,
-		IP:   net.ParseIP("0.0.0.0"),
+		IP:   net.ParseIP(ip),
 	}
 
 	var err error
@@ -141,9 +131,9 @@ func (gca *GCAServer) startUDPServer() {
 	}
 	defer gca.conn.Close()
 
-	fmt.Printf("Listening on UDP port %d...\n", port)
+	fmt.Printf("Listening on UDP  %s:%d...\n", ip, port)
 
-	buffer := make([]byte, maxBufferSize)
+	buffer := make([]byte, equipmentReportSize)
 	for {
 		select {
 		case <-gca.quit:
@@ -167,7 +157,7 @@ func (gca *GCAServer) startUDPServer() {
 			continue
 		}
 
-		if n != maxBufferSize {
+		if n != equipmentReportSize {
 			fmt.Println("Received message of invalid length")
 			continue
 		}
