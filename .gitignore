@@ -1,5 +1,7 @@
 gca-backend
 
+*.log
+
 *.swp
 *.swo
 notes
