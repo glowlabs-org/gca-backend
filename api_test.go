@@ -13,7 +13,7 @@ import (
 )
 
 func TestAuthorizeEquipmentEndpoint(t *testing.T) {
-	server := NewGCAServer()
+	server := NewGCAServer(generateTestDir(t.Name()))
 	defer server.Close() // Ensure resources are cleaned up after the test.
 
 	// Create a GCA key pair
