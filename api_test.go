@@ -13,15 +13,16 @@ import (
 )
 
 func TestAuthorizeEquipmentEndpoint(t *testing.T) {
-	server := NewGCAServer(generateTestDir(t.Name()))
-	defer server.Close() // Ensure resources are cleaned up after the test.
-
-	// Create a GCA key pair
-	gcaPubKey, gcaPrivKey, err := ed25519.GenerateKey(nil)
+	// Create the GCA keys that need to be in place when the GCA server loads.
+	dir := generateTestDir(t.Name())
+	gcaPrivKey, err := generateGCATestKeys(dir)
 	if err != nil {
-		t.Fatalf("Failed to generate GCA key pair: %v", err)
+		t.Fatal(err)
 	}
-	server.LoadGCAPubkey(gcaPubKey)
+
+	// Create the GCA Server
+	server := NewGCAServer(dir)
+	defer server.Close() // Ensure resources are cleaned up after the test.
 
 	time.Sleep(100 * time.Millisecond) // Give the server a bit of time to start.
 

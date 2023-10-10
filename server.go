@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -23,15 +24,15 @@ type EquipmentReport struct {
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
-	baseDir      string                      // Base directory for server files
-	deviceKeys   map[uint32]ed25519.PublicKey // Mapping from device ID to its public key
-	recentReports []EquipmentReport           // Storage for recently received equipment reports
-	gcaPubkey    ed25519.PublicKey            // Public key of the Grid Control Authority
-	logger       *Logger                      // Custom logger for the server
-	httpServer   *http.Server                 // Web server for handling API requests
-	mux          *http.ServeMux               // Routing for HTTP requests
-	conn         *net.UDPConn                 // UDP connection for listening to equipment reports
-	quit         chan bool                    // A channel to initiate server shutdown
+	baseDir       string                       // Base directory for server files
+	deviceKeys    map[uint32]ed25519.PublicKey // Mapping from device ID to its public key
+	recentReports []EquipmentReport            // Storage for recently received equipment reports
+	gcaPubkey     ed25519.PublicKey            // Public key of the Grid Control Authority
+	logger        *Logger                      // Custom logger for the server
+	httpServer    *http.Server                 // Web server for handling API requests
+	mux           *http.ServeMux               // Routing for HTTP requests
+	conn          *net.UDPConn                 // UDP connection for listening to equipment reports
+	quit          chan bool                    // A channel to initiate server shutdown
 }
 
 // NewGCAServer initializes a new instance of GCAServer and sets it up.
@@ -54,16 +55,20 @@ func NewGCAServer(baseDir string) *GCAServer {
 
 	// Populate GCAServer fields
 	server := &GCAServer{
-		baseDir:      baseDir,
-		deviceKeys:   make(map[uint32]ed25519.PublicKey),
+		baseDir:       baseDir,
+		deviceKeys:    make(map[uint32]ed25519.PublicKey),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
-		logger:       logger,
-		mux:          mux,
+		logger:        logger,
+		mux:           mux,
 		httpServer: &http.Server{
 			Addr:    httpPort,
 			Handler: mux,
 		},
 		quit: make(chan bool),
+	}
+
+	if err := server.loadGCAPubkey(); err != nil {
+		logger.Fatal("Failed to load GCA public key: ", err)
 	}
 
 	// Load device public keys
@@ -99,9 +104,23 @@ func (server *GCAServer) Close() {
 	server.logger.Close()
 }
 
-// LoadGCAPubkey sets the public key for the Grid Control Authority.
-func (server *GCAServer) LoadGCAPubkey(pubkey ed25519.PublicKey) {
-	server.gcaPubkey = pubkey
+// loadGCAPubkey sets the public key for the Grid Control Authority.
+// Previously, this function took the public key as an argument. Now it reads
+// the public key from a file located in the server's base directory.
+func (server *GCAServer) loadGCAPubkey() error {
+	// Construct the path to the public key file
+	pubkeyPath := filepath.Join(server.baseDir, "gca.pubkey")
+
+	// Read the public key from the file
+	pubkeyData, err := ioutil.ReadFile(pubkeyPath)
+	if err != nil {
+		// If an error occurs, return it to the caller
+		return fmt.Errorf("unable to read public key from file: %v", err)
+	}
+
+	// Update the public key in the GCAServer struct
+	server.gcaPubkey = ed25519.PublicKey(pubkeyData)
+	return nil
 }
 
 // parseReport translates raw bytes into an EquipmentReport and validates its signature.
