@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
-	"time"
 )
 
 func TestAuthorizeEquipmentEndpoint(t *testing.T) {

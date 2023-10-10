@@ -79,6 +79,9 @@ func NewGCAServer(baseDir string) *GCAServer {
 	// Start the UDP and HTTP servers
 	go server.launchUDPServer()
 	server.launchAPI()
+	
+	// Hang on for a bit to let everything load.
+	time.Sleep(time.Millisecond * 100)
 
 	return server
 }
