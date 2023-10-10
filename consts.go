@@ -5,8 +5,8 @@ package main
 
 const (
 	equipmentReportSize = 80
-	port                = 35030
+	udpPort             = 35030
 	maxRecentReports    = 100e3
-	ip                  = "0.0.0.0"
+	serverIP            = "0.0.0.0"
 	httpPort            = ":35015"
 )

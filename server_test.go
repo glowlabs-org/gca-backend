@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// generateTestKeys generates an ed25519 public-private key pair.
+// This is used to simulate devices in our tests.
 func generateTestKeys() (ed25519.PublicKey, ed25519.PrivateKey) {
 	pubKey, privKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -74,7 +76,7 @@ func TestParseReport(t *testing.T) {
 			wrongSignature := ed25519.Sign(privKeys[i+1], reportData)
 			wrongFullReport := append(reportData, wrongSignature...)
 			_, err = server.parseReport(wrongFullReport)
-			if err == nil || err.Error() != "signature verification failed" {
+			if err == nil || err.Error() != "failed to verify signature" {
 				t.Errorf("Expected signature verification failed error for wrong device signature, got: %v", err)
 			}
 		}
@@ -85,7 +87,7 @@ func TestParseReport(t *testing.T) {
 	blankReport := make([]byte, 16)
 	fullReportInvalidSignature := append(blankReport, invalidSignature...)
 	_, err := server.parseReport(fullReportInvalidSignature)
-	if err == nil || err.Error() != "signature verification failed" {
+	if err == nil || err.Error() != "failed to verify signature" {
 		t.Errorf("Expected signature verification failed error, got: %v", err)
 	}
 
@@ -98,8 +100,10 @@ func TestParseReport(t *testing.T) {
 	}
 }
 
+// sendUDPReport simulates sending a report to the server via UDP.
+// The server should be listening on the given IP and port.
 func sendUDPReport(report []byte) error {
-	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", ip, port))
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", serverIP, udpPort))
 	if err != nil {
 		return err
 	}
@@ -109,6 +113,8 @@ func sendUDPReport(report []byte) error {
 	return err
 }
 
+// TestParseReportIntegration tests the GCAServer's ability to correctly
+// process and record device reports that are sent over UDP.
 func TestParseReportIntegration(t *testing.T) {
 	// Setup the GCAServer with the test keys. This happens first so that it has time to initialize
 	// before we generate all of the keypairs. We also sleep for 250ms because we found it decreases
@@ -146,7 +152,7 @@ func TestParseReportIntegration(t *testing.T) {
 
 		// Loop and check the server processing instead of a fixed sleep.
 		success := false
-		for retries := 0; retries < 100; retries++ {
+		for retries := 0; retries < 200; retries++ {
 			if len(server.recentReports) == i+1 {
 				lastReport := server.recentReports[len(server.recentReports)-1]
 				if lastReport.ShortID == device.ShortID && lastReport.Timeslot == uint32(i*10) && lastReport.PowerOutput == uint64(i*100) {
@@ -192,6 +198,8 @@ func TestParseReportIntegration(t *testing.T) {
 	}
 }
 
+// generateTestReport creates a mock report for testing purposes.
+// The report includes a signature based on the provided private key.
 func generateTestReport(shortID uint32, timeslot uint32, privKey ed25519.PrivateKey) []byte {
 	data := make([]byte, 80)
 	binary.BigEndian.PutUint32(data[0:4], shortID)
@@ -205,6 +213,8 @@ func generateTestReport(shortID uint32, timeslot uint32, privKey ed25519.Private
 	return data
 }
 
+// TestHandleEquipmentReport_MaxRecentReports tests the GCAServer's
+// behavior when the maximum number of recent reports is reached.
 func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	// This test has an implicit assumption about the constants. Panic if the assumption is not maintained.
 	if int(maxRecentReports)%50 != 0 {

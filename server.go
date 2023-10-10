@@ -8,41 +8,39 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 )
 
-// EquipmentReport defines the structure of the report received from equipment.
+// EquipmentReport outlines the schema for a report received from a piece of equipment.
 type EquipmentReport struct {
-	ShortID     uint32   // Unique identifier for the device
-	Timeslot    uint32   // Timestamp or other time-related field
-	PowerOutput uint64   // Measured power output
-	Signature   [64]byte // Digital signature to verify the report
+	ShortID     uint32   // A unique identifier for the equipment
+	Timeslot    uint32   // A field denoting the time of the report
+	PowerOutput uint64   // The power output from the equipment
+	Signature   [64]byte // A digital signature for the report's authenticity
 }
 
-// GCAServer is the main server structure.
+// GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
-	deviceKeys    map[uint32]ed25519.PublicKey // Map of device keys, indexed by ShortID
-	recentReports []EquipmentReport            // Recently received equipment reports
-	gcaPubkey     ed25519.PublicKey            // Public key of the GCA (Grid Control Authority)
-	logger        *Logger                      // Custom logger
-	httpServer    *http.Server                 // HTTP server for any web API
-	mux           *http.ServeMux               // HTTP request multiplexer
-	conn          *net.UDPConn                 // UDP connection for receiving equipment reports
-	quit          chan bool                    // Channel to signal server to quit
+	deviceKeys    map[uint32]ed25519.PublicKey // Mapping from device ID to its public key
+	recentReports []EquipmentReport            // Storage for recently received equipment reports
+	gcaPubkey     ed25519.PublicKey            // Public key of the Grid Control Authority
+	logger        *Logger                      // Custom logger for the server
+	httpServer    *http.Server                 // Web server for handling API requests
+	mux           *http.ServeMux               // Routing for HTTP requests
+	conn          *net.UDPConn                 // UDP connection for listening to equipment reports
+	quit          chan bool                    // A channel to initiate server shutdown
 }
 
-// NewGCAServer creates and initializes a new GCAServer instance and loads device keys.
+// NewGCAServer initializes a new instance of GCAServer and sets it up.
 func NewGCAServer() *GCAServer {
-	// Initialize HTTP request multiplexer and logger
+	// Initialize the HTTP routing and logging functionalities
 	mux := http.NewServeMux()
 	logger, err := NewLogger(INFO, "server.log")
 	if err != nil {
-		logger.Fatal("Failed to initialize logger:", err)
-		os.Exit(1)
+		logger.Fatal("Logger initialization failed: ", err)
 	}
 
-	// Initialize the GCAServer struct
+	// Populate GCAServer fields
 	server := &GCAServer{
 		deviceKeys:    make(map[uint32]ed25519.PublicKey),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
@@ -50,142 +48,139 @@ func NewGCAServer() *GCAServer {
 		mux:           mux,
 		httpServer: &http.Server{
 			Addr:    httpPort,
-			Handler: mux, // Set the handler to the custom multiplexer
+			Handler: mux,
 		},
 		quit: make(chan bool),
 	}
 
-	// Load device keys (assuming devices is a slice of Device objects)
+	// Load device public keys
 	devices := make([]Device, 0)
 	server.loadDeviceKeys(devices)
 
-	// Start UDP and HTTP servers
-	go server.startUDPServer()
-	server.startAPI()
+	// Start the UDP and HTTP servers
+	go server.launchUDPServer()
+	server.launchAPI()
 
 	return server
 }
 
-// Close shuts down the server gracefully.
-func (gca *GCAServer) Close() {
-	close(gca.quit) // Signal the quit channel
+// Close conducts an orderly shutdown of the server.
+func (server *GCAServer) Close() {
+	// Signal the server to terminate
+	close(server.quit)
 
-	// Shutdown HTTP Server
-	if gca.httpServer != nil {
+	// Gracefully terminate the HTTP server
+	if server.httpServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		gca.httpServer.Shutdown(ctx)
+		server.httpServer.Shutdown(ctx)
 	}
 
-	// Wait for the listening loop to exit before closing the connection
-	<-time.After(100 * time.Millisecond) // A small delay to allow the loop to exit. Adjust as necessary
-	if gca.conn != nil {
-		gca.conn.Close()
+	// Close the UDP connection
+	if server.conn != nil {
+		server.conn.Close()
 	}
 
-	// Close the logger last so that we can log all the shutdown steps
-	gca.logger.Close()
+	// Finally, close the logger
+	server.logger.Close()
 }
 
-// LoadGCAPubkey loads the GCA's public key into the server.
-func (gca *GCAServer) LoadGCAPubkey(pubkey ed25519.PublicKey) {
-	gca.gcaPubkey = pubkey
+// LoadGCAPubkey sets the public key for the Grid Control Authority.
+func (server *GCAServer) LoadGCAPubkey(pubkey ed25519.PublicKey) {
+	server.gcaPubkey = pubkey
 }
 
-// parseReport decodes raw data into an EquipmentReport and verifies its signature.
-func (gca *GCAServer) parseReport(data []byte) (*EquipmentReport, error) {
-	// Initialize a new EquipmentReport
-	report := &EquipmentReport{}
+// parseReport translates raw bytes into an EquipmentReport and validates its signature.
+func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
+	// Create a new EquipmentReport to populate
+	var report EquipmentReport
 
-	// Validate the length of the received data
-	if len(data) != 80 { // 80 bytes is the expected size of the data
-		return nil, fmt.Errorf("unexpected data length: got %d bytes, expected 80 bytes", len(data))
+	// Ensure the received data is of the expected length
+	if len(rawData) != 80 {
+		return report, fmt.Errorf("unexpected data length: expected 80 bytes, got %d bytes", len(rawData))
 	}
 
-	// Parsing received data into the EquipmentReport
-	report.ShortID = binary.BigEndian.Uint32(data[0:4])      // First 4 bytes for ShortID
-	report.Timeslot = binary.BigEndian.Uint32(data[4:8])     // Next 4 bytes for Timeslot
-	report.PowerOutput = binary.BigEndian.Uint64(data[8:16]) // Next 8 bytes for PowerOutput
-	copy(report.Signature[:], data[16:80])                   // Final 64 bytes for Signature
+	// Correctly read the data into the EquipmentReport
+	report.ShortID = binary.BigEndian.Uint32(rawData[0:4])
+	report.Timeslot = binary.BigEndian.Uint32(rawData[4:8])
+	report.PowerOutput = binary.BigEndian.Uint64(rawData[8:16])
+	copy(report.Signature[:], rawData[16:80])
 
-	// Validate the ShortID and Signature
-	pubKey, ok := gca.deviceKeys[report.ShortID]
+	// Validate the ShortID and the Signature
+	pubKey, ok := server.deviceKeys[report.ShortID]
 	if !ok {
-		return nil, fmt.Errorf("unknown device ID: %d", report.ShortID)
+		return report, fmt.Errorf("unknown device ID: %d", report.ShortID)
 	}
 
-	if !ed25519.Verify(pubKey, data[:16], report.Signature[:]) {
-		return nil, errors.New("signature verification failed")
+	if !ed25519.Verify(pubKey, rawData[:16], report.Signature[:]) {
+		return report, errors.New("failed to verify signature")
 	}
 
 	return report, nil
 }
 
-// handleEquipmentReport processes the received raw data.
-func (gca *GCAServer) handleEquipmentReport(data []byte) {
-	// Parse the report from the raw data
-	report, err := gca.parseReport(data)
+// handleEquipmentReport interprets the raw data received from equipment.
+func (server *GCAServer) handleEquipmentReport(rawData []byte) {
+	// Translate the raw data into an EquipmentReport
+	report, err := server.parseReport(rawData)
 	if err != nil {
-		gca.logger.Error("Failed to process report: ", err)
+		server.logger.Error("Report decoding failed: ", err)
 		return
 	}
 
 	// Append the report to recentReports
-	gca.recentReports = append(gca.recentReports, *report)
+	server.recentReports = append(server.recentReports, report)
 
-	// If the length of recentReports exceeds maxRecentReports, truncate the list
-	if len(gca.recentReports) > maxRecentReports {
-		halfIndex := len(gca.recentReports) / 2
-		copy(gca.recentReports[:], gca.recentReports[halfIndex:])
-		gca.recentReports = gca.recentReports[:halfIndex]
+	// If the report log has grown too large, trim it
+	if len(server.recentReports) > maxRecentReports {
+		halfIndex := len(server.recentReports) / 2
+		copy(server.recentReports[:], server.recentReports[halfIndex:])
+		server.recentReports = server.recentReports[:halfIndex]
 	}
 }
 
-// startUDPServer initializes and starts the UDP server.
-func (gca *GCAServer) startUDPServer() {
-	// Setup UDP server settings
-	addr := net.UDPAddr{
-		Port: port,
-		IP:   net.ParseIP(ip),
+// launchUDPServer sets up and begins the UDP server for the GCAServer.
+func (server *GCAServer) launchUDPServer() {
+	// Define the UDP server configuration
+	udpAddress := net.UDPAddr{
+		Port: udpPort,
+		IP:   net.ParseIP(serverIP),
 	}
 
-	// Initialize UDP connection
+	// Open the UDP connection
 	var err error
-	gca.conn, err = net.ListenUDP("udp", &addr)
+	server.conn, err = net.ListenUDP("udp", &udpAddress)
 	if err != nil {
-		gca.logger.Fatal("Error starting UDP server: ", err)
-		os.Exit(1)
+		server.logger.Fatal("UDP server launch failed: ", err)
 	}
-	defer gca.conn.Close()
+	defer server.conn.Close()
 
-	gca.logger.Info("Listening on UDP ", ip, ":", port)
-
-	// Buffer to hold incoming data
+	// Initialize a buffer for incoming data
 	buffer := make([]byte, equipmentReportSize)
 
-	// Main UDP listening loop
+	// Main loop to listen for incoming UDP packets
 	for {
 		select {
-		case <-gca.quit:
+		case <-server.quit:
 			return
 		default:
-			// Continue as normal
+			// Wait for the next packet
 		}
 
-		// Read from UDP connection
-		n, _, err := gca.conn.ReadFromUDP(buffer)
+		// Read from the UDP socket
+		readBytes, _, err := server.conn.ReadFromUDP(buffer)
 		if err != nil {
-			gca.logger.Error("Error reading from UDP connection: ", err)
+			server.logger.Error("UDP read error: ", err)
 			continue
 		}
 
-		// Validate the length of the received data
-		if n != equipmentReportSize {
-			gca.logger.Warn("Received message of invalid length")
+		// Make sure the packet is the expected size
+		if readBytes != equipmentReportSize {
+			server.logger.Warn("Received unexpected data size")
 			continue
 		}
 
-		// Process the received data
-		go gca.handleEquipmentReport(buffer[:n])
+		// Process the incoming packet
+		go server.handleEquipmentReport(buffer[:readBytes])
 	}
 }
