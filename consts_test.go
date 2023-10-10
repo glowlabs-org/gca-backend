@@ -9,4 +9,5 @@ const (
 	maxRecentReports    = 1e3
 	serverIP            = "127.0.0.1"
 	httpPort            = ":35015"
+	defaultLogLevel     = DEBUG
 )
