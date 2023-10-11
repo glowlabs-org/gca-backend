@@ -14,15 +14,19 @@ import (
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
-	baseDir       string                       // Base directory for server files
-	equipmentKeys map[uint32]ed25519.PublicKey // Mapping from equipment ID to its public key
-	recentReports []EquipmentReport            // Storage for recently received equipment reports
-	gcaPubkey     ed25519.PublicKey            // Public key of the Grid Control Authority
-	logger        *Logger                      // Custom logger for the server
-	httpServer    *http.Server                 // Web server for handling API requests
-	mux           *http.ServeMux               // Routing for HTTP requests
-	conn          *net.UDPConn                 // UDP connection for listening to equipment reports
-	quit          chan bool                    // A channel to initiate server shutdown
+	equipment map[uint32]EquipmentAuthorization // Map from a ShortID to the full equipment authorization
+
+	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
+	recentReports        []EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
+
+	gcaPubkey ed25519.PublicKey // Public key of the Grid Control Authority
+
+	baseDir    string         // Base directory for server files
+	logger     *Logger        // Custom logger for the server
+	httpServer *http.Server   // Web server for handling API requests
+	mux        *http.ServeMux // Routing for HTTP requests
+	conn       *net.UDPConn   // UDP connection for listening to equipment reports
+	quit       chan bool      // A channel to initiate server shutdown
 }
 
 // NewGCAServer initializes a new instance of GCAServer.
@@ -46,7 +50,7 @@ func NewGCAServer(baseDir string) *GCAServer {
 	// Initialize GCAServer with the proper fields
 	server := &GCAServer{
 		baseDir:       baseDir,
-		equipmentKeys: make(map[uint32]ed25519.PublicKey),
+		equipment:     make(map[uint32]EquipmentAuthorization),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
 		logger:        logger,
 		mux:           mux,
@@ -62,8 +66,10 @@ func NewGCAServer(baseDir string) *GCAServer {
 		logger.Fatal("Failed to load GCA public key: ", err)
 	}
 
-	// Load equipment public keys 
-	server.loadEquipment()
+	// Load equipment public keys
+	if err := server.loadEquipment(); err != nil {
+		logger.Fatal("Failed to load server equipment: ", err)
+	}
 
 	// Start the UDP and HTTP servers
 	go server.launchUDPServer()

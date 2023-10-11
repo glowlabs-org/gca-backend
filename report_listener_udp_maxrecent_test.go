@@ -32,13 +32,13 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
 		pubKey, privKey, _ := ed25519.GenerateKey(nil)
 		device := EquipmentAuthorization{
-			ShortID: uint32(i),
-			PublicKey:     pubKey,
+			ShortID:   uint32(i),
+			PublicKey: pubKey,
 		}
 		devices = append(devices, device)
 		privKeys = append(privKeys, privKey)
 	}
-	server.loadEquipmentKeys(devices)
+	server.loadEquipmentAuths(devices)
 
 	// Submit enough reports to saturate the maxRecentReports field.
 	for i := 0; i < maxRecentReports/50; i++ {

@@ -35,7 +35,7 @@ func TestParseReport(t *testing.T) {
 	server := NewGCAServer(dir)
 	defer server.Close()
 
-	server.loadEquipmentKeys(equipment)
+	server.loadEquipmentAuths(equipment)
 
 	for i, e := range equipment {
 		// Create a mock valid report for each device.

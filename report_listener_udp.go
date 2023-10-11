@@ -32,11 +32,11 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	copy(report.Signature[:], rawData[16:80])
 
 	// Validate the signature and the ShortID
-	pubKey, ok := server.equipmentKeys[report.ShortID]
+	equipment, ok := server.equipment[report.ShortID]
 	if !ok {
 		return report, fmt.Errorf("unknown equipment ID: %d", report.ShortID)
 	}
-	if !ed25519.Verify(pubKey, rawData[:16], report.Signature[:]) {
+	if !ed25519.Verify(equipment.PublicKey, rawData[:16], report.Signature[:]) {
 		return report, errors.New("failed to verify signature")
 	}
 

@@ -32,7 +32,7 @@ func TestParseReportIntegration(t *testing.T) {
 		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
 		privKeys[i] = privKey
 	}
-	server.loadEquipmentKeys(devices)
+	server.loadEquipmentAuths(devices)
 
 	for i, device := range devices {
 		reportData := make([]byte, 16)

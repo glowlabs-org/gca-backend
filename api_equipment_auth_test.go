@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -70,22 +69,21 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	// Create a mock request for equipment authorization.
 	// This mimics what a real request might look like.
 	body := EquipmentAuthorizationRequest{
-		ShortID:    12345,      // A unique identifier for the equipment
-		PublicKey:  "abcd1234", // Public key of the equipment for secure communication
-		Capacity:   1000000,    // Storage capacity
-		Debt:       2000000,    // Current debt value
-		Expiration: 2000,       // Expiry time for the equipment
-		Signature:  "efgh5678", // Placeholder for the cryptographic signature
+		ShortID:    12345,                                                              // A unique identifier for the equipment
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		Capacity:   1000000,                                                            // Storage capacity
+		Debt:       2000000,                                                            // Current debt value
+		Expiration: 2000,                                                               // Expiry time for the equipment
+		Signature:  "",                                                                 // Placeholder for the cryptographic signature
+	}
+	ea, err := body.ToAuthorization()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Sign the authorization request with GCA's private key.
-	// This ensures that the request is genuine.
-	data := []byte(fmt.Sprintf("%d", body.ShortID))
-	data = append(data, []byte(body.PublicKey)...)
-	data = append(data, []byte(fmt.Sprintf("%d", body.Capacity))...)
-	data = append(data, []byte(fmt.Sprintf("%d", body.Debt))...)
-	data = append(data, []byte(fmt.Sprintf("%d", body.Expiration))...)
-	signature := ed25519.Sign(gcaPrivKey, data)
+	raw := ea.Serialize()
+	signature := ed25519.Sign(gcaPrivKey, raw)
 	body.Signature = hex.EncodeToString(signature)
 
 	// Convert the request body to JSON format.
