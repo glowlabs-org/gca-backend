@@ -8,8 +8,47 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"testing"
 )
+
+// TestToAuthorization verifies that an EquipmentAuthorizationRequest
+// correctly converts into an EquipmentAuthorizaiton.
+func TestToAuthorization(t *testing.T) {
+	// Generate a real public-private key pair.
+	pubKey, privKey := generateTestKeys()
+	// Generate a real signature.
+	message := []byte("test message")
+	realSignature := ed25519.Sign(privKey, message)
+
+	// Hex-encode the real public key and signature.
+	hexPublicKey := hex.EncodeToString(pubKey)
+	hexSignature := hex.EncodeToString(realSignature)
+
+	request := EquipmentAuthorizationRequest{
+		ShortID:    1,
+		PublicKey:  hexPublicKey,
+		Capacity:   100,
+		Debt:       50,
+		Expiration: 50000,
+		Signature:  hexSignature,
+	}
+	ea, err := request.ToAuthorization()
+
+	if err != nil {
+		t.Errorf("ToAuthorization returned error: %v", err)
+		return
+	}
+
+	if ea.ShortID != request.ShortID ||
+		!reflect.DeepEqual(pubKey, ea.PublicKey) ||
+		ea.Capacity != request.Capacity ||
+		ea.Debt != request.Debt ||
+		ea.Expiration != request.Expiration ||
+		!reflect.DeepEqual(realSignature, ea.Signature) {
+		t.Errorf("Conversion failed: got %v, want %v", ea, request)
+	}
+}
 
 // TestAuthorizeEquipmentEndpoint is a test function that verifies the functionality
 // of the Authorize Equipment Endpoint in the GCA Server.
