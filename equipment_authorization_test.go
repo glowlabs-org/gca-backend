@@ -10,7 +10,7 @@ import (
 // have the same values.
 func TestSerialization(t *testing.T) {
 	pubKey, _ := generateTestKeys()
-	ea := &EquipmentAuthorization{
+	ea := EquipmentAuthorization{
 		ShortID:    1,
 		PublicKey:  pubKey,
 		Capacity:   100,
@@ -41,7 +41,7 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 	defer server.Close()
 
 	// Create and sign a valid EquipmentAuthorization
-	ea := &EquipmentAuthorization{
+	ea := EquipmentAuthorization{
 		ShortID:    1,
 		PublicKey:  ed25519.PublicKey{},
 		Capacity:   100,
@@ -57,7 +57,7 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 	}
 
 	// Create and sign an invalid EquipmentAuthorization
-	eaInvalid := &EquipmentAuthorization{
+	eaInvalid := EquipmentAuthorization{
 		ShortID:    2,
 		PublicKey:  ed25519.PublicKey{},
 		Capacity:   200,

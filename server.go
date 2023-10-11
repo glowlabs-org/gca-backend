@@ -62,9 +62,8 @@ func NewGCAServer(baseDir string) *GCAServer {
 		logger.Fatal("Failed to load GCA public key: ", err)
 	}
 
-	// Load equipment public keys (Note: loadEquipmentKeys is assumed to exist elsewhere)
-	equipments := make([]Equipment, 0)
-	server.loadEquipmentKeys(equipments)
+	// Load equipment public keys 
+	server.loadEquipment()
 
 	// Start the UDP and HTTP servers
 	go server.launchUDPServer()

@@ -17,12 +17,12 @@ import (
 func TestParseReport(t *testing.T) {
 	// Generate multiple test key pairs for equipment.
 	numEquipment := 3
-	equipment := make([]Equipment, numEquipment)
+	equipment := make([]EquipmentAuthorization, numEquipment)
 	privKeys := make([]ed25519.PrivateKey, numEquipment)
 
 	for i := 0; i < numEquipment; i++ {
 		pubKey, privKey := generateTestKeys()
-		equipment[i] = Equipment{ShortID: uint32(i), Key: pubKey}
+		equipment[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
 		privKeys[i] = privKey
 	}
 

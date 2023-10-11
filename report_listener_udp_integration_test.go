@@ -24,12 +24,12 @@ func TestParseReportIntegration(t *testing.T) {
 
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
-	devices := make([]Equipment, numDevices)
+	devices := make([]EquipmentAuthorization, numDevices)
 	privKeys := make([]ed25519.PrivateKey, numDevices)
 
 	for i := 0; i < numDevices; i++ {
 		pubKey, privKey := generateTestKeys()
-		devices[i] = Equipment{ShortID: uint32(i), Key: pubKey}
+		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
 		privKeys[i] = privKey
 	}
 	server.loadEquipmentKeys(devices)
