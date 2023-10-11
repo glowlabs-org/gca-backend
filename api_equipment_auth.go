@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -74,43 +73,26 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 
 // authorizeEquipment performs the actual authorization based on the client request.
 // This function is responsible for the actual logic of authorizing the equipment.
-func (gca *GCAServer) authorizeEquipment(req EquipmentAuthorizationRequest) error {
-	// Decode the hex-encoded public key
-	pubKeyBytes, err := hex.DecodeString(req.PublicKey)
+func (gcas *GCAServer) authorizeEquipment(req EquipmentAuthorizationRequest) error {
+	// Parse and verify the authorization
+	auth, err := req.ToAuthorization()
 	if err != nil {
-		gca.logger.Error("Failed to decode public key: ", err)
-		return err
+		gcas.logger.Warn("Received bad equipment authorization", req)
+		return fmt.Errorf("unable to convert to normal authorization: %v", err)
 	}
-
-	// Create a data buffer for signature verification
-	data := []byte(fmt.Sprintf("%d", req.ShortID))
-	data = append(data, []byte(req.PublicKey)...)
-	data = append(data, []byte(fmt.Sprintf("%d", req.Capacity))...)
-	data = append(data, []byte(fmt.Sprintf("%d", req.Debt))...)
-	data = append(data, []byte(fmt.Sprintf("%d", req.Expiration))...)
-
-	// Decode the hex-encoded signature
-	signatureBytes, err := hex.DecodeString(req.Signature)
+	err = gcas.verifyEquipmentAuthorization(auth)
 	if err != nil {
-		gca.logger.Error("Invalid signature format.")
-		return err
+		gcas.logger.Warn("Received bad equipment authorization signature", req)
+		return fmt.Errorf("unable to verify authorization: %v", err)
 	}
 
-	// Verify the signature
-	if !ed25519.Verify(gca.gcaPubkey, data, signatureBytes) {
-		gca.logger.Warn("Invalid signature for equipment authorization.")
-		return fmt.Errorf("Invalid signature")
-	}
+	// TODO: Check banlist here. Abort if on banlist.
 
-	// Check for duplicate authorizations
-	existingKey, exists := gca.equipmentKeys[req.ShortID]
-	if exists && string(existingKey) != string(pubKeyBytes) {
-		delete(gca.equipmentKeys, req.ShortID)
-		gca.logger.Warn("Duplicate authorization detected, removing.")
-	} else {
-		gca.equipmentKeys[req.ShortID] = pubKeyBytes
-		gca.logger.Info("Added new equipment for authorization.")
-	}
+	// TODO: Need to handle duplicates here. If there is a duplicate, we have
+	// to add this auth to the banlist along with the dual proofs. Duplicate
+	// means two *different* auths that are both signed.
 
+	// Add the equipment to the server.
+	gcas.equipment[auth.ShortID] = auth
 	return nil
 }
