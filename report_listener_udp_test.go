@@ -40,7 +40,7 @@ func TestParseReport(t *testing.T) {
 	for i, e := range equipment {
 		// Create a mock valid report for each device.
 		reportData := make([]byte, 16)
-		binary.BigEndian.PutUint32(reportData[0:4], e.ShortID) // Set ShortID
+		binary.BigEndian.PutUint32(reportData[0:4], e.ShortID)      // Set ShortID
 		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
 		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
 
