@@ -20,6 +20,7 @@ type EquipmentAuthorizationRequest struct {
 }
 
 // AuthorizeEquipmentHandler handles the authorization requests for equipment.
+// This function serves as the HTTP handler for equipment authorization.
 func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.Request) {
 	// Only accept POST requests
 	if r.Method != http.MethodPost {
@@ -50,6 +51,7 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 }
 
 // authorizeEquipment performs the actual authorization based on the client request.
+// This function is responsible for the actual logic of authorizing the equipment.
 func (gca *GCAServer) authorizeEquipment(req EquipmentAuthorizationRequest) error {
 	// Decode the hex-encoded public key
 	pubKeyBytes, err := hex.DecodeString(req.PublicKey)
@@ -79,19 +81,20 @@ func (gca *GCAServer) authorizeEquipment(req EquipmentAuthorizationRequest) erro
 	}
 
 	// Check for duplicate authorizations
-	existingKey, exists := gca.deviceKeys[req.ShortID]
+	existingKey, exists := gca.equipmentKeys[req.ShortID]
 	if exists && string(existingKey) != string(pubKeyBytes) {
-		delete(gca.deviceKeys, req.ShortID)
+		delete(gca.equipmentKeys, req.ShortID)
 		gca.logger.Warn("Duplicate authorization detected, removing.")
 	} else {
-		gca.deviceKeys[req.ShortID] = pubKeyBytes
-		gca.logger.Info("Added new device for authorization.")
+		gca.equipmentKeys[req.ShortID] = pubKeyBytes
+		gca.logger.Info("Added new equipment for authorization.")
 	}
 
 	return nil
 }
 
 // launchAPI sets up the HTTP API endpoints and starts the HTTP server.
+// This function initializes the API routes and starts the HTTP server.
 func (gca *GCAServer) launchAPI() {
 	gca.mux.HandleFunc("/api/v1/authorize-equipment", gca.AuthorizeEquipmentHandler)
 	go func() {

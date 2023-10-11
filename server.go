@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// EquipmentReport outlines the schema for a report received from a piece of equipment.
+// EquipmentReport defines the structure for a report received from a piece of equipment.
 type EquipmentReport struct {
 	ShortID     uint32   // A unique identifier for the equipment
 	Timeslot    uint32   // A field denoting the time of the report
@@ -25,7 +25,7 @@ type EquipmentReport struct {
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
 	baseDir       string                       // Base directory for server files
-	deviceKeys    map[uint32]ed25519.PublicKey // Mapping from device ID to its public key
+	equipmentKeys map[uint32]ed25519.PublicKey // Mapping from equipment ID to its public key
 	recentReports []EquipmentReport            // Storage for recently received equipment reports
 	gcaPubkey     ed25519.PublicKey            // Public key of the Grid Control Authority
 	logger        *Logger                      // Custom logger for the server
@@ -35,7 +35,7 @@ type GCAServer struct {
 	quit          chan bool                    // A channel to initiate server shutdown
 }
 
-// NewGCAServer initializes a new instance of GCAServer and sets it up.
+// NewGCAServer initializes a new instance of GCAServer.
 //
 // baseDir specifies the directory where all server files will be stored.
 // The function will create this directory if it does not exist.
@@ -53,10 +53,10 @@ func NewGCAServer(baseDir string) *GCAServer {
 		logger.Fatal("Logger initialization failed: ", err)
 	}
 
-	// Populate GCAServer fields
+	// Initialize GCAServer with the proper fields
 	server := &GCAServer{
 		baseDir:       baseDir,
-		deviceKeys:    make(map[uint32]ed25519.PublicKey),
+		equipmentKeys: make(map[uint32]ed25519.PublicKey),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
 		logger:        logger,
 		mux:           mux,
@@ -67,31 +67,31 @@ func NewGCAServer(baseDir string) *GCAServer {
 		quit: make(chan bool),
 	}
 
+	// Load the Grid Control Authority public key
 	if err := server.loadGCAPubkey(); err != nil {
 		logger.Fatal("Failed to load GCA public key: ", err)
 	}
 
-	// Load device public keys
-	// This is just a placeholder, you might want to read the keys from a file
-	devices := make([]Device, 0)
-	server.loadDeviceKeys(devices)
+	// Load equipment public keys (Note: loadEquipmentKeys is assumed to exist elsewhere)
+	equipments := make([]Equipment, 0)
+	server.loadEquipmentKeys(equipments)
 
 	// Start the UDP and HTTP servers
 	go server.launchUDPServer()
 	server.launchAPI()
-	
-	// Hang on for a bit to let everything load.
+
+	// Wait for a short duration to let everything load
 	time.Sleep(time.Millisecond * 100)
 
 	return server
 }
 
-// Close conducts an orderly shutdown of the server.
+// Close cleanly shuts down the GCAServer instance.
 func (server *GCAServer) Close() {
-	// Signal the server to terminate
+	// Signal to terminate the server
 	close(server.quit)
 
-	// Gracefully terminate the HTTP server
+	// Shutdown the HTTP server gracefully
 	if server.httpServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -103,51 +103,41 @@ func (server *GCAServer) Close() {
 		server.conn.Close()
 	}
 
-	// Finally, close the logger
+	// Close the logger
 	server.logger.Close()
 }
 
-// loadGCAPubkey sets the public key for the Grid Control Authority.
-// Previously, this function took the public key as an argument. Now it reads
-// the public key from a file located in the server's base directory.
+// loadGCAPubkey loads the Grid Control Authority public key from a file.
 func (server *GCAServer) loadGCAPubkey() error {
-	// Construct the path to the public key file
 	pubkeyPath := filepath.Join(server.baseDir, "gca.pubkey")
-
-	// Read the public key from the file
 	pubkeyData, err := ioutil.ReadFile(pubkeyPath)
 	if err != nil {
-		// If an error occurs, return it to the caller
 		return fmt.Errorf("unable to read public key from file: %v", err)
 	}
-
-	// Update the public key in the GCAServer struct
 	server.gcaPubkey = ed25519.PublicKey(pubkeyData)
 	return nil
 }
 
-// parseReport translates raw bytes into an EquipmentReport and validates its signature.
+// parseReport converts raw bytes into an EquipmentReport and validates its signature.
 func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
-	// Create a new EquipmentReport to populate
 	var report EquipmentReport
 
-	// Ensure the received data is of the expected length
+	// Check for the correct data length
 	if len(rawData) != 80 {
 		return report, fmt.Errorf("unexpected data length: expected 80 bytes, got %d bytes", len(rawData))
 	}
 
-	// Correctly read the data into the EquipmentReport
+	// Populate the EquipmentReport fields
 	report.ShortID = binary.BigEndian.Uint32(rawData[0:4])
 	report.Timeslot = binary.BigEndian.Uint32(rawData[4:8])
 	report.PowerOutput = binary.BigEndian.Uint64(rawData[8:16])
 	copy(report.Signature[:], rawData[16:80])
 
-	// Validate the ShortID and the Signature
-	pubKey, ok := server.deviceKeys[report.ShortID]
+	// Validate the signature and the ShortID
+	pubKey, ok := server.equipmentKeys[report.ShortID]
 	if !ok {
-		return report, fmt.Errorf("unknown device ID: %d", report.ShortID)
+		return report, fmt.Errorf("unknown equipment ID: %d", report.ShortID)
 	}
-
 	if !ed25519.Verify(pubKey, rawData[:16], report.Signature[:]) {
 		return report, errors.New("failed to verify signature")
 	}
@@ -155,9 +145,9 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	return report, nil
 }
 
-// handleEquipmentReport interprets the raw data received from equipment.
+// handleEquipmentReport processes the raw data received from equipment.
 func (server *GCAServer) handleEquipmentReport(rawData []byte) {
-	// Translate the raw data into an EquipmentReport
+	// Parse the raw data into an EquipmentReport
 	report, err := server.parseReport(rawData)
 	if err != nil {
 		server.logger.Error("Report decoding failed: ", err)
@@ -167,7 +157,7 @@ func (server *GCAServer) handleEquipmentReport(rawData []byte) {
 	// Append the report to recentReports
 	server.recentReports = append(server.recentReports, report)
 
-	// If the report log has grown too large, trim it
+	// Truncate the recentReports slice if it gets too large
 	if len(server.recentReports) > maxRecentReports {
 		halfIndex := len(server.recentReports) / 2
 		copy(server.recentReports[:], server.recentReports[halfIndex:])
@@ -175,15 +165,13 @@ func (server *GCAServer) handleEquipmentReport(rawData []byte) {
 	}
 }
 
-// launchUDPServer sets up and begins the UDP server for the GCAServer.
+// launchUDPServer sets up and starts the UDP server for listening to equipment reports.
 func (server *GCAServer) launchUDPServer() {
-	// Define the UDP server configuration
 	udpAddress := net.UDPAddr{
 		Port: udpPort,
 		IP:   net.ParseIP(serverIP),
 	}
 
-	// Open the UDP connection
 	var err error
 	server.conn, err = net.ListenUDP("udp", &udpAddress)
 	if err != nil {
@@ -191,32 +179,30 @@ func (server *GCAServer) launchUDPServer() {
 	}
 	defer server.conn.Close()
 
-	// Initialize a buffer for incoming data
+	// Initialize the buffer to hold incoming data
 	buffer := make([]byte, equipmentReportSize)
 
-	// Main loop to listen for incoming UDP packets
+	// Continuously listen for incoming UDP packets
 	for {
 		select {
 		case <-server.quit:
 			return
 		default:
-			// Wait for the next packet
+			// Wait for the next incoming packet
 		}
 
 		// Read from the UDP socket
 		readBytes, _, err := server.conn.ReadFromUDP(buffer)
 		if err != nil {
-			server.logger.Error("UDP read error: ", err)
+			server.logger.Error("Failed to read from UDP socket: ", err)
 			continue
 		}
 
-		// Make sure the packet is the expected size
+		// Process the received packet if it has the correct length
 		if readBytes != equipmentReportSize {
-			server.logger.Warn("Received unexpected data size")
+			server.logger.Warn("Received an incorrectly sized packet: expected ", equipmentReportSize, " bytes, got ", readBytes, " bytes")
 			continue
 		}
-
-		// Process the incoming packet
-		go server.handleEquipmentReport(buffer[:readBytes])
+		go server.handleEquipmentReport(buffer)
 	}
 }
