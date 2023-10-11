@@ -14,7 +14,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	}
 
 	// Create test devices
-	var devices []Equipment
+	var devices []EquipmentAuthorization
 	var privKeys []ed25519.PrivateKey
 
 	// Generate test directory and GCA keys
@@ -31,9 +31,9 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
 		pubKey, privKey, _ := ed25519.GenerateKey(nil)
-		device := Equipment{
+		device := EquipmentAuthorization{
 			ShortID: uint32(i),
-			Key:     pubKey,
+			PublicKey:     pubKey,
 		}
 		devices = append(devices, device)
 		privKeys = append(privKeys, privKey)

@@ -31,28 +31,28 @@ func (ea *EquipmentAuthorization) Serialize() []byte {
 }
 
 // Deserialize deserializes a byte slice into an EquipmentAuthorization.
-func Deserialize(data []byte) (*EquipmentAuthorization, error) {
+func Deserialize(data []byte) (EquipmentAuthorization, error) {
 	buf := bytes.NewReader(data)
-	ea := &EquipmentAuthorization{}
+	ea := EquipmentAuthorization{}
 	if err := binary.Read(buf, binary.LittleEndian, &ea.ShortID); err != nil {
-		return nil, err
+		return EquipmentAuthorization{}, err
 	}
 	ea.PublicKey = make([]byte, 32)
 	if err := binary.Read(buf, binary.LittleEndian, &ea.PublicKey); err != nil {
-		return nil, err
+		return EquipmentAuthorization{}, err
 	}
 	if err := binary.Read(buf, binary.LittleEndian, &ea.Capacity); err != nil {
-		return nil, err
+		return EquipmentAuthorization{}, err
 	}
 	if err := binary.Read(buf, binary.LittleEndian, &ea.Debt); err != nil {
-		return nil, err
+		return EquipmentAuthorization{}, err
 	}
 	if err := binary.Read(buf, binary.LittleEndian, &ea.Expiration); err != nil {
-		return nil, err
+		return EquipmentAuthorization{}, err
 	}
 	ea.Signature = make([]byte, 64)
 	if err := binary.Read(buf, binary.LittleEndian, &ea.Signature); err != nil {
-		return nil, err
+		return EquipmentAuthorization{}, err
 	}
 	return ea, nil
 }
@@ -61,7 +61,7 @@ func Deserialize(data []byte) (*EquipmentAuthorization, error) {
 //
 // It uses the public key of the Grid Control Authority (gcaPubkey) to verify the signature.
 // The method returns an error if the verification fails.
-func (gca *GCAServer) verifyEquipmentAuthorization(ea *EquipmentAuthorization) error {
+func (gca *GCAServer) verifyEquipmentAuthorization(ea EquipmentAuthorization) error {
 	// Serialize the EquipmentAuthorization to get the original message.
 	// We exclude the signature part for verification.
 	originalMessage := ea.Serialize()
