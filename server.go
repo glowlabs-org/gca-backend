@@ -14,7 +14,8 @@ import (
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
-	equipment map[uint32]EquipmentAuthorization // Map from a ShortID to the full equipment authorization
+	equipment     map[uint32]EquipmentAuthorization // Map from a ShortID to the full equipment authorization
+	equipmentBans map[uint32]struct{}               // Tracks which equipment is banned
 
 	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers

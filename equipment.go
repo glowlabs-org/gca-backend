@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -23,13 +24,10 @@ func (gcas *GCAServer) addRecentEquipmentAuth(ea EquipmentAuthorization) {
 
 // loadEquipmentAuths is responsible for populating the equipment map
 // using the provided array of EquipmentAuths.
-func (gcas *GCAServer) loadEquipmentAuths(equipment []EquipmentAuthorization) {
-	// Iterate through each piece of equipment in the provided list
-	for _, e := range equipment {
-		// Add the equipment's public key to the equipment map using its ShortID as the key
-		gcas.equipment[e.ShortID] = e
-		gcas.addRecentEquipmentAuth(e)
-	}
+func (gcas *GCAServer) loadEquipmentAuth(ea EquipmentAuthorization) {
+	// Add the equipment's public key to the equipment map using its ShortID as the key
+	gcas.equipment[ea.ShortID] = ea
+	gcas.addRecentEquipmentAuth(ea)
 }
 
 // loadEquipment reads the serialized EquipmentAuthorizations from disk,
@@ -71,7 +69,9 @@ func (gca *GCAServer) loadEquipment() error {
 
 		equipment = append(equipment, ea)
 	}
-	gca.loadEquipmentAuths(equipment)
+	for _, e := range equipment {
+		gca.loadEquipmentAuth(e)
+	}
 
 	return nil
 }
@@ -83,26 +83,57 @@ func (gca *GCAServer) loadEquipment() error {
 // The method returns an error if it fails to open the file, write to it,
 // or close it after writing.
 func (gcas *GCAServer) saveEquipment(ea EquipmentAuthorization) error {
+	// Before saving, check if the equipment is already on the banlist.
+	_, exists := gcas.equipmentBans[ea.ShortID]
+	if exists {
+		return fmt.Errorf("equipment with this ShortID is banned")
+	}
+
+	// Now check if there's already equipment with the same ShortID
+	current, exists := gcas.equipment[ea.ShortID]
+	if exists {
+		// If this is the same equipment, there's no problem.
+		a := current.Serialize()
+		b := ea.Serialize()
+		if bytes.Equal(a, b) {
+			// This exact authorization is already known and saved.
+			// Exit without complaining.
+			return nil
+		}
+	}
+
+	// Save the authorization, whether or not there's a conflict. If there is a
+	// conflict, we need to save the auth so we can prove to other parties that
+	// this ShortID needs to be banned.
+	//
 	// Determine the full path of the 'equipment-authorizations.dat' file within 'baseDir'
 	filePath := filepath.Join(gcas.baseDir, "equipment-authorizations.dat")
-
 	// Open the file in append mode.
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-
 	// Serialize the EquipmentAuthorization to a byte slice
 	serializedData := ea.Serialize()
-
 	// Write the serialized data to the file
 	_, err = file.Write(serializedData)
 	if err != nil {
 		return err
 	}
-
+	// Also add this to the recent equipment list so that the evidence will propagate
+	// to other servers that are trying to sync.
 	gcas.addRecentEquipmentAuth(ea)
 
-	return nil
+	// If there is no conflict, add the new auth and exit.
+	if !exists {
+		gcas.equipment[ea.ShortID] = ea
+		return nil
+	}
+
+	// There is a conflict, so we need to delete the equipment from the list of
+	// equipment and also add a ban.
+	delete(gcas.equipment, ea.ShortID)
+	gcas.equipmentBans[ea.ShortID] = struct{}{}
+	return fmt.Errorf("duplicate authorization received, banning equipment")
 }
