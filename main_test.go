@@ -96,3 +96,11 @@ func generateGCATestKeys(dir string) (ed25519.PrivateKey, error) {
 
 	return privKey, nil
 }
+
+// loadEquipmentAuths is responsible for populating the equipment map
+// using the provided array of EquipmentAuths.
+func (gcas *GCAServer) loadEquipmentAuth(ea EquipmentAuthorization) {
+	// Add the equipment's public key to the equipment map using its ShortID as the key
+	gcas.equipment[ea.ShortID] = ea
+	gcas.addRecentEquipmentAuth(ea)
+}
