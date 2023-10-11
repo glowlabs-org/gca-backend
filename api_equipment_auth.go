@@ -18,6 +18,29 @@ type EquipmentAuthorizationRequest struct {
 	Signature  string `json:"Signature"`
 }
 
+// ToAuthorization converts an EquipmentAuthorizationRequest to an EquipmentAuthorization.
+// It decodes the hex-encoded PublicKey and Signature.
+func (req *EquipmentAuthorizationRequest) ToAuthorization() (EquipmentAuthorization, error) {
+	decodedPublicKey, err := hex.DecodeString(req.PublicKey)
+	if err != nil {
+		return EquipmentAuthorization{}, err
+	}
+
+	decodedSignature, err := hex.DecodeString(req.Signature)
+	if err != nil {
+		return EquipmentAuthorization{}, err
+	}
+
+	return EquipmentAuthorization{
+		ShortID:    req.ShortID,
+		PublicKey:  decodedPublicKey,
+		Capacity:   req.Capacity,
+		Debt:       req.Debt,
+		Expiration: req.Expiration,
+		Signature:  decodedSignature,
+	}, nil
+}
+
 // AuthorizeEquipmentHandler handles the authorization requests for equipment.
 // This function serves as the HTTP handler for equipment authorization.
 func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.Request) {
