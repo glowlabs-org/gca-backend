@@ -85,14 +85,10 @@ func (gcas *GCAServer) authorizeEquipment(req EquipmentAuthorizationRequest) err
 		gcas.logger.Warn("Received bad equipment authorization signature", req)
 		return fmt.Errorf("unable to verify authorization: %v", err)
 	}
-
-	// TODO: Check banlist here. Abort if on banlist.
-
-	// TODO: Need to handle duplicates here. If there is a duplicate, we have
-	// to add this auth to the banlist along with the dual proofs. Duplicate
-	// means two *different* auths that are both signed.
-
-	// Add the equipment to the server.
-	gcas.equipment[auth.ShortID] = auth
+	err = gcas.saveEquipment(auth)
+	if err != nil {
+		gcas.logger.Warn("Unable to save equipment:", auth)
+		return fmt.Errorf("unable to save equipment: %v", err)
+	}
 	return nil
 }

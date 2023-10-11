@@ -38,7 +38,9 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 		devices = append(devices, device)
 		privKeys = append(privKeys, privKey)
 	}
-	server.loadEquipmentAuths(devices)
+	for _, d := range devices {
+		server.loadEquipmentAuth(d)
+	}
 
 	// Submit enough reports to saturate the maxRecentReports field.
 	for i := 0; i < maxRecentReports/50; i++ {
