@@ -22,22 +22,14 @@ func (gcas *GCAServer) addRecentEquipmentAuth(ea EquipmentAuthorization) {
 	}
 }
 
-// loadEquipmentAuths is responsible for populating the equipment map
-// using the provided array of EquipmentAuths.
-func (gcas *GCAServer) loadEquipmentAuth(ea EquipmentAuthorization) {
-	// Add the equipment's public key to the equipment map using its ShortID as the key
-	gcas.equipment[ea.ShortID] = ea
-	gcas.addRecentEquipmentAuth(ea)
-}
-
 // loadEquipment reads the serialized EquipmentAuthorizations from disk,
 // deserializes them, and then verifies each of them.
 //
 // It reads from a file called 'equipment-authorizations.dat' within the 'baseDir' folder.
 // The method creates a new file if the file does not exist.
-func (gca *GCAServer) loadEquipment() error {
+func (gcas *GCAServer) loadEquipment() error {
 	// Determine the full path of the 'equipment-authorizations.dat' file within 'baseDir'
-	filePath := filepath.Join(gca.baseDir, "equipment-authorizations.dat")
+	filePath := filepath.Join(gcas.baseDir, "equipment-authorizations.dat")
 
 	// Attempt to read the file. If it doesn't exist, create it.
 	rawData, err := ioutil.ReadFile(filePath)
@@ -63,14 +55,38 @@ func (gca *GCAServer) loadEquipment() error {
 		}
 
 		// Verify the EquipmentAuthorization
-		if err := gca.verifyEquipmentAuthorization(ea); err != nil {
+		if err := gcas.verifyEquipmentAuthorization(ea); err != nil {
 			return err
 		}
 
 		equipment = append(equipment, ea)
 	}
-	for _, e := range equipment {
-		gca.loadEquipmentAuth(e)
+	for _, ea := range equipment {
+		// Load the equipment, paying close attention to the ban rules.
+		_, exists := gcas.equipmentBans[ea.ShortID]
+		if exists {
+			continue
+		}
+		// Now check if there's already equipment with the same ShortID
+		current, exists := gcas.equipment[ea.ShortID]
+		if exists {
+			// If this is the same equipment, there's no problem.
+			a := current.Serialize()
+			b := ea.Serialize()
+			if bytes.Equal(a, b) {
+				continue
+			}
+		}
+		// Add the auth to the recents either way.
+		gcas.addRecentEquipmentAuth(ea)
+		// If no conflict exists, add the equipment
+		if !exists {
+			gcas.equipment[ea.ShortID] = ea
+			continue
+		}
+		// If a conflict exists, ban the equipment.
+		delete(gcas.equipment, ea.ShortID)
+		gcas.equipmentBans[ea.ShortID] = struct{}{}
 	}
 
 	return nil

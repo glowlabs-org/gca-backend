@@ -22,12 +22,12 @@ type GCAServer struct {
 
 	gcaPubkey ed25519.PublicKey // Public key of the Grid Control Authority
 
-	baseDir    string         // Base directory for server files
-	logger     *Logger        // Custom logger for the server
-	httpServer *http.Server   // Web server for handling API requests
-	mux        *http.ServeMux // Routing for HTTP requests
-	conn       *net.UDPConn   // UDP connection for listening to equipment reports
-	quit       chan bool      // A channel to initiate server shutdown
+	baseDir      string       // Base directory for server files
+	logger       *Logger      // Custom logger for the server
+	httpServer   *http.Server // Web server for handling API requests
+	mux          *http.ServeMux // Routing for HTTP requests
+	conn         *net.UDPConn   // UDP connection for listening to equipment reports
+	quit         chan bool      // A channel to initiate server shutdown
 }
 
 // NewGCAServer initializes a new instance of GCAServer.
@@ -52,6 +52,7 @@ func NewGCAServer(baseDir string) *GCAServer {
 	server := &GCAServer{
 		baseDir:       baseDir,
 		equipment:     make(map[uint32]EquipmentAuthorization),
+		equipmentBans: make(map[uint32]struct{}),
 		recentReports: make([]EquipmentReport, 0, maxRecentReports),
 		logger:        logger,
 		mux:           mux,
@@ -59,7 +60,7 @@ func NewGCAServer(baseDir string) *GCAServer {
 			Addr:    httpPort,
 			Handler: mux,
 		},
-		quit: make(chan bool),
+		quit:         make(chan bool),
 	}
 
 	// Load the Grid Control Authority public key
@@ -88,10 +89,14 @@ func (server *GCAServer) Close() {
 	close(server.quit)
 
 	// Shutdown the HTTP server gracefully
-	if server.httpServer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		server.httpServer.Shutdown(ctx)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Initiate the shutdown.
+	err := server.httpServer.Shutdown(ctx)
+	if err != nil {
+		// Log the error if the shutdown fails.
+		server.logger.Errorf("HTTP server shutdown error: %v", err)
 	}
 
 	// Close the UDP connection
