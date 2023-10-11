@@ -11,29 +11,36 @@ import (
 	"testing"
 )
 
+// TestAuthorizeEquipmentEndpoint is a test function that verifies the functionality
+// of the Authorize Equipment Endpoint in the GCA Server.
 func TestAuthorizeEquipmentEndpoint(t *testing.T) {
-	// Create the GCA keys that need to be in place when the GCA server loads.
+	// Generate test directory and GCA keys
+	// The GCA keys are cryptographic keys needed by the GCA server.
 	dir := generateTestDir(t.Name())
 	gcaPrivKey, err := generateGCATestKeys(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create the GCA Server
+	// Create a new instance of the GCA Server
+	// This is the server that will handle the authorization request.
 	server := NewGCAServer(dir)
-	defer server.Close() // Ensure resources are cleaned up after the test.
+	// Make sure to close the server after the test is complete to free up resources.
+	defer server.Close()
 
-	// Create a mock request
+	// Create a mock request for equipment authorization.
+	// This mimics what a real request might look like.
 	body := EquipmentAuthorizationRequest{
-		ShortID:    12345,
-		PublicKey:  "abcd1234",
-		Capacity:   1000000,
-		Debt:       2000000,
-		Expiration: 2000,
-		Signature:  "efgh5678",
+		ShortID:    12345,      // A unique identifier for the equipment
+		PublicKey:  "abcd1234", // Public key of the equipment for secure communication
+		Capacity:   1000000,    // Storage capacity
+		Debt:       2000000,    // Current debt value
+		Expiration: 2000,       // Expiry time for the equipment
+		Signature:  "efgh5678", // Placeholder for the cryptographic signature
 	}
 
-	// Sign the authorization
+	// Sign the authorization request with GCA's private key.
+	// This ensures that the request is genuine.
 	data := []byte(fmt.Sprintf("%d", body.ShortID))
 	data = append(data, []byte(body.PublicKey)...)
 	data = append(data, []byte(fmt.Sprintf("%d", body.Capacity))...)
@@ -42,25 +49,33 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	signature := ed25519.Sign(gcaPrivKey, data)
 	body.Signature = hex.EncodeToString(signature)
 
-	// Convert request to JSON
+	// Convert the request body to JSON format.
+	// This is necessary for HTTP communication.
 	jsonBody, _ := json.Marshal(body)
+
+	// Perform an HTTP POST request to the authorize-equipment endpoint.
 	resp, err := http.Post("http://localhost"+httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
+	// Close the response body to prevent resource leaks.
 	defer resp.Body.Close()
 
-	// Check for successful response
+	// Check if the HTTP status code is OK (200).
+	// Any other code means something went wrong.
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
 		t.Fatalf("Expected status 200, but got %d. Response: %s", resp.StatusCode, string(bodyBytes))
 	}
 
+	// Decode the JSON response from the server.
 	var response map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
+	// Validate the server's response.
+	// In a successful case, it should return a "status" key with a value of "success".
 	if status, exists := response["status"]; !exists || status != "success" {
 		t.Fatalf("Unexpected response: %v", response)
 	}
