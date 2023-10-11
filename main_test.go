@@ -1,5 +1,7 @@
 package main
 
+// main_test.go contains a set of helpers for the various test files in this package.
+
 import (
 	"crypto/ed25519"
 	"crypto/rand"
