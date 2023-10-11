@@ -10,7 +10,7 @@ import (
 )
 
 // generateTestKeys generates an ed25519 public-private key pair.
-// This is used to simulate devices in our tests.
+// This is used to simulate equipment in our tests.
 func generateTestKeys() (ed25519.PublicKey, ed25519.PrivateKey) {
 	pubKey, privKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -23,18 +23,18 @@ func generateTestKeys() (ed25519.PublicKey, ed25519.PrivateKey) {
 // It ensures that:
 //   - Valid reports are successfully parsed.
 //   - Reports with invalid signatures are rejected.
-//   - Reports from unknown devices are rejected.
-//   - Reports signed by the wrong device are rejected.
+//   - Reports from unknown equipment are rejected.
+//   - Reports signed by the wrong equipment are rejected.
 //   - The values within the report are correctly parsed and verified.
 func TestParseReport(t *testing.T) {
-	// Generate multiple test key pairs for devices.
-	numDevices := 3
-	devices := make([]Device, numDevices)
-	privKeys := make([]ed25519.PrivateKey, numDevices)
+	// Generate multiple test key pairs for equipment.
+	numEquipment := 3
+	equipment := make([]Equipment, numEquipment)
+	privKeys := make([]ed25519.PrivateKey, numEquipment)
 
-	for i := 0; i < numDevices; i++ {
+	for i := 0; i < numEquipment; i++ {
 		pubKey, privKey := generateTestKeys()
-		devices[i] = Device{ShortID: uint32(i), Key: pubKey}
+		equipment[i] = Equipment{ShortID: uint32(i), Key: pubKey}
 		privKeys[i] = privKey
 	}
 
@@ -47,12 +47,12 @@ func TestParseReport(t *testing.T) {
 	server := NewGCAServer(dir)
 	defer server.Close()
 
-	server.loadDeviceKeys(devices)
+	server.loadEquipmentKeys(equipment)
 
-	for i, device := range devices {
+	for i, e := range equipment {
 		// Create a mock valid report for each device.
 		reportData := make([]byte, 16)
-		binary.BigEndian.PutUint32(reportData[0:4], device.ShortID) // Set ShortID
+		binary.BigEndian.PutUint32(reportData[0:4], e.ShortID) // Set ShortID
 		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
 		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
 
@@ -65,8 +65,8 @@ func TestParseReport(t *testing.T) {
 			t.Fatalf("Failed to parse valid report for device %d: %v", i, err)
 		}
 
-		if report.ShortID != device.ShortID {
-			t.Errorf("Unexpected ShortID for device %d: got %v, want %v", i, report.ShortID, device.ShortID)
+		if report.ShortID != e.ShortID {
+			t.Errorf("Unexpected ShortID for device %d: got %v, want %v", i, report.ShortID, e.ShortID)
 		}
 
 		if report.Timeslot != uint32(i*10) {
@@ -78,7 +78,7 @@ func TestParseReport(t *testing.T) {
 		}
 
 		// Report signed by the wrong device (using next device's private key for signature)
-		if i < numDevices-1 {
+		if i < numEquipment-1 {
 			wrongSignature := ed25519.Sign(privKeys[i+1], reportData)
 			wrongFullReport := append(reportData, wrongSignature...)
 			_, err = server.parseReport(wrongFullReport)
@@ -99,9 +99,9 @@ func TestParseReport(t *testing.T) {
 
 	// Test with a device not in the server's list.
 	reportData := make([]byte, 16) // make a blank report for a non-existent device
-	binary.BigEndian.PutUint32(reportData[0:4], uint32(numDevices+1))
+	binary.BigEndian.PutUint32(reportData[0:4], uint32(numEquipment+1))
 	_, err = server.parseReport(append(reportData, invalidSignature...))
-	if err == nil || err.Error() != fmt.Sprintf("unknown device ID: %d", numDevices+1) {
+	if err == nil || err.Error() != fmt.Sprintf("unknown equipment ID: %d", numEquipment+1) {
 		t.Errorf("Expected unknown device ID error, got: %v", err)
 	}
 }
@@ -136,15 +136,15 @@ func TestParseReportIntegration(t *testing.T) {
 
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
-	devices := make([]Device, numDevices)
+	devices := make([]Equipment, numDevices)
 	privKeys := make([]ed25519.PrivateKey, numDevices)
 
 	for i := 0; i < numDevices; i++ {
 		pubKey, privKey := generateTestKeys()
-		devices[i] = Device{ShortID: uint32(i), Key: pubKey}
+		devices[i] = Equipment{ShortID: uint32(i), Key: pubKey}
 		privKeys[i] = privKey
 	}
-	server.loadDeviceKeys(devices)
+	server.loadEquipmentKeys(devices)
 
 	for i, device := range devices {
 		reportData := make([]byte, 16)
@@ -233,7 +233,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	}
 
 	// Create test devices
-	var devices []Device
+	var devices []Equipment
 	var privKeys []ed25519.PrivateKey
 
 	// Generate test directory and GCA keys
@@ -250,14 +250,14 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
 		pubKey, privKey, _ := ed25519.GenerateKey(nil)
-		device := Device{
+		device := Equipment{
 			ShortID: uint32(i),
 			Key:     pubKey,
 		}
 		devices = append(devices, device)
 		privKeys = append(privKeys, privKey)
 	}
-	server.loadDeviceKeys(devices)
+	server.loadEquipmentKeys(devices)
 
 	// Submit enough reports to saturate the maxRecentReports field.
 	for i := 0; i < maxRecentReports/50; i++ {
