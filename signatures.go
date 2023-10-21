@@ -1,0 +1,85 @@
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+// PublicKey represents a 32-byte public key.
+type PublicKey [32]byte
+
+// PrivateKey represents a 32-byte private key.
+type PrivateKey [32]byte
+
+// Signature represents a 64-byte signature.
+type Signature [64]byte
+
+// generateKeyPair generates a new ECDSA private and public key pair.
+// The function panics if there is an error during key generation.
+// It also makes sure that the public key has the prefix 0x02.
+func generateKeyPair() (PublicKey, PrivateKey) {
+	for i := 0; i < 500; i++ {
+		// Generate an ECDSA private key.
+		// The function panics if an error occurs.
+		privateKeyECDSA, err := crypto.GenerateKey()
+		if err != nil {
+			panic("Failed to generate private key: " + err.Error())
+		}
+		var privateKey PrivateKey
+		copy(privateKey[:], crypto.FromECDSA(privateKeyECDSA))
+
+		// Obtain the compressed public key.
+		publicKeyCompressed := crypto.CompressPubkey(&privateKeyECDSA.PublicKey)
+
+		// Check if the public key prefix is 0x02.
+		// If yes, proceed; otherwise, generate a new key pair.
+		if publicKeyCompressed[0] == 0x02 {
+			var publicKey PublicKey
+			copy(publicKey[:], publicKeyCompressed[1:])  // Skip the first byte (0x02 prefix)
+			return publicKey, privateKey
+		}
+	}
+	panic("did not generate a good key in 500 attempts")
+}
+
+// Sign generates an Ethereum signature for given data using a private key.
+func Sign(data []byte, privateKey PrivateKey) (Signature, error) {
+	// Convert back to ecdsa.PrivateKey type from [32]byte
+	privateKeyECDSA, err := crypto.ToECDSA(privateKey[:])
+	if err != nil {
+		return Signature{}, err
+	}
+
+	// Hash the data
+	hash := crypto.Keccak256Hash(data)
+
+	// Sign the hash
+	sig, err := crypto.Sign(hash.Bytes(), privateKeyECDSA)
+	if err != nil {
+		return Signature{}, err
+	}
+
+	// Convert the signature to [64]byte format.
+	var signature Signature
+	copy(signature[:], sig[:64])
+
+	return signature, nil
+}
+
+// Verify checks the Ethereum signature for given data and a public key.
+func Verify(publicKey PublicKey, data []byte, signature Signature) bool {
+	// Add back the 0x02 prefix to the public key.
+	publicKey33 := append([]byte{0x02}, publicKey[:]...)
+
+	// Decompress the public key to get the ECDSA public key
+	publicKeyECDSA, err := crypto.DecompressPubkey(publicKey33)
+	if err != nil {
+		return false
+	}
+
+	// Hash the data
+	hash := crypto.Keccak256Hash(data)
+
+	// Verify the signature
+	return crypto.VerifySignature(crypto.FromECDSAPub(publicKeyECDSA), hash.Bytes(), signature[:])
+}
+
