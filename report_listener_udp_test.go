@@ -40,19 +40,19 @@ func TestParseReport(t *testing.T) {
 	}
 
 	for i, e := range equipment {
-		// Create a mock valid report for each device.
-		reportData := make([]byte, 16)
-		binary.BigEndian.PutUint32(reportData[0:4], e.ShortID)      // Set ShortID
-		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
-		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
-		signature := Sign(reportData, privKeys[i])
-		isValid := Verify(e.PublicKey, reportData, signature)
+		er := EquipmentReport {
+			ShortID: e.ShortID,
+			Timeslot: uint32(i*10),
+			PowerOutput: uint64(i*100),
+		}
+		sb := er.SigningBytes()
+		er.Signature = Sign(sb, privKeys[i])
+		isValid := Verify(e.PublicKey, sb, er.Signature)
 		if !isValid {
 			t.Fatal("Can't even verify my own signature")
 		}
-		fullReport := append(reportData, signature[:]...)
 
-		report, err := server.parseReport(fullReport)
+		report, err := server.parseReport(er.Serialize())
 		if err != nil {
 			t.Fatalf("Failed to parse valid report for device %d: %v", i, err)
 		}
@@ -71,9 +71,8 @@ func TestParseReport(t *testing.T) {
 
 		// Report signed by the wrong device (using next device's private key for signature)
 		if i < numEquipment-1 {
-			wrongSignature := Sign(reportData, privKeys[i+1])
-			wrongFullReport := append(reportData, wrongSignature[:64]...)
-			_, err = server.parseReport(wrongFullReport)
+			er.Signature = Sign(er.Serialize(), privKeys[i+1])
+			_, err = server.parseReport(er.Serialize())
 			if err == nil || err.Error() != "failed to verify signature" {
 				t.Errorf("Expected signature verification failed error for wrong device signature, got: %v", err)
 			}
