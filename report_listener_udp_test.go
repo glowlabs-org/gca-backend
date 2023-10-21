@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
 	"testing"
@@ -20,13 +19,13 @@ func TestParseReport(t *testing.T) {
 	// Generate multiple test key pairs for equipment.
 	numEquipment := 3
 	equipment := make([]EquipmentAuthorization, numEquipment)
-	privKeys := make([]*ecdsa.PrivateKey, numEquipment)
+	privKeys := make([][32]byte, numEquipment)
 
 	for i := 0; i < numEquipment; i++ {
 		pubKey, privKey := generateTestKeys()
 		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
-		copy(equipment[i].PublicKey[:], crypto.FromECDSAPub(pubKey))
-		privKeys[i] = privKey
+		copy(equipment[i].PublicKey[:], crypto.CompressPubkey(pubKey))
+		copy(privKeys[i][:], crypto.FromECDSA(privKey))
 	}
 
 	// Setup the GCAServer with the test keys.
@@ -49,10 +48,18 @@ func TestParseReport(t *testing.T) {
 		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
 		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
 		reportDataHash := crypto.Keccak256Hash(reportData).Bytes()
-		t.Log(reportDataHash)
-		signature, err := crypto.Sign(reportDataHash, privKeys[i])
+		pk, err := crypto.ToECDSA(privKeys[i][:])
 		if err != nil {
 			t.Fatal(err)
+		}
+		signature, err := crypto.Sign(reportDataHash, pk)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signature = signature[:64]
+		isValid := crypto.VerifySignature(crypto.FromECDSAPub(&pk.PublicKey), reportDataHash, signature[:])
+		if !isValid {
+			t.Fatal("Can't even verify my own signature")
 		}
 		fullReport := append(reportData, signature...)
 
@@ -75,11 +82,15 @@ func TestParseReport(t *testing.T) {
 
 		// Report signed by the wrong device (using next device's private key for signature)
 		if i < numEquipment-1 {
-			wrongSignature, err := crypto.Sign(reportDataHash, privKeys[i+1])
+			pk, err := crypto.ToECDSA(privKeys[i+1][:])
 			if err != nil {
 				t.Fatal(err)
 			}
-			wrongFullReport := append(reportData, wrongSignature...)
+			wrongSignature, err := crypto.Sign(reportDataHash, pk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wrongFullReport := append(reportData, wrongSignature[:64]...)
 			_, err = server.parseReport(wrongFullReport)
 			if err == nil || err.Error() != "failed to verify signature" {
 				t.Errorf("Expected signature verification failed error for wrong device signature, got: %v", err)
@@ -88,9 +99,9 @@ func TestParseReport(t *testing.T) {
 	}
 
 	// Test with an invalid signature.
-	invalidSignature := make([]byte, 64) // Just an example of an invalid signature
+	invalidSignature := make([]byte, 65) // Just an example of an invalid signature
 	blankReport := make([]byte, 16)
-	fullReportInvalidSignature := append(blankReport, invalidSignature...)
+	fullReportInvalidSignature := append(blankReport, invalidSignature[:64]...)
 	_, err = server.parseReport(fullReportInvalidSignature)
 	if err == nil || err.Error() != "failed to verify signature" {
 		t.Errorf("Expected signature verification failed error, got: %v", err)
@@ -99,7 +110,7 @@ func TestParseReport(t *testing.T) {
 	// Test with a device not in the server's list.
 	reportData := make([]byte, 16) // make a blank report for a non-existent device
 	binary.BigEndian.PutUint32(reportData[0:4], uint32(numEquipment+1))
-	_, err = server.parseReport(append(reportData, invalidSignature...))
+	_, err = server.parseReport(append(reportData, invalidSignature[:64]...))
 	if err == nil || err.Error() != fmt.Sprintf("unknown equipment ID: %d", numEquipment+1) {
 		t.Errorf("Expected unknown device ID error, got: %v", err)
 	}

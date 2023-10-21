@@ -14,7 +14,7 @@ type EquipmentReport struct {
 	ShortID     uint32 // A unique identifier for the equipment
 	Timeslot    uint32 // A field denoting the time of the report
 	PowerOutput uint64 // The power output from the equipment
-	Signature   [65]byte // A digital signature for the report's authenticity
+	Signature   [64]byte // A digital signature for the report's authenticity
 }
 
 // parseReport converts raw bytes into an EquipmentReport and validates its signature.
@@ -22,8 +22,8 @@ type EquipmentReport struct {
 // equipment ShortIDs to a struct containing their ECDSA public keys.
 func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	var report EquipmentReport
-	if len(rawData) != 81 {
-		return report, fmt.Errorf("unexpected data length: expected 81 bytes, got %d bytes", len(rawData))
+	if len(rawData) != 80 {
+		return report, fmt.Errorf("unexpected data length: expected 80 bytes, got %d bytes", len(rawData))
 	}
 
 	// Populate the EquipmentReport fields
@@ -40,8 +40,7 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 
 	// Hash the data and then verify the signature.
 	hash := crypto.Keccak256(rawData[:16])
-	fmt.Println(hash)
-	if !crypto.VerifySignature(equipment.PublicKey[:], hash, report.Signature[:64]) {
+	if !crypto.VerifySignature(equipment.PublicKey[:], hash, report.Signature[:]) {
 		return report, errors.New("failed to verify signature")
 	}
 
