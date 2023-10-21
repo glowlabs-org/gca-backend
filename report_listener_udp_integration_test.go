@@ -1,8 +1,6 @@
 package main
-/*
+
 import (
-	"crypto/ed25519"
-	"encoding/binary"
 	"testing"
 	"time"
 )
@@ -25,10 +23,10 @@ func TestParseReportIntegration(t *testing.T) {
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
 	devices := make([]EquipmentAuthorization, numDevices)
-	privKeys := make([]ed25519.PrivateKey, numDevices)
+	privKeys := make([]PrivateKey, numDevices)
 
 	for i := 0; i < numDevices; i++ {
-		pubKey, privKey := generateTestKeys()
+		pubKey, privKey := GenerateKeyPair()
 		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
 		privKeys[i] = privKey
 	}
@@ -37,17 +35,16 @@ func TestParseReportIntegration(t *testing.T) {
 	}
 
 	for i, device := range devices {
-		reportData := make([]byte, 16)
-		binary.BigEndian.PutUint32(reportData[0:4], device.ShortID)
-		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))
-		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100))
-
+		er := EquipmentReport {
+			ShortID: device.ShortID,
+			Timeslot: uint32(i*10),
+			PowerOutput: uint64(i*100),
+		}
 		// Correctly signed report
-		signature := ed25519.Sign(privKeys[i], reportData)
-		fullReport := append(reportData, signature...)
+		er.Signature = Sign(er.SigningBytes(), privKeys[i])
 
 		// Send the report over UDP
-		if err := sendUDPReport(fullReport); err != nil {
+		if err := sendUDPReport(er.Serialize()); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 
@@ -77,9 +74,8 @@ func TestParseReportIntegration(t *testing.T) {
 
 		// Report signed by the wrong device (using next device's private key for signature)
 		if i < numDevices-1 {
-			wrongSignature := ed25519.Sign(privKeys[i+1], reportData)
-			wrongFullReport := append(reportData, wrongSignature...)
-			if err := sendUDPReport(wrongFullReport); err != nil {
+			er.Signature = Sign(er.Serialize(), privKeys[i+1])
+			if err := sendUDPReport(er.Serialize()); err != nil {
 				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
 			}
 
@@ -98,4 +94,3 @@ func TestParseReportIntegration(t *testing.T) {
 		}
 	}
 }
-*/
