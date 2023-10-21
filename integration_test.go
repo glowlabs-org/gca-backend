@@ -3,10 +3,11 @@ package main
 // main_test.go contains a set of helpers for the various test files in this package.
 
 import (
-	"crypto/ed25519"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -69,17 +70,21 @@ func generateTestDir(testName string) string {
 	return fullPath
 }
 
-// generateGCATestKeys creates a new Ed25519 key pair for the GCA, saves the public key
-// into a file named "gca.pubkey" within the specified directory, and returns the private key.
+// generateGCATestKeys creates a new ECDSA key pair for the GCA using the secp256k1 curve,
+// saves the public key into a file named "gca.pubkey" within the specified directory,
+// and returns the private key.
 //
 // dir specifies the directory where the public key will be stored.
 // If an error occurs, it returns nil along with the error.
-func generateGCATestKeys(dir string) (ed25519.PrivateKey, error) {
-	// Generate a new Ed25519 key pair
-	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+func generateGCATestKeys(dir string) (*ecdsa.PrivateKey, error) {
+	// Generate a new ECDSA key pair with secp256k1 curve
+	privKey, err := crypto.GenerateKey()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate Ed25519 key pair: %v", err)
+		return nil, fmt.Errorf("failed to generate ECDSA key pair: %v", err)
 	}
+
+	// Serialize the public key to bytes
+	pubKeyBytes := crypto.FromECDSAPub(&privKey.PublicKey)
 
 	// Make sure the directory exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -90,7 +95,7 @@ func generateGCATestKeys(dir string) (ed25519.PrivateKey, error) {
 	pubKeyPath := filepath.Join(dir, "gca.pubkey")
 
 	// Save the public key to a file
-	if err := ioutil.WriteFile(pubKeyPath, pubKey, 0644); err != nil {
+	if err := ioutil.WriteFile(pubKeyPath, pubKeyBytes, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write public key to file: %v", err)
 	}
 

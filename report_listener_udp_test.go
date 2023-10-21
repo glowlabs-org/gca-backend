@@ -1,10 +1,12 @@
 package main
 
 import (
-	"crypto/ed25519"
+	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestParseReport tests the parseReport function of the GCAServer.
@@ -18,11 +20,12 @@ func TestParseReport(t *testing.T) {
 	// Generate multiple test key pairs for equipment.
 	numEquipment := 3
 	equipment := make([]EquipmentAuthorization, numEquipment)
-	privKeys := make([]ed25519.PrivateKey, numEquipment)
+	privKeys := make([]*ecdsa.PrivateKey, numEquipment)
 
 	for i := 0; i < numEquipment; i++ {
 		pubKey, privKey := generateTestKeys()
-		equipment[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
+		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
+		copy(equipment[i].PublicKey[:], crypto.FromECDSAPub(pubKey))
 		privKeys[i] = privKey
 	}
 
@@ -45,9 +48,12 @@ func TestParseReport(t *testing.T) {
 		binary.BigEndian.PutUint32(reportData[0:4], e.ShortID)      // Set ShortID
 		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
 		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
-
-		// Correctly signed report
-		signature := ed25519.Sign(privKeys[i], reportData)
+		reportDataHash := crypto.Keccak256Hash(reportData).Bytes()
+		t.Log(reportDataHash)
+		signature, err := crypto.Sign(reportDataHash, privKeys[i])
+		if err != nil {
+			t.Fatal(err)
+		}
 		fullReport := append(reportData, signature...)
 
 		report, err := server.parseReport(fullReport)
@@ -69,7 +75,10 @@ func TestParseReport(t *testing.T) {
 
 		// Report signed by the wrong device (using next device's private key for signature)
 		if i < numEquipment-1 {
-			wrongSignature := ed25519.Sign(privKeys[i+1], reportData)
+			wrongSignature, err := crypto.Sign(reportDataHash, privKeys[i+1])
+			if err != nil {
+				t.Fatal(err)
+			}
 			wrongFullReport := append(reportData, wrongSignature...)
 			_, err = server.parseReport(wrongFullReport)
 			if err == nil || err.Error() != "failed to verify signature" {
