@@ -11,16 +11,10 @@ func TestSignAndVerify(t *testing.T) {
 	wrongData := []byte("Hello, everyone!")
 
 	// Generate a key pair and sign some data.
-	publicKey, privateKey := generateKeyPair()
-	_, privateKey2 := generateKeyPair()
-	signature, err := Sign(data, privateKey)
-	if err != nil {
-		t.Fatalf("Failed to sign data: %v", err)
-	}
-	wrongSignature, err := Sign(data, privateKey2)
-	if err != nil {
-		t.Fatalf("Failed to sign data: %v", err)
-	}
+	publicKey, privateKey := GenerateKeyPair()
+	_, privateKey2 := GenerateKeyPair()
+	signature := Sign(data, privateKey)
+	wrongSignature := Sign(data, privateKey2)
 
 	// Verify the signature
 	isValid := Verify(publicKey, data, signature)

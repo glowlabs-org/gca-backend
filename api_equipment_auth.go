@@ -21,7 +21,7 @@ type EquipmentAuthorizationRequest struct {
 // ToAuthorization converts an EquipmentAuthorizationRequest to an EquipmentAuthorization.
 // It decodes the hex-encoded PublicKey and Signature.
 func (req *EquipmentAuthorizationRequest) ToAuthorization() (EquipmentAuthorization, error) {
-	if len(req.PublicKey) != 66 {
+	if len(req.PublicKey) != 64 {
 		return EquipmentAuthorization{}, errors.New("public key is wrong length")
 	}
 	decodedPublicKey, err := hex.DecodeString(req.PublicKey)
@@ -29,7 +29,7 @@ func (req *EquipmentAuthorizationRequest) ToAuthorization() (EquipmentAuthorizat
 		return EquipmentAuthorization{}, err
 	}
 
-	if len(req.Signature) != 130 {
+	if len(req.Signature) != 128 {
 		return EquipmentAuthorization{}, fmt.Errorf("signature is wrong length: %v", len(req.Signature))
 	}
 	decodedSignature, err := hex.DecodeString(req.Signature)

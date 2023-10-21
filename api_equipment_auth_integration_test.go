@@ -7,8 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestAuthorizeEquipmentIntegration checks that the full flow for
@@ -27,11 +25,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Create the http request that will authorize new equipment.
 	body := EquipmentAuthorizationRequest{
 		ShortID:    12345,                                                                // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
 		Capacity:   1000000,                                                              // Storage capacity
 		Debt:       2000000,                                                              // Current debt value
 		Expiration: 2000,                                                                 // Expiry time for the equipment
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err := body.ToAuthorization()
 	if err != nil {
@@ -39,11 +37,8 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature, err := crypto.Sign(sb, gcaPrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body.Signature = hex.EncodeToString(signature)
+	signature := Sign(sb, gcaPrivKey)
+	body.Signature = hex.EncodeToString(signature[:])
 	// Convert the request body to JSON format.
 	jsonBody, _ := json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
@@ -98,11 +93,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Send a new request, this time with the same ShortID. The server should add the ShortID to the banlist.
 	body = EquipmentAuthorizationRequest{
 		ShortID:    12345,                                                                // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
 		Capacity:   1000000,                                                              // Storage capacity
 		Debt:       2400000,                                                              // Current debt value
 		Expiration: 2000,                                                                 // Expiry time for the equipment
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err = body.ToAuthorization()
 	if err != nil {
@@ -110,11 +105,8 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	// Sign the authorization request with GCA's private key.
 	sb = ea.SigningBytes()
-	signature, err = crypto.Sign(sb, gcaPrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body.Signature = hex.EncodeToString(signature)
+	signature = Sign(sb, gcaPrivKey)
+	body.Signature = hex.EncodeToString(signature[:])
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
@@ -146,11 +138,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Send a new request, this time with a new ShortID.
 	body = EquipmentAuthorizationRequest{
 		ShortID:    12346,                                                                // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
 		Capacity:   1000000,                                                              // Storage capacity
 		Debt:       2400000,                                                              // Current debt value
 		Expiration: 2000,                                                                 // Expiry time for the equipment
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err = body.ToAuthorization()
 	if err != nil {
@@ -158,11 +150,8 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	// Sign the authorization request with GCA's private key.
 	sb = ea.SigningBytes()
-	signature, err = crypto.Sign(sb, gcaPrivKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body.Signature = hex.EncodeToString(signature)
+	signature = Sign(sb, gcaPrivKey)
+	body.Signature = hex.EncodeToString(signature[:])
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
