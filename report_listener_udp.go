@@ -1,42 +1,47 @@
 package main
 
 import (
-	"crypto/ed25519"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // EquipmentReport defines the structure for a report received from a piece of equipment.
 type EquipmentReport struct {
-	ShortID     uint32   // A unique identifier for the equipment
-	Timeslot    uint32   // A field denoting the time of the report
-	PowerOutput uint64   // The power output from the equipment
-	Signature   [64]byte // A digital signature for the report's authenticity
+	ShortID     uint32 // A unique identifier for the equipment
+	Timeslot    uint32 // A field denoting the time of the report
+	PowerOutput uint64 // The power output from the equipment
+	Signature   [65]byte // A digital signature for the report's authenticity
 }
 
 // parseReport converts raw bytes into an EquipmentReport and validates its signature.
+// This function assumes the server object has a map called 'equipment' which maps
+// equipment ShortIDs to a struct containing their ECDSA public keys.
 func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	var report EquipmentReport
-
-	// Check for the correct data length
-	if len(rawData) != 80 {
-		return report, fmt.Errorf("unexpected data length: expected 80 bytes, got %d bytes", len(rawData))
+	if len(rawData) != 81 {
+		return report, fmt.Errorf("unexpected data length: expected 81 bytes, got %d bytes", len(rawData))
 	}
 
 	// Populate the EquipmentReport fields
 	report.ShortID = binary.BigEndian.Uint32(rawData[0:4])
 	report.Timeslot = binary.BigEndian.Uint32(rawData[4:8])
 	report.PowerOutput = binary.BigEndian.Uint64(rawData[8:16])
-	copy(report.Signature[:], rawData[16:80])
+	copy(report.Signature[:], rawData[16:])
 
 	// Validate the signature and the ShortID
 	equipment, ok := server.equipment[report.ShortID]
 	if !ok {
 		return report, fmt.Errorf("unknown equipment ID: %d", report.ShortID)
 	}
-	if !ed25519.Verify(equipment.PublicKey, rawData[:16], report.Signature[:]) {
+
+	// Hash the data and then verify the signature.
+	hash := crypto.Keccak256(rawData[:16])
+	fmt.Println(hash)
+	if !crypto.VerifySignature(equipment.PublicKey[:], hash, report.Signature[:64]) {
 		return report, errors.New("failed to verify signature")
 	}
 

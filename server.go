@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/ed25519"
+	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // GCAServer defines the structure for our Grid Control Authority Server.
@@ -20,14 +22,14 @@ type GCAServer struct {
 	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
 
-	gcaPubkey ed25519.PublicKey // Public key of the Grid Control Authority
+	gcaPubkey *ecdsa.PublicKey // Public key of the Glow Certification Agent.
 
-	baseDir      string       // Base directory for server files
-	logger       *Logger      // Custom logger for the server
-	httpServer   *http.Server // Web server for handling API requests
-	mux          *http.ServeMux // Routing for HTTP requests
-	conn         *net.UDPConn   // UDP connection for listening to equipment reports
-	quit         chan bool      // A channel to initiate server shutdown
+	baseDir    string         // Base directory for server files
+	logger     *Logger        // Custom logger for the server
+	httpServer *http.Server   // Web server for handling API requests
+	mux        *http.ServeMux // Routing for HTTP requests
+	conn       *net.UDPConn   // UDP connection for listening to equipment reports
+	quit       chan bool      // A channel to initiate server shutdown
 }
 
 // NewGCAServer initializes a new instance of GCAServer.
@@ -60,10 +62,10 @@ func NewGCAServer(baseDir string) *GCAServer {
 			Addr:    httpPort,
 			Handler: mux,
 		},
-		quit:         make(chan bool),
+		quit: make(chan bool),
 	}
 
-	// Load the Grid Control Authority public key
+	// Load the Glow Certification Agent public key
 	if err := server.loadGCAPubkey(); err != nil {
 		logger.Fatal("Failed to load GCA public key: ", err)
 	}
@@ -108,13 +110,16 @@ func (server *GCAServer) Close() {
 	server.logger.Close()
 }
 
-// loadGCAPubkey loads the Grid Control Authority public key from a file.
+// loadGCAPubkey loads the Glow Certification Agent public key from a file.
 func (server *GCAServer) loadGCAPubkey() error {
 	pubkeyPath := filepath.Join(server.baseDir, "gca.pubkey")
 	pubkeyData, err := ioutil.ReadFile(pubkeyPath)
 	if err != nil {
 		return fmt.Errorf("unable to read public key from file: %v", err)
 	}
-	server.gcaPubkey = ed25519.PublicKey(pubkeyData)
+	server.gcaPubkey, err = crypto.UnmarshalPubkey(pubkeyData)
+	if err != nil {
+		return fmt.Errorf("unable to unmarshal ECDSA public key: %v", err)
+	}
 	return nil
 }

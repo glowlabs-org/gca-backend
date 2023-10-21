@@ -2,12 +2,13 @@ package main
 
 import (
 	"bytes"
-	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestAuthorizeEquipmentIntegration checks that the full flow for
@@ -25,20 +26,23 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Create the http request that will authorize new equipment.
 	body := EquipmentAuthorizationRequest{
-		ShortID:    12345,                                                              // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                            // Storage capacity
-		Debt:       2000000,                                                            // Current debt value
-		Expiration: 2000,                                                               // Expiry time for the equipment
-		Signature:  "",                                                                 // Placeholder for the cryptographic signature
+		ShortID:    12345,                                                                // A unique identifier for the equipment
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		Capacity:   1000000,                                                              // Storage capacity
+		Debt:       2000000,                                                              // Current debt value
+		Expiration: 2000,                                                                 // Expiry time for the equipment
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err := body.ToAuthorization()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Sign the authorization request with GCA's private key.
-	raw := ea.Serialize()
-	signature := ed25519.Sign(gcaPrivKey, raw)
+	sb := ea.SigningBytes()
+	signature, err := crypto.Sign(sb, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	body.Signature = hex.EncodeToString(signature)
 	// Convert the request body to JSON format.
 	jsonBody, _ := json.Marshal(body)
@@ -47,7 +51,6 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
-
 	// Check if the HTTP status code is OK (200).
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
@@ -91,23 +94,26 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 		t.Fatal("server did not receive equipment")
 	}
 	resp.Body.Close()
-	
+
 	// Send a new request, this time with the same ShortID. The server should add the ShortID to the banlist.
 	body = EquipmentAuthorizationRequest{
-		ShortID:    12345,                                                              // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                            // Storage capacity
-		Debt:       2400000,                                                            // Current debt value
-		Expiration: 2000,                                                               // Expiry time for the equipment
-		Signature:  "",                                                                 // Placeholder for the cryptographic signature
+		ShortID:    12345,                                                                // A unique identifier for the equipment
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		Capacity:   1000000,                                                              // Storage capacity
+		Debt:       2400000,                                                              // Current debt value
+		Expiration: 2000,                                                                 // Expiry time for the equipment
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err = body.ToAuthorization()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Sign the authorization request with GCA's private key.
-	raw = ea.Serialize()
-	signature = ed25519.Sign(gcaPrivKey, raw)
+	sb = ea.SigningBytes()
+	signature, err = crypto.Sign(sb, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	body.Signature = hex.EncodeToString(signature)
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
@@ -118,7 +124,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	// Close the response body to prevent resource leaks.
 	resp.Body.Close()
-	
+
 	// The equipment should be gone now, because it should have been banned.
 	if len(server.equipment) == 1 {
 		t.Fatal("server did not ban equipment")
@@ -126,7 +132,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if len(server.equipmentBans) != 1 {
 		t.Fatal("bad")
 	}
-	
+
 	// Restart the server again, make sure that the equipment is still banned.
 	server.Close()
 	server = NewGCAServer(dir)
@@ -136,23 +142,26 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if len(server.equipmentBans) != 1 {
 		t.Fatal("bad")
 	}
-	
+
 	// Send a new request, this time with a new ShortID.
 	body = EquipmentAuthorizationRequest{
-		ShortID:    12346,                                                              // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                            // Storage capacity
-		Debt:       2400000,                                                            // Current debt value
-		Expiration: 2000,                                                               // Expiry time for the equipment
-		Signature:  "",                                                                 // Placeholder for the cryptographic signature
+		ShortID:    12346,                                                                // A unique identifier for the equipment
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
+		Capacity:   1000000,                                                              // Storage capacity
+		Debt:       2400000,                                                              // Current debt value
+		Expiration: 2000,                                                                 // Expiry time for the equipment
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err = body.ToAuthorization()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Sign the authorization request with GCA's private key.
-	raw = ea.Serialize()
-	signature = ed25519.Sign(gcaPrivKey, raw)
+	sb = ea.SigningBytes()
+	signature, err = crypto.Sign(sb, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 	body.Signature = hex.EncodeToString(signature)
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
@@ -169,7 +178,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if len(server.equipmentBans) != 1 {
 		t.Fatal("bad")
 	}
-	
+
 	// Restart the server again, make sure the state is maintained.
 	server.Close()
 	server = NewGCAServer(dir)

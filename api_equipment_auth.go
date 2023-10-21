@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -20,24 +21,32 @@ type EquipmentAuthorizationRequest struct {
 // ToAuthorization converts an EquipmentAuthorizationRequest to an EquipmentAuthorization.
 // It decodes the hex-encoded PublicKey and Signature.
 func (req *EquipmentAuthorizationRequest) ToAuthorization() (EquipmentAuthorization, error) {
+	if len(req.PublicKey) != 66 {
+		return EquipmentAuthorization{}, errors.New("public key is wrong length")
+	}
 	decodedPublicKey, err := hex.DecodeString(req.PublicKey)
 	if err != nil {
 		return EquipmentAuthorization{}, err
 	}
 
+	if len(req.Signature) != 130 {
+		return EquipmentAuthorization{}, fmt.Errorf("signature is wrong length: %v", len(req.Signature))
+	}
 	decodedSignature, err := hex.DecodeString(req.Signature)
 	if err != nil {
 		return EquipmentAuthorization{}, err
 	}
 
-	return EquipmentAuthorization{
+	ea := EquipmentAuthorization{
 		ShortID:    req.ShortID,
-		PublicKey:  decodedPublicKey,
 		Capacity:   req.Capacity,
 		Debt:       req.Debt,
 		Expiration: req.Expiration,
-		Signature:  decodedSignature,
-	}, nil
+	}
+	copy(ea.PublicKey[:], decodedPublicKey)
+	copy(ea.Signature[:], decodedSignature)
+
+	return ea, nil
 }
 
 // AuthorizeEquipmentHandler handles the authorization requests for equipment.
@@ -60,7 +69,7 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 
 	// Validate and process the request
 	if err := gca.authorizeEquipment(request); err != nil {
-		http.Error(w, "Failed to authorize equipment.", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprint("Failed to authorize equipment:", err), http.StatusInternalServerError)
 		gca.logger.Error("Failed to authorize equipment: ", err)
 		return
 	}

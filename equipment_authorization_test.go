@@ -1,35 +1,43 @@
 package main
 
 import (
-	"crypto/ed25519"
-	"reflect"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// TestSerialization ensures that a serialized and deserialized EquipmentAuthorization
-// have the same values.
-func TestSerialization(t *testing.T) {
-	pubKey, _ := generateTestKeys()
+// Test function to check the serialization and deserialization
+//
+// This function serializes and then deserializes an EquipmentAuthorization
+// object to ensure that the serialization and deserialization functions work as expected.
+func TestEquipmentAuthSerialization(t *testing.T) {
+	// Sample EquipmentAuthorization object for testing
 	ea := EquipmentAuthorization{
-		ShortID:    1,
-		PublicKey:  pubKey,
-		Capacity:   100,
-		Debt:       50,
-		Expiration: 50000,
-		Signature:  make([]byte, 64),
+		ShortID:    12345,
+		PublicKey:  [33]byte{1, 2, 3, 4, 5}, // Shortened for demonstration
+		Capacity:   67890,
+		Debt:       111213,
+		Expiration: 141516,
+		Signature:  [65]byte{17, 18, 19, 20}, // Shortened for demonstration
 	}
-	data := ea.Serialize()
-	deserializedEA, err := Deserialize(data)
 
+	// Serialize the object
+	serialized := ea.Serialize()
+
+	// Deserialize the object
+	deserialized, err := Deserialize(serialized)
 	if err != nil {
-		t.Errorf("Deserialize returned error: %v", err)
+		t.Fatal("Error deserializing:", err)
+		return
 	}
 
-	if !reflect.DeepEqual(ea, deserializedEA) {
-		t.Errorf("Original and deserialized structs are not the same: got %v, want %v", deserializedEA, ea)
+	// Compare the original and deserialized objects
+	if ea != deserialized {
+		t.Fatal("Serialization and deserialization failed.")
 	}
 }
 
+// Perform an integration test for the equipment authorizations.
 func TestVerifyEquipmentAuthorization(t *testing.T) {
 	// Test setup
 	dir := generateTestDir(t.Name())
@@ -43,13 +51,17 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 	// Create and sign a valid EquipmentAuthorization
 	ea := EquipmentAuthorization{
 		ShortID:    1,
-		PublicKey:  ed25519.PublicKey{},
+		PublicKey:  [33]byte{1},
 		Capacity:   100,
 		Debt:       0,
 		Expiration: 1000,
 	}
-	eaBytes := ea.Serialize() // Assuming Serialize() doesn't include Signature
-	ea.Signature = ed25519.Sign(gcaPrivateKey, eaBytes)
+	signingBytes := ea.SigningBytes()
+	signature, err := crypto.Sign(signingBytes, gcaPrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy(ea.Signature[:], signature)
 
 	// Test case 1: Valid EquipmentAuthorization should pass verification
 	if err := server.verifyEquipmentAuthorization(ea); err != nil {
@@ -59,13 +71,17 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 	// Create and sign an invalid EquipmentAuthorization
 	eaInvalid := EquipmentAuthorization{
 		ShortID:    2,
-		PublicKey:  ed25519.PublicKey{},
+		PublicKey:  [33]byte{2},
 		Capacity:   200,
 		Debt:       50,
 		Expiration: 2000,
 	}
-	eaInvalidBytes := eaInvalid.Serialize()
-	eaInvalid.Signature = ed25519.Sign(gcaPrivateKey, eaInvalidBytes)
+	eaInvalidBytes := eaInvalid.SigningBytes()
+	signatureInvalid, err := crypto.Sign(eaInvalidBytes, gcaPrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy(eaInvalid.Signature[:], signatureInvalid)
 
 	// Tamper with the EquipmentAuthorization to make it invalid
 	eaInvalid.Debt = 100
