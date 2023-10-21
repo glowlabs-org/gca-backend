@@ -1,7 +1,6 @@
 package main
-/*
+
 import (
-	"crypto/ed25519"
 	"testing"
 )
 
@@ -15,7 +14,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 
 	// Create test devices
 	var devices []EquipmentAuthorization
-	var privKeys []ed25519.PrivateKey
+	var privKeys []PrivateKey
 
 	// Generate test directory and GCA keys
 	dir := generateTestDir(t.Name())
@@ -30,7 +29,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
-		pubKey, privKey, _ := ed25519.GenerateKey(nil)
+		pubKey, privKey := GenerateKeyPair()
 		device := EquipmentAuthorization{
 			ShortID:   uint32(i),
 			PublicKey: pubKey,
@@ -87,4 +86,4 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 		}
 	}
 }
-*/
+
