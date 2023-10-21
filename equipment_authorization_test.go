@@ -2,8 +2,6 @@ package main
 
 import (
 	"testing"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Test function to check the serialization and deserialization
@@ -14,11 +12,11 @@ func TestEquipmentAuthSerialization(t *testing.T) {
 	// Sample EquipmentAuthorization object for testing
 	ea := EquipmentAuthorization{
 		ShortID:    12345,
-		PublicKey:  [33]byte{1, 2, 3, 4, 5}, // Shortened for demonstration
+		PublicKey:  [32]byte{1, 2, 3, 4, 5}, // Shortened for demonstration
 		Capacity:   67890,
 		Debt:       111213,
 		Expiration: 141516,
-		Signature:  [65]byte{17, 18, 19, 20}, // Shortened for demonstration
+		Signature:  [64]byte{17, 18, 19, 20}, // Shortened for demonstration
 	}
 
 	// Serialize the object
@@ -51,17 +49,13 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 	// Create and sign a valid EquipmentAuthorization
 	ea := EquipmentAuthorization{
 		ShortID:    1,
-		PublicKey:  [33]byte{1},
+		PublicKey:  [32]byte{1},
 		Capacity:   100,
 		Debt:       0,
 		Expiration: 1000,
 	}
 	signingBytes := ea.SigningBytes()
-	signature, err := crypto.Sign(signingBytes, gcaPrivateKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	copy(ea.Signature[:], signature)
+	ea.Signature = Sign(signingBytes, gcaPrivateKey)
 
 	// Test case 1: Valid EquipmentAuthorization should pass verification
 	if err := server.verifyEquipmentAuthorization(ea); err != nil {
@@ -71,17 +65,13 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 	// Create and sign an invalid EquipmentAuthorization
 	eaInvalid := EquipmentAuthorization{
 		ShortID:    2,
-		PublicKey:  [33]byte{2},
+		PublicKey:  [32]byte{2},
 		Capacity:   200,
 		Debt:       50,
 		Expiration: 2000,
 	}
 	eaInvalidBytes := eaInvalid.SigningBytes()
-	signatureInvalid, err := crypto.Sign(eaInvalidBytes, gcaPrivateKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	copy(eaInvalid.Signature[:], signatureInvalid)
+	ea.Signature = Sign(eaInvalidBytes, gcaPrivateKey)
 
 	// Tamper with the EquipmentAuthorization to make it invalid
 	eaInvalid.Debt = 100

@@ -3,19 +3,17 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // EquipmentAuthorization struct reflects an authorization request,
 // except PublicKey and Signature are byte slices for the secp256k1 algorithm.
 type EquipmentAuthorization struct {
 	ShortID    uint32
-	PublicKey  [33]byte
+	PublicKey  [32]byte
 	Capacity   uint64
 	Debt       uint64
 	Expiration uint32
-	Signature  [65]byte
+	Signature  [64]byte
 }
 
 // SigningBytes generates the byte slice for signing.
@@ -30,29 +28,16 @@ func (ea *EquipmentAuthorization) SigningBytes() []byte {
 
 	// Initialize a byte slice with a length sufficient to hold all serialized fields except Signature
 	// Added length of prefixBytes for the "EquipmentAuthorization" prefix
-	data := make([]byte, len(prefixBytes)+4+33+8+8+4)
+	data := make([]byte, len(prefixBytes)+4+32+8+8+4)
 
-	// Add the prefix to the byte slice
+	// Serialize all the fields.
 	copy(data[0:len(prefixBytes)], prefixBytes)
-
-	// Serialize ShortID
 	binary.LittleEndian.PutUint32(data[len(prefixBytes):len(prefixBytes)+4], ea.ShortID)
-
-	// Serialize PublicKey (updated to 33 bytes)
-	copy(data[len(prefixBytes)+4:len(prefixBytes)+37], ea.PublicKey[:])
-
-	// Serialize Capacity
-	binary.LittleEndian.PutUint64(data[len(prefixBytes)+37:len(prefixBytes)+45], ea.Capacity)
-
-	// Serialize Debt
-	binary.LittleEndian.PutUint64(data[len(prefixBytes)+45:len(prefixBytes)+53], ea.Debt)
-
-	// Serialize Expiration
-	binary.LittleEndian.PutUint32(data[len(prefixBytes)+53:len(prefixBytes)+57], ea.Expiration)
-
-	// Return the byte slice for signing
-	hash := crypto.Keccak256Hash(data).Bytes()
-	return hash
+	copy(data[len(prefixBytes)+4:len(prefixBytes)+36], ea.PublicKey[:])
+	binary.LittleEndian.PutUint64(data[len(prefixBytes)+36:len(prefixBytes)+44], ea.Capacity)
+	binary.LittleEndian.PutUint64(data[len(prefixBytes)+44:len(prefixBytes)+52], ea.Debt)
+	binary.LittleEndian.PutUint32(data[len(prefixBytes)+52:len(prefixBytes)+56], ea.Expiration)
+	return data
 }
 
 // Serialize serializes the EquipmentAuthorization into a byte slice.
@@ -62,27 +47,15 @@ func (ea *EquipmentAuthorization) SigningBytes() []byte {
 // It returns the byte slice containing the serialized data.
 func (ea *EquipmentAuthorization) Serialize() []byte {
 	// Initialize a byte slice with a length sufficient to hold all serialized fields
-	data := make([]byte, 4+33+8+8+4+65) // Updated to account for 33-byte PublicKey
+	data := make([]byte, 4+32+8+8+4+64) // Updated to account for 33-byte PublicKey
 
-	// Serialize ShortID
+	// Serialize all the fields.
 	binary.LittleEndian.PutUint32(data[0:4], ea.ShortID)
-
-	// Serialize PublicKey (updated to 33 bytes)
-	copy(data[4:37], ea.PublicKey[:]) // Updated indices
-
-	// Serialize Capacity
-	binary.LittleEndian.PutUint64(data[37:45], ea.Capacity) // Updated indices
-
-	// Serialize Debt
-	binary.LittleEndian.PutUint64(data[45:53], ea.Debt) // Updated indices
-
-	// Serialize Expiration
-	binary.LittleEndian.PutUint32(data[53:57], ea.Expiration) // Updated indices
-
-	// Serialize Signature
-	copy(data[57:], ea.Signature[:]) // Updated indices
-
-	// Return the serialized byte slice
+	copy(data[4:36], ea.PublicKey[:]) // Updated indices
+	binary.LittleEndian.PutUint64(data[36:44], ea.Capacity) // Updated indices
+	binary.LittleEndian.PutUint64(data[44:52], ea.Debt) // Updated indices
+	binary.LittleEndian.PutUint32(data[52:56], ea.Expiration) // Updated indices
+	copy(data[56:], ea.Signature[:]) // Updated indices
 	return data
 }
 
@@ -96,29 +69,17 @@ func Deserialize(data []byte) (EquipmentAuthorization, error) {
 	var ea EquipmentAuthorization
 
 	// Check for minimum required length (updated to account for 33-byte PublicKey)
-	if len(data) != 122 { // Updated total size
+	if len(data) != 120 { // Updated total size
 		return ea, errors.New("input is not the correct length to be an EquipmentAuthorization")
 	}
 
-	// Deserialize ShortID
+	// Deserialize all the fields
 	ea.ShortID = binary.LittleEndian.Uint32(data[0:4])
-
-	// Deserialize PublicKey (updated to 33 bytes)
-	copy(ea.PublicKey[:], data[4:37]) // Updated indices
-
-	// Deserialize Capacity
-	ea.Capacity = binary.LittleEndian.Uint64(data[37:45]) // Updated indices
-
-	// Deserialize Debt
-	ea.Debt = binary.LittleEndian.Uint64(data[45:53]) // Updated indices
-
-	// Deserialize Expiration
-	ea.Expiration = binary.LittleEndian.Uint32(data[53:57]) // Updated indices
-
-	// Deserialize Signature
-	copy(ea.Signature[:], data[57:]) // Updated indices
-
-	// Return the deserialized object and nil error
+	copy(ea.PublicKey[:], data[4:36]) // Updated indices
+	ea.Capacity = binary.LittleEndian.Uint64(data[36:44]) // Updated indices
+	ea.Debt = binary.LittleEndian.Uint64(data[44:52]) // Updated indices
+	ea.Expiration = binary.LittleEndian.Uint32(data[52:56]) // Updated indices
+	copy(ea.Signature[:], data[56:]) // Updated indices
 	return ea, nil
 }
 
@@ -127,11 +88,8 @@ func Deserialize(data []byte) (EquipmentAuthorization, error) {
 // It uses the public key of the Grid Control Authority (gcaPubkey) to verify the signature.
 // The method returns an error if the verification fails.
 func (gcas *GCAServer) verifyEquipmentAuthorization(ea EquipmentAuthorization) error {
-	// Generate the signing bytes for the EquipmentAuthorization
 	signingBytes := ea.SigningBytes()
-
-	// Verify the signature using Ethereum's crypto.VerifySignature
-	isValid := crypto.VerifySignature(crypto.FromECDSAPub(gcas.gcaPubkey), signingBytes, ea.Signature[:64])
+	isValid := Verify(gcas.gcaPubkey, signingBytes, ea.Signature)
 	if !isValid {
 		return errors.New("invalid signature on EquipmentAuthorization")
 	}

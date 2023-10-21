@@ -49,7 +49,7 @@ func (gcas *GCAServer) loadEquipment() error {
 	buffer := bytes.NewBuffer(rawData)
 	for buffer.Len() > 0 {
 		// Deserialize the EquipmentAuthorization
-		ea, err := Deserialize(buffer.Next(122)) // 122 bytes = 4 (ShortID) + 33 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 65 (Signature)
+		ea, err := Deserialize(buffer.Next(120)) // 120 bytes = 4 (ShortID) + 32 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 64 (Signature)
 		if err != nil {
 			return err
 		}

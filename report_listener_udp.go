@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // EquipmentReport defines the structure for a report received from a piece of equipment.
@@ -39,8 +37,7 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	}
 
 	// Hash the data and then verify the signature.
-	hash := crypto.Keccak256(rawData[:16])
-	if !crypto.VerifySignature(equipment.PublicKey[:], hash, report.Signature[:]) {
+	if !Verify(equipment.PublicKey, rawData[:16], report.Signature) {
 		return report, errors.New("failed to verify signature")
 	}
 

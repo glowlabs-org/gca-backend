@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestParseReport tests the parseReport function of the GCAServer.
@@ -19,13 +17,13 @@ func TestParseReport(t *testing.T) {
 	// Generate multiple test key pairs for equipment.
 	numEquipment := 3
 	equipment := make([]EquipmentAuthorization, numEquipment)
-	privKeys := make([][32]byte, numEquipment)
+	privKeys := make([]PrivateKey, numEquipment)
 
 	for i := 0; i < numEquipment; i++ {
-		pubKey, privKey := generateTestKeys()
+		pubKey, privKey := GenerateKeyPair()
 		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
-		copy(equipment[i].PublicKey[:], crypto.CompressPubkey(pubKey))
-		copy(privKeys[i][:], crypto.FromECDSA(privKey))
+		equipment[i].PublicKey = pubKey
+		privKeys[i] = privKey
 	}
 
 	// Setup the GCAServer with the test keys.
@@ -47,21 +45,12 @@ func TestParseReport(t *testing.T) {
 		binary.BigEndian.PutUint32(reportData[0:4], e.ShortID)      // Set ShortID
 		binary.BigEndian.PutUint32(reportData[4:8], uint32(i*10))   // Example Timeslot based on i
 		binary.BigEndian.PutUint64(reportData[8:16], uint64(i*100)) // Example PowerOutput based on i
-		reportDataHash := crypto.Keccak256Hash(reportData).Bytes()
-		pk, err := crypto.ToECDSA(privKeys[i][:])
-		if err != nil {
-			t.Fatal(err)
-		}
-		signature, err := crypto.Sign(reportDataHash, pk)
-		if err != nil {
-			t.Fatal(err)
-		}
-		signature = signature[:64]
-		isValid := crypto.VerifySignature(crypto.FromECDSAPub(&pk.PublicKey), reportDataHash, signature[:])
+		signature := Sign(reportData, privKeys[i])
+		isValid := Verify(e.PublicKey, reportData, signature)
 		if !isValid {
 			t.Fatal("Can't even verify my own signature")
 		}
-		fullReport := append(reportData, signature...)
+		fullReport := append(reportData, signature[:]...)
 
 		report, err := server.parseReport(fullReport)
 		if err != nil {
@@ -82,14 +71,7 @@ func TestParseReport(t *testing.T) {
 
 		// Report signed by the wrong device (using next device's private key for signature)
 		if i < numEquipment-1 {
-			pk, err := crypto.ToECDSA(privKeys[i+1][:])
-			if err != nil {
-				t.Fatal(err)
-			}
-			wrongSignature, err := crypto.Sign(reportDataHash, pk)
-			if err != nil {
-				t.Fatal(err)
-			}
+			wrongSignature := Sign(reportData, privKeys[i+1])
 			wrongFullReport := append(reportData, wrongSignature[:64]...)
 			_, err = server.parseReport(wrongFullReport)
 			if err == nil || err.Error() != "failed to verify signature" {

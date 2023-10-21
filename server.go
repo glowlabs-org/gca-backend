@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -10,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // GCAServer defines the structure for our Grid Control Authority Server.
@@ -22,7 +19,7 @@ type GCAServer struct {
 	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
 
-	gcaPubkey *ecdsa.PublicKey // Public key of the Glow Certification Agent.
+	gcaPubkey PublicKey // Public key of the Glow Certification Agent.
 
 	baseDir    string         // Base directory for server files
 	logger     *Logger        // Custom logger for the server
@@ -117,9 +114,6 @@ func (server *GCAServer) loadGCAPubkey() error {
 	if err != nil {
 		return fmt.Errorf("unable to read public key from file: %v", err)
 	}
-	server.gcaPubkey, err = crypto.UnmarshalPubkey(pubkeyData)
-	if err != nil {
-		return fmt.Errorf("unable to unmarshal ECDSA public key: %v", err)
-	}
+	copy(server.gcaPubkey[:], pubkeyData)
 	return nil
 }

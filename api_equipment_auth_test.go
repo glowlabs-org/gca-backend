@@ -8,31 +8,21 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestToAuthorization verifies that an EquipmentAuthorizationRequest
 // correctly converts into an EquipmentAuthorization.
 func TestToAuthorization(t *testing.T) {
 	// Generate a real ECDSA public-private key pair using the secp256k1 curve.
-	privKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate ECDSA key: %v", err)
-	}
-	pubKey := crypto.CompressPubkey(&privKey.PublicKey)
+	pubKey, privKey := GenerateKeyPair()
 
 	// Generate a real signature using the ECDSA private key.
 	message := []byte("test message")
-	hash := crypto.Keccak256Hash(message).Bytes()
-	signature, err := crypto.Sign(hash, privKey)
-	if err != nil {
-		t.Fatalf("Failed to sign message: %v", err)
-	}
+	signature := Sign(message, privKey)
 
 	// Hex-encode the real public key and signature.
-	hexPublicKey := hex.EncodeToString(pubKey)
-	hexSignature := hex.EncodeToString(signature)
+	hexPublicKey := hex.EncodeToString(pubKey[:])
+	hexSignature := hex.EncodeToString(signature[:])
 
 	// Create a new EquipmentAuthorizationRequest.
 	request := EquipmentAuthorizationRequest{
@@ -78,11 +68,11 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	// Create a mock request for equipment authorization.
 	body := EquipmentAuthorizationRequest{
 		ShortID:    12345,
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Capacity:   1000000,
 		Debt:       2000000,
 		Expiration: 2000,
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err := body.ToAuthorization()
 	if err != nil {
@@ -91,11 +81,8 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature, err := crypto.Sign(sb, gcaPrivKey)
-	if err != nil {
-		t.Fatalf("Failed to sign: %v", err)
-	}
-	body.Signature = hex.EncodeToString(signature)
+	signature := Sign(sb, gcaPrivKey)
+	body.Signature = hex.EncodeToString(signature[:])
 
 	// Convert the request body to JSON.
 	jsonBody, _ := json.Marshal(body)
