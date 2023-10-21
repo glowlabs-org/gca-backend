@@ -15,6 +15,27 @@ type EquipmentReport struct {
 	Signature   [64]byte // A digital signature for the report's authenticity
 }
 
+// SigningBytes returns the bytes that should be signed when sending an
+// equipment report.
+func (er EquipmentReport) SigningBytes() []byte {
+	prefix := []byte("EquipmentReport")
+	bytes := make([]byte, len(prefix)+16)
+	copy(bytes, prefix)
+	binary.BigEndian.PutUint32(bytes[15:], er.ShortID)
+	binary.BigEndian.PutUint32(bytes[19:], er.Timeslot)
+	binary.BigEndian.PutUint64(bytes[23:], er.PowerOutput)
+	return bytes
+}
+
+func (er EquipmentReport) Serialize() []byte {
+	bytes := make([]byte, 80)
+	binary.BigEndian.PutUint32(bytes[0:], er.ShortID)
+	binary.BigEndian.PutUint32(bytes[4:], er.Timeslot)
+	binary.BigEndian.PutUint64(bytes[8:], er.PowerOutput)
+	copy(bytes[16:], er.Signature[:])
+	return bytes
+}
+
 // parseReport converts raw bytes into an EquipmentReport and validates its signature.
 // This function assumes the server object has a map called 'equipment' which maps
 // equipment ShortIDs to a struct containing their ECDSA public keys.
@@ -37,7 +58,8 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	}
 
 	// Hash the data and then verify the signature.
-	if !Verify(equipment.PublicKey, rawData[:16], report.Signature) {
+	sb := report.SigningBytes()
+	if !Verify(equipment.PublicKey, sb, report.Signature) {
 		return report, errors.New("failed to verify signature")
 	}
 
