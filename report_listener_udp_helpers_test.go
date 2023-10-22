@@ -8,9 +8,10 @@ import (
 // generateTestReport creates a mock report for testing purposes.
 // The report includes a signature based on the provided private key.
 func generateTestReport(shortID uint32, timeslot uint32, privKey PrivateKey) []byte {
-	er := EquipmentReport {
-		ShortID: shortID,
-		Timeslot: timeslot,
+	er := EquipmentReport{
+		ShortID:     shortID,
+		Timeslot:    timeslot,
+		PowerOutput: 5,
 	}
 	er.Signature = Sign(er.SigningBytes(), privKey)
 	return er.Serialize()

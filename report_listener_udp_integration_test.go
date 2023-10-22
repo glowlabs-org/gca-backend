@@ -34,11 +34,12 @@ func TestParseReportIntegration(t *testing.T) {
 		server.loadEquipmentAuth(d)
 	}
 
+	now := currentTimeslot()
 	for i, device := range devices {
-		er := EquipmentReport {
-			ShortID: device.ShortID,
-			Timeslot: uint32(i*10),
-			PowerOutput: uint64(i*100),
+		er := EquipmentReport{
+			ShortID:     device.ShortID,
+			Timeslot:    uint32(i) + now,
+			PowerOutput: uint64(5 + i*100),
 		}
 		// Correctly signed report
 		er.Signature = Sign(er.SigningBytes(), privKeys[i])
@@ -50,25 +51,31 @@ func TestParseReportIntegration(t *testing.T) {
 
 		// Loop and check the server processing instead of a fixed sleep.
 		success := false
-		for retries := 0; retries < 200; retries++ {
+		retries := 0
+		for retries = 0; retries < 200; retries++ {
 			if len(server.recentReports) == i+1 {
 				lastReport := server.recentReports[len(server.recentReports)-1]
-				if lastReport.ShortID == device.ShortID && lastReport.Timeslot == uint32(i*10) && lastReport.PowerOutput == uint64(i*100) {
+				if lastReport.ShortID == device.ShortID && lastReport.Timeslot == uint32(i)+now && lastReport.PowerOutput == uint64(5+i*100) {
 					success = true
 					break
 				}
 			}
-			time.Sleep(10 * time.Millisecond)
 
-			// TODO: Try sending the report again over UDP, but only after implmenting code that prevents
-			// two of the same report from being recorded twice.
+			// Sleep a bit and try sending the report again.
+			time.Sleep(10 * time.Millisecond)
+			if err := sendUDPReport(er.Serialize()); err != nil {
+				t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
+			}
 		}
 		if !success {
 			t.Fatalf("No reports in recentReports after sending valid report for device %d", i)
 		}
+		if retries > 3 {
+			t.Log("retries:", retries)
+		}
 
 		lastReport := server.recentReports[len(server.recentReports)-1]
-		if lastReport.ShortID != device.ShortID || lastReport.Timeslot != uint32(i*10) || lastReport.PowerOutput != uint64(i*100) {
+		if lastReport.ShortID != device.ShortID || lastReport.Timeslot != uint32(i)+now || lastReport.PowerOutput != uint64(5+i*100) {
 			t.Errorf("Unexpected report details for device %d: got %+v", i, lastReport)
 		}
 

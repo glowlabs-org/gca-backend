@@ -24,11 +24,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Create the http request that will authorize new equipment.
 	body := EquipmentAuthorizationRequest{
-		ShortID:    12345,                                                                // A unique identifier for the equipment
+		ShortID:    12345,                                                              // A unique identifier for the equipment
 		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                              // Storage capacity
-		Debt:       2000000,                                                              // Current debt value
-		Expiration: 2000,                                                                 // Expiry time for the equipment
+		Capacity:   1000000,                                                            // Storage capacity
+		Debt:       2000000,                                                            // Current debt value
+		Expiration: 2000,                                                               // Expiry time for the equipment
 		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err := body.ToAuthorization()
@@ -92,11 +92,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Send a new request, this time with the same ShortID. The server should add the ShortID to the banlist.
 	body = EquipmentAuthorizationRequest{
-		ShortID:    12345,                                                                // A unique identifier for the equipment
+		ShortID:    12345,                                                              // A unique identifier for the equipment
 		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                              // Storage capacity
-		Debt:       2400000,                                                              // Current debt value
-		Expiration: 2000,                                                                 // Expiry time for the equipment
+		Capacity:   1000000,                                                            // Storage capacity
+		Debt:       2400000,                                                            // Current debt value
+		Expiration: 2000,                                                               // Expiry time for the equipment
 		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err = body.ToAuthorization()
@@ -137,11 +137,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Send a new request, this time with a new ShortID.
 	body = EquipmentAuthorizationRequest{
-		ShortID:    12346,                                                                // A unique identifier for the equipment
+		ShortID:    12346,                                                              // A unique identifier for the equipment
 		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                              // Storage capacity
-		Debt:       2400000,                                                              // Current debt value
-		Expiration: 2000,                                                                 // Expiry time for the equipment
+		Capacity:   1000000,                                                            // Storage capacity
+		Debt:       2400000,                                                            // Current debt value
+		Expiration: 2000,                                                               // Expiry time for the equipment
 		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	ea, err = body.ToAuthorization()

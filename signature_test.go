@@ -35,4 +35,3 @@ func TestSignAndVerify(t *testing.T) {
 		t.Fatalf("Signature is incorrectly valid")
 	}
 }
-
