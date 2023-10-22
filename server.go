@@ -12,11 +12,9 @@ import (
 	"time"
 )
 
-// TODO: Need a background thread that updates the equipmentReports offsets.
-// Also need to set the equipmentReportsOffset value to the right place at
-// startup.
-//
-// TODO: Need to write tests around the report banning code we just implemented.
+// TODO: Need to write tests around the report banning code we just
+// implemented. Also need to write tests around the migrations for the
+// equipmentReports.
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
@@ -57,12 +55,22 @@ func NewGCAServer(baseDir string) *GCAServer {
 		logger.Fatal("Logger initialization failed: ", err)
 	}
 
+	// Compute the timeslot that should be used as the reports offset. We
+	// want it to be at 0:00:00 on Monday UTC. We want it to be less than 2
+	// weeks in the past but more than 4 days in the past.
+	now := currentTimeslot()
+	closestWeek := uint32(0)
+	for now-closestWeek > 3200 {
+		closestWeek += 2016
+	}
+
 	// Initialize GCAServer with the proper fields
 	server := &GCAServer{
 		baseDir:          baseDir,
 		equipment:        make(map[uint32]EquipmentAuthorization),
 		equipmentBans:    make(map[uint32]struct{}),
 		equipmentReports: make(map[uint32]*[4032]EquipmentReport),
+		equipmentReportsOffset: closestWeek,
 		recentReports:    make([]EquipmentReport, 0, maxRecentReports),
 		logger:           logger,
 		mux:              mux,
@@ -83,8 +91,12 @@ func NewGCAServer(baseDir string) *GCAServer {
 		logger.Fatal("Failed to load server equipment: ", err)
 	}
 
-	// Start the UDP and HTTP servers
+	// Start all of the background threads. There's a UDP server to grab
+	// reports, there's an HTTP server to interact with non-IOT equipment,
+	// and there's a background thread which updates the equipment reports
+	// infrequently.
 	go server.threadedLaunchUDPServer()
+	go server.threadedMigrateReports()
 	server.launchAPI()
 
 	// Wait for a short duration to let everything load

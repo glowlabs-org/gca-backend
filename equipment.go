@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // addRecentEquipmentAuth will add a recent auth to the list of recent auths in the
@@ -153,4 +154,33 @@ func (gcas *GCAServer) saveEquipment(ea EquipmentAuthorization) error {
 	delete(gcas.equipmentReports, ea.ShortID)
 	gcas.equipmentBans[ea.ShortID] = struct{}{}
 	return fmt.Errorf("duplicate authorization received, banning equipment")
+}
+
+// threadedMigrateReports will infrequently update the equipment reports so
+// that the reports are always for the current week and the previous.
+func (gcas *GCAServer) threadedMigrateReports() {
+	for {
+		// This loop is pretty lightweight so every 3 seconds seems
+		// fine, even though action is only taken once a week.
+		time.Sleep(time.Second * 3)
+
+		// We only update if we are progressed most of the way through
+		// the second week.
+		gcas.mu.Lock()
+		now := currentTimeslot()
+		if int64(now) - int64(gcas.equipmentReportsOffset) > 4000 {
+			// panic, because the system has entered incoherency.
+			panic("migration got out of sync")
+		}
+		if int64(now) - int64(gcas.equipmentReportsOffset) > 3200 {
+			// Copy the last half of every report into the first
+			// half.
+			for _, report := range gcas.equipmentReports {
+				copy(report[:2016], report[2016:])
+			}
+			// Update the reports offset.
+			gcas.equipmentReportsOffset += 2016
+		}
+		gcas.mu.Unlock()
+	}
 }
