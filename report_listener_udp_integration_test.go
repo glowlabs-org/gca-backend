@@ -178,5 +178,48 @@ func TestParseReportIntegration(t *testing.T) {
 			t.Error("report was not banned")
 		}
 		server.mu.Unlock()
+
+		// Now send a report with a correct sig, but have it be yet
+		// another duplicate. The report should be entirely ignored and
+		// not added to the list of recent reports.
+		er = EquipmentReport{
+			ShortID:     device.ShortID,
+			Timeslot:    uint32(i) + now,
+			PowerOutput: uint64(7 + i*100),
+		}
+		// Correctly sign the report
+		er.Signature = Sign(er.SigningBytes(), privKeys[i])
+		// Send the report over UDP. Since the server state isn't
+		// supposed to change, we need to send it multiple times just
+		// to be certain it gets through.
+		if err := sendUDPReport(er.Serialize()); err != nil {
+			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
+		}
+		time.Sleep(25 * time.Millisecond)
+		if err := sendUDPReport(er.Serialize()); err != nil {
+			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
+		}
+		time.Sleep(25 * time.Millisecond)
+		if err := sendUDPReport(er.Serialize()); err != nil {
+			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
+		}
+		// Loop and check for the report to make it into the report
+		// history.
+		server.mu.Lock()
+		if len(server.recentReports) != expectedReports {
+			t.Fatal("bad")
+		}
+		server.mu.Unlock()
+		if !success {
+			t.Fatalf("No reports in recentReports after sending valid report for device %d", i)
+		}
+		if retries > 3 {
+			t.Log("retries:", retries)
+		}
+		server.mu.Lock()
+		if server.equipmentReports[device.ShortID][uint32(i)+now].PowerOutput != 1 {
+			t.Error("report was not banned")
+		}
+		server.mu.Unlock()
 	}
 }
