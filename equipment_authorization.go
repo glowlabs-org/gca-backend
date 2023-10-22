@@ -59,12 +59,13 @@ func (ea *EquipmentAuthorization) Serialize() []byte {
 	return data
 }
 
-// Deserialize deserializes a byte slice into an EquipmentAuthorization.
+// DeserializeEquipmentAuthorization deserializes a byte slice into an
+// EquipmentAuthorization.
 //
 // This function takes a byte slice and deserializes it directly into an EquipmentAuthorization struct.
 // The byte slice should be serialized in the same order as the fields in the EquipmentAuthorization struct.
 // It returns the deserialized EquipmentAuthorization and any error encountered.
-func Deserialize(data []byte) (EquipmentAuthorization, error) {
+func DeserializeEquipmentAuthorization(data []byte) (EquipmentAuthorization, error) {
 	// Initialize an EquipmentAuthorization object to hold the deserialized data
 	var ea EquipmentAuthorization
 

@@ -85,10 +85,13 @@ func NewGCAServer(baseDir string) *GCAServer {
 	if err := server.loadGCAPubkey(); err != nil {
 		logger.Fatal("Failed to load GCA public key: ", err)
 	}
-
 	// Load equipment public keys
 	if err := server.loadEquipment(); err != nil {
 		logger.Fatal("Failed to load server equipment: ", err)
+	}
+	// Load all equipment reports
+	if err := server.loadEquipmentReports(); err != nil {
+		logger.Fatal("Failed to load equipment reports: ", err)
 	}
 
 	// Start all of the background threads. There's a UDP server to grab
