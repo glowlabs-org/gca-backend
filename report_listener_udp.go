@@ -7,36 +7,6 @@ import (
 	"net"
 )
 
-// EquipmentReport defines the structure for a report received from a piece of equipment.
-type EquipmentReport struct {
-	ShortID     uint32    // A unique identifier for the equipment
-	Timeslot    uint32    // A field denoting the time of the report
-	PowerOutput uint64    // The power output from the equipment
-	Signature   Signature // A digital signature for the report's authenticity
-}
-
-// SigningBytes returns the bytes that should be signed when sending an
-// equipment report.
-func (er EquipmentReport) SigningBytes() []byte {
-	prefix := []byte("EquipmentReport")
-	bytes := make([]byte, len(prefix)+16)
-	copy(bytes, prefix)
-	binary.BigEndian.PutUint32(bytes[15:], er.ShortID)
-	binary.BigEndian.PutUint32(bytes[19:], er.Timeslot)
-	binary.BigEndian.PutUint64(bytes[23:], er.PowerOutput)
-	return bytes
-}
-
-// Serialize creates a compact binary representation of the data structure.
-func (er EquipmentReport) Serialize() []byte {
-	bytes := make([]byte, 80)
-	binary.BigEndian.PutUint32(bytes[0:], er.ShortID)
-	binary.BigEndian.PutUint32(bytes[4:], er.Timeslot)
-	binary.BigEndian.PutUint64(bytes[8:], er.PowerOutput)
-	copy(bytes[16:], er.Signature[:])
-	return bytes
-}
-
 // parseReport converts raw bytes into an EquipmentReport and validates its signature.
 // This function assumes the server object has a map called 'equipment' which maps
 // equipment ShortIDs to a struct containing their ECDSA public keys.
@@ -67,35 +37,16 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 	return report, nil
 }
 
-// managedHandleEquipmentReport processes the raw data received from equipment.
-func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
-	server.mu.Lock()
-	defer server.mu.Unlock()
-
-	// Parse the raw data into an EquipmentReport
-	report, err := server.parseReport(rawData)
-	if err != nil {
-		server.logger.Error("Report decoding failed: ", err)
+// integrateReport will take an equipment report and use it to update the live
+// state of the server.
+func (server *GCAServer) integrateReport(report EquipmentReport) {
+	// Nothing to integrate if the report is too old.
+	if report.Timeslot < server.equipmentReportsOffset {
 		return
 	}
-
-	// Verify that the timeslot of the report is acceptable. This means
-	// that the report must be within 432 timeslots of the current
-	// timeslot, which is 72 hours.
-	//
-	// When doing the comparison, we cast everything to int64 to handle
-	// potential overflows and underflows.
-	now := currentTimeslot()
-	if int64(report.Timeslot) < int64(now)-432 || int64(report.Timeslot) > int64(now)+432 {
-		server.logger.Warn("Received out of bounds timeslot: ", now, " ", report.Timeslot)
-		return
-	}
-	// Reports that don't have any power generated are ignored. A power of
-	// '1' is effectively 0, and we use the '1' value to signal that a
-	// report has been banned for duplicate attempts.
-	if report.PowerOutput == 0 || report.PowerOutput == 1 {
-		server.logger.Warn("Received report with 0 power output")
-		return
+	// Panic if the timeslot is too new.
+	if report.Timeslot > server.equipmentReportsOffset + 4032 {
+		panic("received a report that's too far in the future to integrate")
 	}
 
 	// Check whether we've seen a duplicate of this report before.
@@ -127,15 +78,50 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput = 1
 	}
 
-	// Append the report to recentReports
+	// Add the report to the list of recent reports, and truncate the list
+	// if it's too large.
 	server.recentReports = append(server.recentReports, report)
-
-	// Truncate the recentReports slice if it gets too large
 	if len(server.recentReports) > maxRecentReports {
 		halfIndex := len(server.recentReports) / 2
 		copy(server.recentReports[:], server.recentReports[halfIndex:])
 		server.recentReports = server.recentReports[:halfIndex]
 	}
+}
+
+// managedHandleEquipmentReport processes the raw data received from equipment.
+func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+
+	// Parse the raw data into an EquipmentReport
+	report, err := server.parseReport(rawData)
+	if err != nil {
+		server.logger.Error("Report decoding failed: ", err)
+		return
+	}
+
+	// Verify that the timeslot of the report is acceptable. This means
+	// that the report must be within 432 timeslots of the current
+	// timeslot, which is 72 hours.
+	//
+	// When doing the comparison, we cast everything to int64 to handle
+	// potential overflows and underflows.
+	now := currentTimeslot()
+	if int64(report.Timeslot) < int64(now)-432 || int64(report.Timeslot) > int64(now)+432 {
+		server.logger.Warn("Received out of bounds timeslot: ", now, " ", report.Timeslot)
+		return
+	}
+	// Reports that don't have any power generated are ignored. A power of
+	// '1' is effectively 0, and we use the '1' value to signal that a
+	// report has been banned for duplicate attempts.
+	if report.PowerOutput == 0 || report.PowerOutput == 1 {
+		server.logger.Warn("Received report with a sentinel power output")
+		return
+	}
+
+	// Integrate and save the report.
+	server.integrateReport(report)
+	server.saveEquipmentReport(report)
 }
 
 // threadedLaunchUDPServer sets up and starts the UDP server for listening to

@@ -23,7 +23,7 @@ func TestEquipmentAuthSerialization(t *testing.T) {
 	serialized := ea.Serialize()
 
 	// Deserialize the object
-	deserialized, err := Deserialize(serialized)
+	deserialized, err := DeserializeEquipmentAuthorization(serialized)
 	if err != nil {
 		t.Fatal("Error deserializing:", err)
 		return

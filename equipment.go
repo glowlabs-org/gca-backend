@@ -37,9 +37,11 @@ func (gcas *GCAServer) loadEquipment() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Create the file if it does not exist
-			if _, err := os.Create(filePath); err != nil {
+			f, err := os.Create(filePath)
+			if err != nil {
 				return err
 			}
+			f.Close()
 			return nil
 		}
 		return err
@@ -50,7 +52,7 @@ func (gcas *GCAServer) loadEquipment() error {
 	buffer := bytes.NewBuffer(rawData)
 	for buffer.Len() > 0 {
 		// Deserialize the EquipmentAuthorization
-		ea, err := Deserialize(buffer.Next(120)) // 120 bytes = 4 (ShortID) + 32 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 64 (Signature)
+		ea, err := DeserializeEquipmentAuthorization(buffer.Next(120)) // 120 bytes = 4 (ShortID) + 32 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 64 (Signature)
 		if err != nil {
 			return err
 		}
@@ -170,6 +172,7 @@ func (gcas *GCAServer) threadedMigrateReports() {
 		now := currentTimeslot()
 		if int64(now)-int64(gcas.equipmentReportsOffset) > 4000 {
 			// panic, because the system has entered incoherency.
+			gcas.mu.Unlock()
 			panic("migration got out of sync")
 		}
 		if int64(now)-int64(gcas.equipmentReportsOffset) > 3200 {

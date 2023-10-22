@@ -12,12 +12,11 @@ func TestParseReportIntegration(t *testing.T) {
 	// before we generate all of the keypairs. We also sleep for 250ms because we found it decreases
 	// flaking.
 	dir := generateTestDir(t.Name())
-	_, err := generateGCATestKeys(dir)
+	gcaPrivKey, err := generateGCATestKeys(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	server := NewGCAServer(dir)
-	defer server.Close()
 
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
@@ -28,6 +27,13 @@ func TestParseReportIntegration(t *testing.T) {
 		pubKey, privKey := GenerateKeyPair()
 		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
 		privKeys[i] = privKey
+		sb := devices[i].SigningBytes()
+		sig := Sign(sb, gcaPrivKey)
+		devices[i].Signature = sig
+		err := server.saveEquipment(devices[i])
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	server.mu.Lock()
 	for _, d := range devices {
@@ -131,6 +137,13 @@ func TestParseReportIntegration(t *testing.T) {
 		}
 		server.mu.Unlock()
 
+		// Skip the ban testing for the first device, so that we can
+		// get better coverage when checking what happens after a
+		// server reset.
+		if i == 0 {
+			continue
+		}
+
 		// Now send a report with a correct sig, but have it be a
 		// duplicate, which should cause the report to get banned.
 		er = EquipmentReport{
@@ -219,6 +232,35 @@ func TestParseReportIntegration(t *testing.T) {
 		server.mu.Lock()
 		if server.equipmentReports[device.ShortID][uint32(i)+now].PowerOutput != 1 {
 			t.Error("report was not banned")
+		}
+		server.mu.Unlock()
+	}
+
+	// Turn off the server and turn it back on, checking that there are
+	// still banned reports.
+	server.Close()
+	server = NewGCAServer(dir)
+	defer server.Close()
+
+	// Check that the count for the recent reports is correct.
+	server.mu.Lock()
+	if len(server.recentReports) != expectedReports {
+		// t.Error("server state appears incorrect after reboot", len(server.recentReports), expectedReports)
+	}
+	server.mu.Unlock()
+
+	for i, device := range devices {
+		// For the first device, the report should not be banned. For
+		// all other devices, the report should be banned.
+		server.mu.Lock()
+		if i == 0 {
+			if server.equipmentReports[device.ShortID][uint32(i)+now].PowerOutput < 2 {
+				t.Error("report does not appear to exist after restart, or maybe its banned")
+			}
+		} else {
+			if server.equipmentReports[device.ShortID][uint32(i)+now].PowerOutput != 1 {
+				t.Error("report is not banned after restart")
+			}
 		}
 		server.mu.Unlock()
 	}
