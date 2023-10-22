@@ -15,6 +15,7 @@ const (
 	serverIP                = "0.0.0.0"
 	httpPort                = ":35015"
 	defaultLogLevel         = WARN
+	reportMigrationFrequency = 1 * time.Hour
 )
 
 // Returns the current time of the protocol, as measured in 5 minute increments

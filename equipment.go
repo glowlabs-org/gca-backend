@@ -162,7 +162,7 @@ func (gcas *GCAServer) threadedMigrateReports() {
 	for {
 		// This loop is pretty lightweight so every 3 seconds seems
 		// fine, even though action is only taken once a week.
-		time.Sleep(time.Second * 3)
+		time.Sleep(reportMigrationFrequency)
 
 		// We only update if we are progressed most of the way through
 		// the second week.
@@ -174,12 +174,15 @@ func (gcas *GCAServer) threadedMigrateReports() {
 		}
 		if int64(now) - int64(gcas.equipmentReportsOffset) > 3200 {
 			// Copy the last half of every report into the first
-			// half.
+			// half, then blank out the last half.
 			for _, report := range gcas.equipmentReports {
+				var blankReports [2016]EquipmentReport
 				copy(report[:2016], report[2016:])
+				copy(report[2016:], blankReports[:])
 			}
 			// Update the reports offset.
 			gcas.equipmentReportsOffset += 2016
+			gcas.logger.Info("completed an equipment reports migration")
 		}
 		gcas.mu.Unlock()
 	}

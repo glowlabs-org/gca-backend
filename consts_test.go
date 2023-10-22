@@ -15,16 +15,16 @@ const (
 	serverIP                = "127.0.0.1"
 	httpPort                = ":35015"
 	defaultLogLevel         = DEBUG
+	reportMigrationFrequency = 100 * time.Millisecond
 )
+
+// This is a special variable only available in testing which allows the test
+// to control what the current timeslot is, this makes it a lot easier to test
+// timeslot related code.
+var manualCurrentTimeslot = uint32(0)
 
 // Returns the current time of the protocol, as measured in 5 minute increments
 // from genesis. This function implies a genesis time.
 func currentTimeslot() uint32 {
-	genesisTime := time.Now().Unix()
-	now := time.Now().Unix()
-	if now < genesisTime {
-		panic("system clock appears to be incorrect")
-	}
-	secondsSinceGenesis := now - genesisTime
-	return uint32(secondsSinceGenesis / 300)
+	return manualCurrentTimeslot
 }

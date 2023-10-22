@@ -89,7 +89,7 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 	// potential overflows and underflows.
 	now := currentTimeslot()
 	if int64(report.Timeslot) < int64(now)-432 || int64(report.Timeslot) > int64(now)+432 {
-		server.logger.Warn("Received out of bounds timeslot", now, report.Timeslot)
+		server.logger.Warn("Received out of bounds timeslot: ", now, " ", report.Timeslot)
 		return
 	}
 	// Reports that don't have any power generated are ignored. A power of
