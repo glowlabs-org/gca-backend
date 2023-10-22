@@ -53,13 +53,16 @@ func TestParseReportIntegration(t *testing.T) {
 		success := false
 		retries := 0
 		for retries = 0; retries < 200; retries++ {
+			server.mu.Lock()
 			if len(server.recentReports) == i+1 {
 				lastReport := server.recentReports[len(server.recentReports)-1]
 				if lastReport.ShortID == device.ShortID && lastReport.Timeslot == uint32(i)+now && lastReport.PowerOutput == uint64(5+i*100) {
 					success = true
+					server.mu.Unlock()
 					break
 				}
 			}
+			server.mu.Unlock()
 
 			// Sleep a bit and try sending the report again.
 			time.Sleep(10 * time.Millisecond)

@@ -128,9 +128,11 @@ func (server *GCAServer) Close() {
 	}
 
 	// Close the UDP connection
+	server.mu.Lock()
 	if server.conn != nil {
 		server.conn.Close()
 	}
+	server.mu.Unlock()
 
 	// Close the logger
 	server.logger.Close()
