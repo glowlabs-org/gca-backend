@@ -8,13 +8,22 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
+// TODO: Need to delete from equipmentReports when an equipment is banned.
+//
+// TODO: Need a background thread that updates the equipmentReports offsets.
+//
+// TODO: Need to write tests around the report banning code we just implemented.
+
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
-	equipment     map[uint32]EquipmentAuthorization // Map from a ShortID to the full equipment authorization
-	equipmentBans map[uint32]struct{}               // Tracks which equipment is banned
+	equipment              map[uint32]EquipmentAuthorization // Map from a ShortID to the full equipment authorization
+	equipmentBans          map[uint32]struct{}               // Tracks which equipment is banned
+	equipmentReports       map[uint32]*[4032]EquipmentReport // Keeps all recent reports in memory
+	equipmentReportsOffset uint32                            // What timeslot the equipmentReports arrays start at
 
 	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
@@ -27,6 +36,7 @@ type GCAServer struct {
 	mux        *http.ServeMux // Routing for HTTP requests
 	conn       *net.UDPConn   // UDP connection for listening to equipment reports
 	quit       chan bool      // A channel to initiate server shutdown
+	mu         sync.Mutex
 }
 
 // NewGCAServer initializes a new instance of GCAServer.
@@ -49,12 +59,13 @@ func NewGCAServer(baseDir string) *GCAServer {
 
 	// Initialize GCAServer with the proper fields
 	server := &GCAServer{
-		baseDir:       baseDir,
-		equipment:     make(map[uint32]EquipmentAuthorization),
-		equipmentBans: make(map[uint32]struct{}),
-		recentReports: make([]EquipmentReport, 0, maxRecentReports),
-		logger:        logger,
-		mux:           mux,
+		baseDir:          baseDir,
+		equipment:        make(map[uint32]EquipmentAuthorization),
+		equipmentBans:    make(map[uint32]struct{}),
+		equipmentReports: make(map[uint32]*[4032]EquipmentReport),
+		recentReports:    make([]EquipmentReport, 0, maxRecentReports),
+		logger:           logger,
+		mux:              mux,
 		httpServer: &http.Server{
 			Addr:    httpPort,
 			Handler: mux,
@@ -73,7 +84,7 @@ func NewGCAServer(baseDir string) *GCAServer {
 	}
 
 	// Start the UDP and HTTP servers
-	go server.launchUDPServer()
+	go server.threadedLaunchUDPServer()
 	server.launchAPI()
 
 	// Wait for a short duration to let everything load

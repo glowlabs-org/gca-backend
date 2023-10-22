@@ -34,7 +34,7 @@ func GenerateKeyPair() (PublicKey, PrivateKey) {
 		// If yes, proceed; otherwise, generate a new key pair.
 		if publicKeyCompressed[0] == 0x02 {
 			var publicKey PublicKey
-			copy(publicKey[:], publicKeyCompressed[1:])  // Skip the first byte (0x02 prefix)
+			copy(publicKey[:], publicKeyCompressed[1:]) // Skip the first byte (0x02 prefix)
 			return publicKey, privateKey
 		}
 	}
@@ -70,4 +70,3 @@ func Verify(publicKey PublicKey, data []byte, signature Signature) bool {
 	hash := crypto.Keccak256Hash(data)
 	return crypto.VerifySignature(crypto.FromECDSAPub(publicKeyECDSA), hash.Bytes(), signature[:])
 }
-

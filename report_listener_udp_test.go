@@ -40,10 +40,10 @@ func TestParseReport(t *testing.T) {
 	}
 
 	for i, e := range equipment {
-		er := EquipmentReport {
-			ShortID: e.ShortID,
-			Timeslot: uint32(i*10),
-			PowerOutput: uint64(i*100),
+		er := EquipmentReport{
+			ShortID:     e.ShortID,
+			Timeslot:    uint32(i * 10),
+			PowerOutput: uint64(i * 100),
 		}
 		sb := er.SigningBytes()
 		er.Signature = Sign(sb, privKeys[i])

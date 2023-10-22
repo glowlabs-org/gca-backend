@@ -51,11 +51,11 @@ func (ea *EquipmentAuthorization) Serialize() []byte {
 
 	// Serialize all the fields.
 	binary.LittleEndian.PutUint32(data[0:4], ea.ShortID)
-	copy(data[4:36], ea.PublicKey[:]) // Updated indices
-	binary.LittleEndian.PutUint64(data[36:44], ea.Capacity) // Updated indices
-	binary.LittleEndian.PutUint64(data[44:52], ea.Debt) // Updated indices
+	copy(data[4:36], ea.PublicKey[:])                         // Updated indices
+	binary.LittleEndian.PutUint64(data[36:44], ea.Capacity)   // Updated indices
+	binary.LittleEndian.PutUint64(data[44:52], ea.Debt)       // Updated indices
 	binary.LittleEndian.PutUint32(data[52:56], ea.Expiration) // Updated indices
-	copy(data[56:], ea.Signature[:]) // Updated indices
+	copy(data[56:], ea.Signature[:])                          // Updated indices
 	return data
 }
 
@@ -75,11 +75,11 @@ func Deserialize(data []byte) (EquipmentAuthorization, error) {
 
 	// Deserialize all the fields
 	ea.ShortID = binary.LittleEndian.Uint32(data[0:4])
-	copy(ea.PublicKey[:], data[4:36]) // Updated indices
-	ea.Capacity = binary.LittleEndian.Uint64(data[36:44]) // Updated indices
-	ea.Debt = binary.LittleEndian.Uint64(data[44:52]) // Updated indices
+	copy(ea.PublicKey[:], data[4:36])                       // Updated indices
+	ea.Capacity = binary.LittleEndian.Uint64(data[36:44])   // Updated indices
+	ea.Debt = binary.LittleEndian.Uint64(data[44:52])       // Updated indices
 	ea.Expiration = binary.LittleEndian.Uint32(data[52:56]) // Updated indices
-	copy(ea.Signature[:], data[56:]) // Updated indices
+	copy(ea.Signature[:], data[56:])                        // Updated indices
 	return ea, nil
 }
 

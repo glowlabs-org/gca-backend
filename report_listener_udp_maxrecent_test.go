@@ -46,7 +46,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 		for j := 0; j < 50; j++ {
 			timeslot := uint32(j)
 			report := generateTestReport(devices[i].ShortID, timeslot, privKeys[i])
-			server.handleEquipmentReport(report)
+			server.managedHandleEquipmentReport(report)
 		}
 	}
 
@@ -60,7 +60,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 
 	// Submit another report, using the final device.
 	report := generateTestReport(devices[maxRecentReports/50].ShortID, 0, privKeys[maxRecentReports/50]) // Use a new device ID, timeslot = 0
-	server.handleEquipmentReport(report)
+	server.managedHandleEquipmentReport(report)
 
 	if len(server.recentReports) != int(maxRecentReports)/2 {
 		t.Fatalf("Expected %f reports after adding one more, but got %d", maxRecentReports/2+1, len(server.recentReports))
@@ -86,4 +86,3 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 		}
 	}
 }
-

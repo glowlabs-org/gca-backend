@@ -82,10 +82,12 @@ func (gcas *GCAServer) loadEquipment() error {
 		// If no conflict exists, add the equipment
 		if !exists {
 			gcas.equipment[ea.ShortID] = ea
+			gcas.equipmentReports[ea.ShortID] = new([4032]EquipmentReport)
 			continue
 		}
 		// If a conflict exists, ban the equipment.
 		delete(gcas.equipment, ea.ShortID)
+		delete(gcas.equipmentReports, ea.ShortID)
 		gcas.equipmentBans[ea.ShortID] = struct{}{}
 	}
 
@@ -108,10 +110,7 @@ func (gcas *GCAServer) saveEquipment(ea EquipmentAuthorization) error {
 	// Now check if there's already equipment with the same ShortID
 	current, exists := gcas.equipment[ea.ShortID]
 	if exists {
-		// If this is the same equipment, there's no problem.
-		a := current.Serialize()
-		b := ea.Serialize()
-		if bytes.Equal(a, b) {
+		if current == ea {
 			// This exact authorization is already known and saved.
 			// Exit without complaining.
 			return nil
@@ -144,12 +143,14 @@ func (gcas *GCAServer) saveEquipment(ea EquipmentAuthorization) error {
 	// If there is no conflict, add the new auth and exit.
 	if !exists {
 		gcas.equipment[ea.ShortID] = ea
+		gcas.equipmentReports[ea.ShortID] = new([4032]EquipmentReport)
 		return nil
 	}
 
 	// There is a conflict, so we need to delete the equipment from the list of
 	// equipment and also add a ban.
 	delete(gcas.equipment, ea.ShortID)
+	delete(gcas.equipmentReports, ea.ShortID)
 	gcas.equipmentBans[ea.ShortID] = struct{}{}
 	return fmt.Errorf("duplicate authorization received, banning equipment")
 }
