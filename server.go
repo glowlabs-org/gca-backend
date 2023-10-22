@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-// TODO: Need to delete from equipmentReports when an equipment is banned.
-//
 // TODO: Need a background thread that updates the equipmentReports offsets.
+// Also need to set the equipmentReportsOffset value to the right place at
+// startup.
 //
 // TODO: Need to write tests around the report banning code we just implemented.
 
