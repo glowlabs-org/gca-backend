@@ -12,15 +12,9 @@ import (
 	"time"
 )
 
-// TODO: Need to write tests around the report banning code we just
-// implemented.
-//
 // TODO: Need to write a high concurrency test where all of the major APIs and
 // functions of the server are blasting at once, that way we can detect race
 // conditions.
-//
-// TODO: Fix all the race conditions that are detected in the current test
-// suite.
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
