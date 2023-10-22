@@ -36,8 +36,10 @@ type GCAServer struct {
 	baseDir    string         // Base directory for server files
 	logger     *Logger        // Custom logger for the server
 	httpServer *http.Server   // Web server for handling API requests
+	httpPort   string         // Records the port that is being used to serve the api
 	mux        *http.ServeMux // Routing for HTTP requests
-	conn       *net.UDPConn   // UDP connection for listening to equipment reports
+	udpConn    *net.UDPConn   // UDP connection for listening to equipment reports
+	udpPort    int            // The port that the UDP conn is listening on
 	quit       chan bool      // A channel to initiate server shutdown
 	mu         sync.Mutex
 }
@@ -131,8 +133,8 @@ func (server *GCAServer) Close() {
 
 	// Close the UDP connection
 	server.mu.Lock()
-	if server.conn != nil {
-		server.conn.Close()
+	if server.udpConn != nil {
+		server.udpConn.Close()
 	}
 	server.mu.Unlock()
 

@@ -53,7 +53,7 @@ func TestParseReportIntegration(t *testing.T) {
 		er.Signature = Sign(er.SigningBytes(), privKeys[i])
 
 		// Send the report over UDP
-		if err := sendUDPReport(er.Serialize()); err != nil {
+		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 		expectedReports++
@@ -62,11 +62,11 @@ func TestParseReportIntegration(t *testing.T) {
 		// sent multiple times. The duplicates should be ignored.
 		if i == 0 {
 			time.Sleep(25 * time.Millisecond)
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 			}
 			time.Sleep(25 * time.Millisecond)
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 			}
 		}
@@ -74,7 +74,7 @@ func TestParseReportIntegration(t *testing.T) {
 		// Loop and check the server processing instead of a fixed sleep.
 		success := false
 		retries := 0
-		for retries = 0; retries < 200; retries++ {
+		for retries = 0; retries < 10; retries++ {
 			server.mu.Lock()
 			if len(server.recentReports) == expectedReports {
 				lastReport := server.recentReports[len(server.recentReports)-1]
@@ -88,7 +88,7 @@ func TestParseReportIntegration(t *testing.T) {
 
 			// Sleep a bit and try sending the report again.
 			time.Sleep(10 * time.Millisecond)
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 			}
 		}
@@ -116,15 +116,15 @@ func TestParseReportIntegration(t *testing.T) {
 		// non-deterministically catch this.
 		if i < numDevices-1 {
 			er.Signature = Sign(er.Serialize(), privKeys[i+1])
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
 			}
 			time.Sleep(25 * time.Millisecond)
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
 			}
 			time.Sleep(25 * time.Millisecond)
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
 			}
 			if len(server.recentReports) != expectedReports {
@@ -154,7 +154,7 @@ func TestParseReportIntegration(t *testing.T) {
 		// Correctly sign the report
 		er.Signature = Sign(er.SigningBytes(), privKeys[i])
 		// Send the report over UDP
-		if err := sendUDPReport(er.Serialize()); err != nil {
+		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 		expectedReports++
@@ -162,7 +162,7 @@ func TestParseReportIntegration(t *testing.T) {
 		// history.
 		success = false
 		retries = 0
-		for retries = 0; retries < 200; retries++ {
+		for retries = 0; retries < 10; retries++ {
 			server.mu.Lock()
 			if len(server.recentReports) == expectedReports {
 				lastReport := server.recentReports[len(server.recentReports)-1]
@@ -176,7 +176,7 @@ func TestParseReportIntegration(t *testing.T) {
 
 			// Sleep a bit and try sending the report again.
 			time.Sleep(10 * time.Millisecond)
-			if err := sendUDPReport(er.Serialize()); err != nil {
+			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 			}
 		}
@@ -205,15 +205,15 @@ func TestParseReportIntegration(t *testing.T) {
 		// Send the report over UDP. Since the server state isn't
 		// supposed to change, we need to send it multiple times just
 		// to be certain it gets through.
-		if err := sendUDPReport(er.Serialize()); err != nil {
+		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 		time.Sleep(25 * time.Millisecond)
-		if err := sendUDPReport(er.Serialize()); err != nil {
+		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 		time.Sleep(25 * time.Millisecond)
-		if err := sendUDPReport(er.Serialize()); err != nil {
+		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
 		}
 		// Loop and check for the report to make it into the report
@@ -225,9 +225,6 @@ func TestParseReportIntegration(t *testing.T) {
 		server.mu.Unlock()
 		if !success {
 			t.Fatalf("No reports in recentReports after sending valid report for device %d", i)
-		}
-		if retries > 3 {
-			t.Log("retries:", retries)
 		}
 		server.mu.Lock()
 		if server.equipmentReports[device.ShortID][uint32(i)+now].PowerOutput != 1 {

@@ -45,7 +45,7 @@ func (server *GCAServer) integrateReport(report EquipmentReport) {
 		return
 	}
 	// Panic if the timeslot is too new.
-	if report.Timeslot > server.equipmentReportsOffset + 4032 {
+	if report.Timeslot > server.equipmentReportsOffset+4032 {
 		panic("received a report that's too far in the future to integrate")
 	}
 
@@ -134,12 +134,18 @@ func (server *GCAServer) threadedLaunchUDPServer() {
 
 	var err error
 	server.mu.Lock()
-	server.conn, err = net.ListenUDP("udp", &udpAddress)
+	server.udpConn, err = net.ListenUDP("udp", &udpAddress)
+	addr, ok := server.udpConn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		panic("bad type on udpConn")
+	}
+	server.udpPort = addr.Port
 	server.mu.Unlock()
 	if err != nil {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
-	defer server.conn.Close()
+	server.logger.Infof("UDP server launched on port %v", server.udpPort)
+	defer server.udpConn.Close()
 
 	// Initialize the buffer to hold incoming data
 	buffer := make([]byte, equipmentReportSize)
@@ -154,7 +160,7 @@ func (server *GCAServer) threadedLaunchUDPServer() {
 		}
 
 		// Read from the UDP socket
-		readBytes, _, err := server.conn.ReadFromUDP(buffer)
+		readBytes, _, err := server.udpConn.ReadFromUDP(buffer)
 		if err != nil {
 			server.logger.Error("Failed to read from UDP socket: ", err)
 			continue
