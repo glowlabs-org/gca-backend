@@ -13,8 +13,14 @@ import (
 )
 
 // TODO: Need to write tests around the report banning code we just
-// implemented. Also need to write tests around the migrations for the
-// equipmentReports.
+// implemented.
+//
+// TODO: Need to write a high concurrency test where all of the major APIs and
+// functions of the server are blasting at once, that way we can detect race
+// conditions.
+//
+// TODO: Fix all the race conditions that are detected in the current test
+// suite.
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
@@ -66,14 +72,14 @@ func NewGCAServer(baseDir string) *GCAServer {
 
 	// Initialize GCAServer with the proper fields
 	server := &GCAServer{
-		baseDir:          baseDir,
-		equipment:        make(map[uint32]EquipmentAuthorization),
-		equipmentBans:    make(map[uint32]struct{}),
-		equipmentReports: make(map[uint32]*[4032]EquipmentReport),
+		baseDir:                baseDir,
+		equipment:              make(map[uint32]EquipmentAuthorization),
+		equipmentBans:          make(map[uint32]struct{}),
+		equipmentReports:       make(map[uint32]*[4032]EquipmentReport),
 		equipmentReportsOffset: closestWeek,
-		recentReports:    make([]EquipmentReport, 0, maxRecentReports),
-		logger:           logger,
-		mux:              mux,
+		recentReports:          make([]EquipmentReport, 0, maxRecentReports),
+		logger:                 logger,
+		mux:                    mux,
 		httpServer: &http.Server{
 			Addr:    httpPort,
 			Handler: mux,

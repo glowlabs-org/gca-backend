@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	equipmentReportSize     = 80
-	udpPort                 = 35030
-	maxRecentReports        = 100e3
-	maxRecentEquipmentAuths = 1e3
-	serverIP                = "0.0.0.0"
-	httpPort                = ":35015"
-	defaultLogLevel         = WARN
+	equipmentReportSize      = 80
+	udpPort                  = 35030
+	maxRecentReports         = 100e3
+	maxRecentEquipmentAuths  = 1e3
+	serverIP                 = "0.0.0.0"
+	httpPort                 = ":35015"
+	defaultLogLevel          = WARN
 	reportMigrationFrequency = 1 * time.Hour
 )
 

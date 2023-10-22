@@ -22,12 +22,12 @@ func TestThreadedMigrateReports(t *testing.T) {
 	defer func() {
 		manualCurrentTimeslot = 0
 	}()
-	
+
 	// Generate a dummy EquipmentAuthorization
 	ePubKey, _ := GenerateKeyPair()
 	dummyEquipment := EquipmentAuthorization{ShortID: 1, PublicKey: ePubKey}
 	server.loadEquipmentAuth(dummyEquipment)
-	
+
 	// Generate reports that will fill out the first 2 migrations.
 	dummyReport := [4032]EquipmentReport{}
 	for i := 0; i < len(dummyReport); i++ {
@@ -84,7 +84,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 			t.Fatal("equipment should still exist")
 		}
 	}
-	
+
 	// Wait for another prune cycle, verify nothing happens.
 	time.Sleep(150 * time.Millisecond)
 	for i := 0; i < 2016; i++ {
@@ -121,4 +121,3 @@ func TestThreadedMigrateReports(t *testing.T) {
 		}
 	}
 }
-
