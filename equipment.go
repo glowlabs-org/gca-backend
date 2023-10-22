@@ -168,11 +168,11 @@ func (gcas *GCAServer) threadedMigrateReports() {
 		// the second week.
 		gcas.mu.Lock()
 		now := currentTimeslot()
-		if int64(now) - int64(gcas.equipmentReportsOffset) > 4000 {
+		if int64(now)-int64(gcas.equipmentReportsOffset) > 4000 {
 			// panic, because the system has entered incoherency.
 			panic("migration got out of sync")
 		}
-		if int64(now) - int64(gcas.equipmentReportsOffset) > 3200 {
+		if int64(now)-int64(gcas.equipmentReportsOffset) > 3200 {
 			// Copy the last half of every report into the first
 			// half, then blank out the last half.
 			for _, report := range gcas.equipmentReports {
