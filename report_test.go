@@ -35,4 +35,3 @@ func TestSerializationAndDeserialization(t *testing.T) {
 		t.Errorf("Original and deserialized EquipmentReports are not identical")
 	}
 }
-

@@ -42,7 +42,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Convert the request body to JSON format.
 	jsonBody, _ := json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
-	resp, err := http.Post("http://localhost"+httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post("http://localhost"+server.httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 
 	// Send a duplicate request. The server should ignore the request.
-	resp, err = http.Post("http://localhost"+httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err = http.Post("http://localhost"+server.httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
-	resp, err = http.Post("http://localhost"+httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err = http.Post("http://localhost"+server.httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
-	resp, err = http.Post("http://localhost"+httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err = http.Post("http://localhost"+server.httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}

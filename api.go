@@ -1,17 +1,24 @@
 package main
 
 import (
+	"net"
 	"net/http"
+	"strconv"
 )
 
 // launchAPI sets up the HTTP API endpoints and starts the HTTP server.
 // This function initializes the API routes and starts the HTTP server.
-func (gca *GCAServer) launchAPI() {
-	gca.mux.HandleFunc("/api/v1/authorize-equipment", gca.AuthorizeEquipmentHandler)
+func (gcas *GCAServer) launchAPI() {
+	gcas.mux.HandleFunc("/api/v1/authorize-equipment", gcas.AuthorizeEquipmentHandler)
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		panic("unable to launch gca api")
+	}
+	gcas.httpPort = ":" + strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 	go func() {
-		gca.logger.Info("Starting HTTP server on port 35015...")
-		if err := gca.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			gca.logger.Fatal("Could not start HTTP server: ", err)
+		gcas.logger.Info("Starting HTTP server on port ", gcas.httpPort)
+		if err := gcas.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
+			gcas.logger.Fatal("Could not start HTTP server: ", err)
 		}
 	}()
 }

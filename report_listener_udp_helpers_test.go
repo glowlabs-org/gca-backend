@@ -19,8 +19,8 @@ func generateTestReport(shortID uint32, timeslot uint32, privKey PrivateKey) []b
 
 // sendUDPReport simulates sending a report to the server via UDP.
 // The server should be listening on the given IP and port.
-func sendUDPReport(report []byte) error {
-	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", serverIP, udpPort))
+func sendUDPReport(report []byte, port int) error {
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", serverIP, port))
 	if err != nil {
 		return err
 	}

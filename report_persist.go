@@ -25,13 +25,13 @@ func (gcas *GCAServer) loadEquipmentReports() error {
 	}
 
 	// Check that the data is a sensisble length.
-	if len(rawData) % 80 != 0 {
+	if len(rawData)%80 != 0 {
 		return fmt.Errorf("reports file has an unexpected size")
 	}
 
 	// Parse all of the reports and integrate them into the state.
 	for i := 0; i < len(rawData)/80; i++ {
-		report, err := gcas.parseReport(rawData[i*80:i*80+80])
+		report, err := gcas.parseReport(rawData[i*80 : i*80+80])
 		if err != nil {
 			return fmt.Errorf("corrupt report: %v", err)
 		}
