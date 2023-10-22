@@ -4,6 +4,7 @@
 package main
 
 import (
+	"sync/atomic"
 	"time"
 )
 
@@ -23,8 +24,13 @@ const (
 // timeslot related code.
 var manualCurrentTimeslot = uint32(0)
 
+// Sets the current time of the protocol to the provided value.
+func setCurrentTimeslot(val uint32) {
+	atomic.StoreUint32(&manualCurrentTimeslot, val)
+}
+
 // Returns the current time of the protocol, as measured in 5 minute increments
 // from genesis. This function implies a genesis time.
 func currentTimeslot() uint32 {
-	return manualCurrentTimeslot
+	return atomic.LoadUint32(&manualCurrentTimeslot)
 }

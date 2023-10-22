@@ -149,7 +149,9 @@ func (server *GCAServer) threadedLaunchUDPServer() {
 	}
 
 	var err error
+	server.mu.Lock()
 	server.conn, err = net.ListenUDP("udp", &udpAddress)
+	server.mu.Unlock()
 	if err != nil {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
