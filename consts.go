@@ -22,7 +22,7 @@ const (
 // from genesis. This function implies a genesis time.
 func currentTimeslot() uint32 {
 	// TODO: Update for real network launch.
-	genesisTime := 1697414400 // Monday Oct 16, 0:00:00 UTC
+	genesisTime := int64(1697414400) // Monday Oct 16, 0:00:00 UTC
 	now := time.Now().Unix()
 	if now < genesisTime {
 		panic("system clock appears to be incorrect")

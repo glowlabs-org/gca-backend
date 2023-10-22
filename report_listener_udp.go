@@ -1,7 +1,5 @@
 package main
 
-// TODO: Need to implement and test logic for dealing with duplicated reports.
-
 import (
 	"encoding/binary"
 	"errors"
