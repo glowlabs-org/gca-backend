@@ -15,11 +15,6 @@ import (
 // TODO: Need to write a high concurrency test where all of the major APIs and
 // functions of the server are blasting at once, that way we can detect race
 // conditions.
-//
-// TODO: Need to get to a point where we can have multiple servers running at
-// once while testing. This is more a concern just to ensure that we don't
-// accrue a ton of techincal debt before we start running multiple servers in
-// tests that sync. Syncing isn't a high priority, but technical debt is.
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {
