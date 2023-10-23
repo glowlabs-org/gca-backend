@@ -27,12 +27,10 @@ func TestParseReport(t *testing.T) {
 	}
 
 	// Setup the GCAServer with the test keys.
-	dir := generateTestDir(t.Name())
-	_, err := generateGCATestKeys(dir)
+	server, _, _, err := setupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := NewGCAServer(dir)
 	defer server.Close()
 
 	for _, e := range equipment {

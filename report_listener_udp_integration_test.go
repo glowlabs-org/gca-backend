@@ -8,15 +8,10 @@ import (
 // TestParseReportIntegration tests the GCAServer's ability to correctly
 // process and record device reports that are sent over UDP.
 func TestParseReportIntegration(t *testing.T) {
-	// Setup the GCAServer with the test keys. This happens first so that it has time to initialize
-	// before we generate all of the keypairs. We also sleep for 250ms because we found it decreases
-	// flaking.
-	dir := generateTestDir(t.Name())
-	gcaPrivKey, err := generateGCATestKeys(dir)
+	server, dir, gcaPrivKey, err := setupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := NewGCAServer(dir)
 
 	// Generate multiple test key pairs for devices.
 	numDevices := 3

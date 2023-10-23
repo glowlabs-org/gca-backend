@@ -12,22 +12,16 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 		panic("bad constant")
 	}
 
-	// Create test devices
-	var devices []EquipmentAuthorization
-	var privKeys []PrivateKey
-
-	// Generate test directory and GCA keys
-	dir := generateTestDir(t.Name())
-	_, err := generateGCATestKeys(dir)
+	// Create the server.
+	server, _, _, err := setupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Create the GCA Server
-	server := NewGCAServer(dir)
 	defer server.Close() // Ensure resources are cleaned up after the test.
 
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
+	var devices []EquipmentAuthorization
+	var privKeys []PrivateKey
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
 		pubKey, privKey := GenerateKeyPair()
 		device := EquipmentAuthorization{

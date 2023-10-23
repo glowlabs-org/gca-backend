@@ -37,13 +37,10 @@ func TestEquipmentAuthSerialization(t *testing.T) {
 
 // Perform an integration test for the equipment authorizations.
 func TestVerifyEquipmentAuthorization(t *testing.T) {
-	// Test setup
-	dir := generateTestDir(t.Name())
-	gcaPrivateKey, err := generateGCATestKeys(dir)
+	server, _, gcaPrivateKey, err := setupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := NewGCAServer(dir)
 	defer server.Close()
 
 	// Create and sign a valid EquipmentAuthorization
