@@ -22,7 +22,11 @@ func main() {
 	serverDir := filepath.Join(usr.HomeDir, "gca-server")
 
 	// Initialize a new GCAServer instance with the server directory.
-	gcaServer := NewGCAServer(serverDir)
+	gcaServer, err := NewGCAServer(serverDir)
+	if err != nil {
+		fmt.Println("Unable to launch GCA server:", err)
+		os.Exit(1)
+	}
 
 	// Create a channel to listen for operating system signals.
 	// The channel c is buffered with a size of 1.

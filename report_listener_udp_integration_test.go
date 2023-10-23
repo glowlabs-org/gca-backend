@@ -231,7 +231,10 @@ func TestParseReportIntegration(t *testing.T) {
 	// Turn off the server and turn it back on, checking that there are
 	// still banned reports.
 	server.Close()
-	server = NewGCAServer(dir)
+	server, err = NewGCAServer(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer server.Close()
 
 	// Check that the count for the recent reports is correct.

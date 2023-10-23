@@ -12,11 +12,7 @@ import (
 	"time"
 )
 
-// TODO: Need to change the function signature of NewGCAServer so that it
-// returns an error.
-//
-// TODO: Need to write the endpoints for the GCA server handshake (where the
-// GCA tells the server who it is) and also the auth page where the GCA server
+// TODO: Need to write the endpoints for the auth page where the GCA server
 // can show its recent authorization from the GCA.
 //
 // TODO: All existing HTTP GET endpoints need to have a signature attached to
@@ -64,14 +60,17 @@ type GCAServer struct {
 	mu         sync.Mutex
 }
 
-// NewGCAServer initializes a new instance of GCAServer.
+// NewGCAServer initializes a new instance of GCAServer and returns either
+// the GCAServer or an error.
 //
 // baseDir specifies the directory where all server files will be stored.
 // The function will create this directory if it does not exist.
-func NewGCAServer(baseDir string) *GCAServer {
+func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// Create the directory if it doesn't exist
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
-		os.MkdirAll(baseDir, 0755)
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
+			return nil, fmt.Errorf("Failed to create base directory: %v", err)
+		}
 	}
 
 	// Initialize the HTTP routing and logging functionalities
@@ -79,19 +78,18 @@ func NewGCAServer(baseDir string) *GCAServer {
 	loggerPath := filepath.Join(baseDir, "server.log")
 	logger, err := NewLogger(defaultLogLevel, loggerPath)
 	if err != nil {
-		logger.Fatal("Logger initialization failed: ", err)
+		return nil, fmt.Errorf("Logger initialization failed: %v", err)
 	}
 
-	// Compute the timeslot that should be used as the reports offset. We
-	// want it to be at 0:00:00 on Monday UTC. We want it to be less than 2
-	// weeks in the past but more than 4 days in the past.
+	// Compute the timeslot that should be used as the reports offset.
+	// This is aimed to be 0:00:00 on Monday UTC.
 	now := currentTimeslot()
 	closestWeek := uint32(0)
 	for now-closestWeek > 3200 {
 		closestWeek += 2016
 	}
 
-	// Initialize GCAServer with the proper fields
+	// Initialize GCAServer with the necessary fields
 	server := &GCAServer{
 		baseDir:                baseDir,
 		equipment:              make(map[uint32]EquipmentAuthorization),
@@ -110,33 +108,31 @@ func NewGCAServer(baseDir string) *GCAServer {
 
 	// Load the temporary Glow Certification Agent public key.
 	if err := server.loadGCATempKey(); err != nil {
-		logger.Fatal("Failed to load GCA public key: ", err)
+		return nil, fmt.Errorf("Failed to load GCA public key: %v", err)
 	}
-	// Load the Glow Certification Agent public key
+	// Load the Glow Certification Agent permanent public key
 	if err := server.loadGCAPubkey(); err != nil {
-		logger.Fatal("Failed to load GCA public key: ", err)
+		return nil, fmt.Errorf("Failed to load GCA public key: %v", err)
 	}
 	// Load equipment public keys
 	if err := server.loadEquipment(); err != nil {
-		logger.Fatal("Failed to load server equipment: ", err)
+		return nil, fmt.Errorf("Failed to load server equipment: %v", err)
 	}
 	// Load all equipment reports
 	if err := server.loadEquipmentReports(); err != nil {
-		logger.Fatal("Failed to load equipment reports: ", err)
+		return nil, fmt.Errorf("Failed to load equipment reports: %v", err)
 	}
 
-	// Start all of the background threads. There's a UDP server to grab
-	// reports, there's an HTTP server to interact with non-IOT equipment,
-	// and there's a background thread which updates the equipment reports
-	// infrequently.
+	// Start the background threads for various server functionalities
 	go server.threadedLaunchUDPServer()
 	go server.threadedMigrateReports()
 	server.launchAPI()
 
-	// Wait for a short duration to let everything load
+	// Pause for a short duration to allow all the components to load
 	time.Sleep(time.Millisecond * 100)
 
-	return server
+	// Return the initialized server
+	return server, nil
 }
 
 // Close cleanly shuts down the GCAServer instance.
