@@ -55,7 +55,10 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey PrivateKey, 
 	}
 
 	// Initialize and launch the GCAServer.
-	gcas = NewGCAServer(dir)
+	gcas, err = NewGCAServer(dir)
+	if err != nil {
+		return nil, PrivateKey{}, fmt.Errorf("failed to create gca server: %v", err)
+	}
 	return gcas, tempPrivKey, nil
 }
 
@@ -156,5 +159,4 @@ func TestGCAKeyLifecycle(t *testing.T) {
 	if err == nil {
 		t.Fatal("expecting an error")
 	}
-
 }
