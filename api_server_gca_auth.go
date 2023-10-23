@@ -125,6 +125,12 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 // registerGCA performs the actual registration based on the client request.
 // This function is responsible for the actual logic of registering the GCA.
 func (s *GCAServer) registerGCA(req RegisterGCARequest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gcaPubkeyAvailable {
+		return fmt.Errorf("a GCA key has already been registered")
+	}
+
 	// Parse and verify the GCA key
 	gk, err := req.ToGCAKey()
 	if err != nil {

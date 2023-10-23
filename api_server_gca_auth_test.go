@@ -121,8 +121,7 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateK
 			return PrivateKey{}, fmt.Errorf("failed to read response body: %v", readErr)
 		}
 		// Log or print the full response body
-		fmt.Printf("Received a non-200 status code: %d\nFull response: %s\n", resp.StatusCode, string(respBodyBytes))
-		return PrivateKey{}, fmt.Errorf("received a non-200 status code: %d", resp.StatusCode)
+		return PrivateKey{}, fmt.Errorf("received a non-200 status code: %d :: %s", resp.StatusCode, string(respBodyBytes))
 	}
 
 	// Return the private key and no error since the function succeeded.
@@ -142,22 +141,35 @@ func TestGCAKeyLifecycle(t *testing.T) {
 	}
 	defer gcas.Close()
 
-	// TODO: Check that the server lists the gca pubkey as unavailable.
+	// Check that the server lists the gca pubkey as unavailable.
+	if gcas.gcaPubkeyAvailable {
+		t.Fatal("gca pubkey should be set to unavailable before a pubkey has been submitted")
+	}
 
-	// TODO: Try submitting a public key to the server using the wrong priv
-	// key.
-
-	// TODO: Check that the server lists the gca pubkey as unavailable.
+	// Try submitting a public key to the server using the wrong priv key.
+	badTempKey := tempPrivKey
+	badTempKey[0]++
+	_, err = gcas.submitGCAKey(badTempKey)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if gcas.gcaPubkeyAvailable {
+		t.Fatal("gca pubkey should be set to unavailable before a pubkey has been submitted")
+	}
 
 	// Try submitting a public key to the server using the temp priv key.
 	_, err = gcas.submitGCAKey(tempPrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !gcas.gcaPubkeyAvailable {
+		t.Fatal("gca pubkey should be set to available after a pubkey has been submitted")
+	}
 
-	// TODO: Check tht the server lists the gca pubkey as available.
-
-	// TODO: Check that we get an error when trying to submit another gca
-	// key.
+	// Check that we get an error when trying to submit another gca key.
+	_, err = gcas.submitGCAKey(tempPrivKey)
+	if err == nil {
+		t.Fatal("expecting an error")
+	}
 
 }
