@@ -7,14 +7,10 @@ import (
 
 // TestThreadedMigrateReports tests the migration of equipment reports.
 func TestThreadedMigrateReports(t *testing.T) {
-	// Create a test directory for the GCAServer
-	dir := generateTestDir(t.Name())
-	_, err := generateGCATestKeys(dir)
+	server, _, _, err := setupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Initialize the GCAServer
-	server := NewGCAServer(dir)
 	defer server.Close()
 
 	// Because we mess with the global time during this test, we need to

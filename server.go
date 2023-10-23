@@ -12,6 +12,20 @@ import (
 	"time"
 )
 
+// TODO: Need to change the function signature of NewGCAServer so that it
+// returns an error.
+//
+// TODO: Need to write the endpoints for the GCA server handshake (where the
+// GCA tells the server who it is) and also the auth page where the GCA server
+// can show its recent authorization from the GCA.
+//
+// TODO: All existing HTTP GET endpoints need to have a signature attached to
+// them so that the caller knows that the data is coming from an authorized GCA
+// server.
+//
+// TODO: Existing endpoints need to fail gracefully if no GCA key has been
+// loaded yet. This means writing tests around hitting each endpoint.
+//
 // TODO: Need to write a high concurrency test where all of the major APIs and
 // functions of the server are blasting at once, that way we can detect race
 // conditions.
@@ -26,7 +40,18 @@ type GCAServer struct {
 	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
 
-	gcaPubkey PublicKey // Public key of the Glow Certification Agent.
+	// The GCA interacts with the server in two stages. The first stage
+	// uses a temporary key which is created by the technicians before the
+	// GCA lockbook is presented to the GCA. The actual GCA key is created
+	// *after* the GCA configures their lockbook. We don't require GCAs to
+	// be techincal, therefore so we don't expect them to be able to
+	// configure their own server to upload their real pubkey. Instead, the
+	// technician puts a temporary key on the lockbook and server, then
+	// after the real key is generated, it can be signed by the temp key to
+	// minimize the risk of a MiTM attack against the server.
+	gcaPubkey          PublicKey
+	gcaPubkeyAvailable bool
+	gcaTempKey         PublicKey
 
 	baseDir    string         // Base directory for server files
 	logger     *Logger        // Custom logger for the server
@@ -83,6 +108,10 @@ func NewGCAServer(baseDir string) *GCAServer {
 		quit: make(chan bool),
 	}
 
+	// Load the temporary Glow Certification Agent public key.
+	if err := server.loadGCATempKey(); err != nil {
+		logger.Fatal("Failed to load GCA public key: ", err)
+	}
 	// Load the Glow Certification Agent public key
 	if err := server.loadGCAPubkey(); err != nil {
 		logger.Fatal("Failed to load GCA public key: ", err)
@@ -137,13 +166,29 @@ func (server *GCAServer) Close() {
 	server.logger.Close()
 }
 
+// loadGCATempKey loads the temporary key of the Glow Certification Agent.
+func (server *GCAServer) loadGCATempKey() error {
+	path := filepath.Join(server.baseDir, "gca.tempkey")
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("unable to read temp gca key from file: %v", err)
+	}
+	copy(server.gcaTempKey[:], data)
+	return nil
+}
+
 // loadGCAPubkey loads the Glow Certification Agent public key from a file.
 func (server *GCAServer) loadGCAPubkey() error {
 	pubkeyPath := filepath.Join(server.baseDir, "gca.pubkey")
 	pubkeyData, err := ioutil.ReadFile(pubkeyPath)
+	if os.IsNotExist(err) {
+		server.logger.Info("GCA Temp Key not available, waiting to receive over the API")
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("unable to read public key from file: %v", err)
 	}
+	server.gcaPubkeyAvailable = true
 	copy(server.gcaPubkey[:], pubkeyData)
 	return nil
 }

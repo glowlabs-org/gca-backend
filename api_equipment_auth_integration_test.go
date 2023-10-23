@@ -12,15 +12,10 @@ import (
 // TestAuthorizeEquipmentIntegration checks that the full flow for
 // authorizing new equipment works as intended.
 func TestAuthorizeEquipmentIntegration(t *testing.T) {
-	// Generate test directory and GCA keys
-	// The GCA keys are cryptographic keys needed by the GCA server.
-	dir := generateTestDir(t.Name())
-	gcaPrivKey, err := generateGCATestKeys(dir)
+	server, dir, gcaPrivKey, err := setupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Create a new instance of the GCA Server
-	server := NewGCAServer(dir)
 
 	// Create the http request that will authorize new equipment.
 	body := EquipmentAuthorizationRequest{
@@ -35,10 +30,12 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
 	signature := Sign(sb, gcaPrivKey)
 	body.Signature = hex.EncodeToString(signature[:])
+
 	// Convert the request body to JSON format.
 	jsonBody, _ := json.Marshal(body)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
@@ -46,6 +43,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
+
 	// Check if the HTTP status code is OK (200).
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
