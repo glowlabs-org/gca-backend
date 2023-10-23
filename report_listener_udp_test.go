@@ -14,17 +14,6 @@ import (
 //   - Reports signed by the wrong equipment are rejected.
 //   - The values within the report are correctly parsed and verified.
 func TestParseReport(t *testing.T) {
-	// Generate multiple test key pairs for equipment.
-	numEquipment := 3
-	equipment := make([]EquipmentAuthorization, numEquipment)
-	privKeys := make([]PrivateKey, numEquipment)
-
-	for i := 0; i < numEquipment; i++ {
-		pubKey, privKey := GenerateKeyPair()
-		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
-		equipment[i].PublicKey = pubKey
-		privKeys[i] = privKey
-	}
 
 	// Setup the GCAServer with the test keys.
 	server, _, _, err := setupTestEnvironment(t.Name())
@@ -33,10 +22,23 @@ func TestParseReport(t *testing.T) {
 	}
 	defer server.Close()
 
+	// Generate multiple test key pairs for equipment.
+	numEquipment := 3
+	equipment := make([]EquipmentAuthorization, numEquipment)
+	privKeys := make([]PrivateKey, numEquipment)
+	for i := 0; i < numEquipment; i++ {
+		pubKey, privKey := GenerateKeyPair()
+		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
+		equipment[i].PublicKey = pubKey
+		privKeys[i] = privKey
+	}
+
+	// Load the equipment
 	for _, e := range equipment {
 		server.loadEquipmentAuth(e)
 	}
 
+	// Run some reports on each piece of equipment.
 	for i, e := range equipment {
 		er := EquipmentReport{
 			ShortID:     e.ShortID,
