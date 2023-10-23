@@ -4,6 +4,15 @@ import (
 	"testing"
 )
 
+// loadEquipmentAuths is responsible for populating the equipment map
+// using the provided array of EquipmentAuths.
+func (gcas *GCAServer) loadEquipmentAuth(ea EquipmentAuthorization) {
+	// Add the equipment's public key to the equipment map using its ShortID as the key
+	gcas.equipment[ea.ShortID] = ea
+	gcas.equipmentReports[ea.ShortID] = new([4032]EquipmentReport)
+	gcas.addRecentEquipmentAuth(ea)
+}
+
 // Test function to check the serialization and deserialization
 //
 // This function serializes and then deserializes an EquipmentAuthorization

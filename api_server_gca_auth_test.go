@@ -32,21 +32,6 @@ import (
 	"testing"
 )
 
-// setupTestEnvironment will return a fully initialized gca server that is
-// ready to be used.
-func setupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey PrivateKey, err error) {
-	dir = generateTestDir(testName)
-	server, tempPrivKey, err := gcaServerWithTempKey(dir)
-	if err != nil {
-		return nil, "", PrivateKey{}, fmt.Errorf("unable to create gca server with temp key: %v", err)
-	}
-	gcaPrivKey, err = server.submitGCAKey(tempPrivKey)
-	if err != nil {
-		return nil, "", PrivateKey{}, fmt.Errorf("unable to submit gca priv key: %v", err)
-	}
-	return server, dir, gcaPrivKey, nil
-}
-
 // gcaServerWithTempKey creates a temporary GCA key, saves its public key to a
 // file, and launches the GCAServer.
 //
