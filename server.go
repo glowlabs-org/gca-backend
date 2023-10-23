@@ -15,13 +15,6 @@ import (
 // TODO: Need to write the endpoints for the auth page where the GCA server
 // can show its recent authorization from the GCA.
 //
-// TODO: All existing HTTP GET endpoints need to have a signature attached to
-// them so that the caller knows that the data is coming from an authorized GCA
-// server.
-//
-// TODO: Existing endpoints need to fail gracefully if no GCA key has been
-// loaded yet. This means writing tests around hitting each endpoint.
-//
 // TODO: Need to write a high concurrency test where all of the major APIs and
 // functions of the server are blasting at once, that way we can detect race
 // conditions.

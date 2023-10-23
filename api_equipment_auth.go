@@ -68,7 +68,7 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 	}
 
 	// Validate and process the request
-	if err := gca.authorizeEquipment(request); err != nil {
+	if err := gca.managedAuthorizeEquipment(request); err != nil {
 		http.Error(w, fmt.Sprint("Failed to authorize equipment:", err), http.StatusInternalServerError)
 		gca.logger.Error("Failed to authorize equipment: ", err)
 		return
@@ -80,9 +80,15 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 	gca.logger.Info("Successfully authorized equipment.")
 }
 
-// authorizeEquipment performs the actual authorization based on the client request.
+// managedAuthorizeEquipment performs the actual authorization based on the client request.
 // This function is responsible for the actual logic of authorizing the equipment.
-func (gcas *GCAServer) authorizeEquipment(req EquipmentAuthorizationRequest) error {
+func (gcas *GCAServer) managedAuthorizeEquipment(req EquipmentAuthorizationRequest) error {
+	gcas.mu.Lock()
+	defer gcas.mu.Unlock()
+	if !gcas.gcaPubkeyAvailable {
+		return fmt.Errorf("this gca server has not yet been initialized by the GCA")
+	}
+
 	// Parse and verify the authorization
 	auth, err := req.ToAuthorization()
 	if err != nil {
