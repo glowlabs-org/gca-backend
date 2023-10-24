@@ -1,5 +1,8 @@
 package main
 
+// This file contains helper functions and structs related to the processing of
+// equipment reports.
+
 import (
 	"encoding/binary"
 	"errors"

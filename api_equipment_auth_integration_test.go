@@ -24,10 +24,10 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey PrivateKey) 
 	// request body.
 	pubkey, equipmentKey := GenerateKeyPair()
 	body := EquipmentAuthorizationRequest{
-		ShortID: shortID,
-		PublicKey: hex.EncodeToString(pubkey[:]),
-		Capacity: 15400300,
-		Debt: 11223344,
+		ShortID:    shortID,
+		PublicKey:  hex.EncodeToString(pubkey[:]),
+		Capacity:   15400300,
+		Debt:       11223344,
 		Expiration: 15000,
 		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // need a dummy signature
 	}

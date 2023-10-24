@@ -1,5 +1,9 @@
 package main
 
+// This file contains most of the brains of the server, it creates and launches
+// all of the key components and background threads, and it handles shutting
+// them all down as well.
+
 import (
 	"context"
 	"fmt"
@@ -18,6 +22,12 @@ import (
 // TODO: Need to write a high concurrency test where all of the major APIs and
 // functions of the server are blasting at once, that way we can detect race
 // conditions.
+//
+// TODO: Need to write an endpoint that will allow the GCA (and maybe anyone)
+// to fetch all of the data from the server. This would actually just consist
+// of loading up the respective persist files and zipping them together. That
+// would allow anyone to reconstruct all of the equipment, the bans, and the
+// reports.
 
 // GCAServer defines the structure for our Grid Control Authority Server.
 type GCAServer struct {

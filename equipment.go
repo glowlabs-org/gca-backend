@@ -1,5 +1,8 @@
 package main
 
+// This file contains helper functions related to the creation and tracking of
+// equipement.
+
 import (
 	"bytes"
 	"fmt"

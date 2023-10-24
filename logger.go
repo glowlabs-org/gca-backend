@@ -1,5 +1,6 @@
-// Package main provides a simple logging utility.
 package main
+
+// This file implements a logging utility for the GCA server.
 
 import (
 	"fmt"
