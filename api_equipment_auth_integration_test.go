@@ -29,6 +29,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey PrivateKey) 
 		Capacity: 15400300,
 		Debt: 11223344,
 		Expiration: 15000,
+		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // need a dummy signature
 	}
 
 	// Serialize and sign the request.
@@ -249,5 +250,11 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	if len(server.equipmentBans) != 1 {
 		t.Fatal("bad")
+	}
+
+	// Test the hardware function quickly.
+	_, _, err = server.submitNewHardware(1024, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
