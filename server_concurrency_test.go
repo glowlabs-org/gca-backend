@@ -8,6 +8,7 @@ package main
 // without setting off the race detector.
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -20,6 +21,12 @@ import (
 // "by the book" - we try as much as possible to avoid referencing the internal
 // state of the gcaServer and instead just query its APIs.
 func TestConcurrency(t *testing.T) {
+	// This test adjusts the flow of time. Defer a statement that resets
+	// the time for future tests.
+	defer func() {
+		setCurrentTimeslot(0)
+	}()
+
 	// The concurrency test starts at time 0 with no GCA key provided, only
 	// the temp key is in place. This means that all of the concurrent
 	// operations will be failing, but that's okay. We want to make sure
@@ -150,6 +157,153 @@ func TestConcurrency(t *testing.T) {
 	// sleep for 10 milliseconds at a time and then do work, so every loop
 	// should get plenty of iterations in within 250 milliseconds.
 	time.Sleep(250 * time.Millisecond)
+
+	// Send a GCA key to the server. All of the above threads should be
+	// able to continue running successfully after that, as they were
+	// designed not care whether the GCA key was active or not.
+	gcaPrivKey, err := gcas.submitGCAKey(tempPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ShortID counter that can be shared across all threads that
+	// are authorizing hardware.
+	atomicShortID := uint32(0)
+
+	// Create a few threads that will be repeatedly submitting GCA keys
+	// with the right signature. Since there's already a key, it should
+	// fail.
+	for i := 0; i < 3; i++ {
+		// Create a goroutine to repeatedly submit the bad key .
+		go func(key PrivateKey) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Try submitting the key.
+				_, err := gcas.submitGCAKey(key)
+				if err == nil {
+					t.Fatal("should not be able to submit a GCA key after it's been set")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				i++
+			}
+		}(tempPrivKey)
+	}
+
+	// Create a few threads that will be repeatedly authorizing new
+	// equipment.
+	for i := 0; i < 3; i++ {
+		// Create a goroutine to repeatedly authorize new hardware.
+		go func(key PrivateKey) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Try submitting some new hardware.
+				shortID := atomic.AddUint32(&atomicShortID, 1)
+				_, _, err := gcas.submitNewHardware(shortID, key)
+				if err != nil {
+					t.Fatal("should be able to submit new hardware")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				i++
+			}
+		}(gcaPrivKey)
+	}
+
+	// Create a few threads that will use the same authorized equipment to
+	// submit reports. This is the first place where we will be actually
+	// advancing the flow of time.
+	for i := 0; i < 3; i++ {
+		// Create authorized equipment to be making reports.
+		shortID := atomic.AddUint32(&atomicShortID, 1)
+		ea, ePriv, err := gcas.submitNewHardware(shortID, gcaPrivKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		go func(ea EquipmentAuthorization, ePriv PrivateKey) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Before submitting a new report, advance the
+				// time.
+				slot := atomic.AddUint32(&manualCurrentTimeslot, 1)
+
+				// Try submitting a new report.
+				err := gcas.sendEquipmentReportSpecific(ea, ePriv, slot, 5)
+				if err != nil {
+					t.Fatal("reports should send correctly")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					// Log the percentage of requests that
+					// seem to have gone through.
+					gcas.mu.Lock()
+					totalGood := 0
+					totalBad := 0
+					for i := gcas.equipmentReportsOffset; i < currentTimeslot() && i < gcas.equipmentReportsOffset+4032; i++ {
+						if gcas.equipmentReports[ea.ShortID][i-gcas.equipmentReportsOffset].PowerOutput > 1 {
+							totalGood++
+						} else {
+							totalBad++
+						}
+					}
+					gcas.mu.Unlock()
+
+					// There are three threads marching
+					// time forward, so we expect a read
+					// rate of 1/3rd.
+					//
+					// NOTE: The target rate of 1/3rd will
+					// change if the number of threads that
+					// are changing the time also changes.
+					t.Logf("equipment %v hit rate: %v :: %v :: %v", ea.ShortID, float64(totalGood)/float64(totalGood+totalBad), totalGood+totalBad, i)
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				i++
+			}
+		}(ea, ePriv)
+	}
+
+	// Run for another 250 milliseconds to let the new loops have some time
+	// to generate chaos.
+	time.Sleep(250 * time.Millisecond)
+
+	// Stop everything, and then wait 50 more milliseconds for good measure.
+	close(stopSignal)
+	time.Sleep(50 * time.Millisecond)
 
 	/* - a bunch of reference code for when we build the real test. Right
 	* now there is no 'by the book' method for setting up the GCA keys with

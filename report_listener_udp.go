@@ -168,9 +168,6 @@ func (server *GCAServer) threadedLaunchUDPServer() {
 	server.logger.Infof("UDP server launched on port %v", server.udpPort)
 	defer server.udpConn.Close()
 
-	// Initialize the buffer to hold incoming data
-	buffer := make([]byte, equipmentReportSize)
-
 	// Continuously listen for incoming UDP packets
 	for {
 		select {
@@ -181,6 +178,7 @@ func (server *GCAServer) threadedLaunchUDPServer() {
 		}
 
 		// Read from the UDP socket
+		buffer := make([]byte, equipmentReportSize)
 		readBytes, _, err := server.udpConn.ReadFromUDP(buffer)
 		if err != nil {
 			server.logger.Error("Failed to read from UDP socket: ", err)
