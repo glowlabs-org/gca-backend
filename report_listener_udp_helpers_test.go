@@ -1,5 +1,7 @@
 package main
 
+// This file contains helpers related to testing the UDP reports.
+
 import (
 	"fmt"
 	"net"

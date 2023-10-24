@@ -1,5 +1,21 @@
 package main
 
+// This file creates an API endpoint that monitoring equipment can hit over
+// UDP. The purpose of the provided API is to collect reports from the
+// monitoring equipment. UDP is used as the protocol because it is the most
+// lightweight, and reports are going to be sent over IoT networks, which means
+// that they need to be very light.
+//
+// Reports will *always* be just one packet, so we don't have to worry about
+// packet fragmentation when rebuilding the UDP stream. We do have to worry
+// about dropped packets, this is handled by a separate TCP endpoint that
+// communicates to the IoT device which reports have been received vs not
+// received for the equipment. The equipment can then resend anything that
+// didn't successfully transfer across the network.
+//
+// This combination should keep long term bandwidth requirements low while
+// still preserving long term reliability.
+
 import (
 	"encoding/binary"
 	"errors"
@@ -92,6 +108,11 @@ func (server *GCAServer) integrateReport(report EquipmentReport) {
 func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 	server.mu.Lock()
 	defer server.mu.Unlock()
+
+	// We could do a check here to verify that the GCA pubkey has been
+	// provided to the server, but if no GCA key has been provided, the
+	// server should not have any authorized equipment on it anyway, and
+	// therefore parseReport should fail.
 
 	// Parse the raw data into an EquipmentReport
 	report, err := server.parseReport(rawData)

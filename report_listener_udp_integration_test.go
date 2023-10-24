@@ -1,9 +1,46 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
+
+// sendEquipmentReport will take an equipment authorization and the private key
+// of the equipment, and then send a valid report to the GCA server on behalf
+// of the equipment. It will invent numbers for the power output based on the
+// authorized limits of the equipment and use the current timeslot as the
+// timeslot submission.
+//
+// NOTE: Because UDP is used as the protocol, this send may fail. It seems like
+// the test suite will occasionally fail to send the udp packet even over
+// localhost. Therefore this function doesn't do any checking itself to see
+// whether the report successfully arrived.
+func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv PrivateKey) error {
+	// Generate a number between 2 and the capacity for the PowerOutput. We
+	// cannot use 0 or 1 because both of those values are sentinel values
+	// and thus the report will simply be ignored by the server.
+	output := generateSecureRandomInt(2, int(ea.Capacity))
+	return gcas.sendEquipmentReportSpecific(ea, ePriv, currentTimeslot(), uint64(output))
+}
+
+// sendEquipmentReportSpecific is the same as sendEquipmentReport, but takes
+// specific values for the power output and the timeslot.
+func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, ePriv PrivateKey, timeslot uint32, output uint64) error {
+	// Create the report and sign it using the provided private key.
+	er := EquipmentReport{
+		ShortID:     ea.ShortID,
+		Timeslot:    timeslot,
+		PowerOutput: output,
+	}
+	er.Signature = Sign(er.SigningBytes(), ePriv)
+
+	// Send the report over UDP.
+	if err := sendUDPReport(er.Serialize(), gcas.udpPort); err != nil {
+		return fmt.Errorf("Failed to send UDP report for device %d: %v", ea.ShortID, err)
+	}
+	return nil
+}
 
 // TestParseReportIntegration tests the GCAServer's ability to correctly
 // process and record device reports that are sent over UDP.

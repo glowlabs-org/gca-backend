@@ -1,5 +1,12 @@
 package main
 
+// This file contains one large integration test focused on detecting race
+// conditions. It's intentionally a pretty chaotic test that has every API
+// being accessed rapidly, simultaneously. It's not worried so much about the
+// correctness of the logic as it is worried about ensuring that each piece is
+// able to operate independently and maintain a level of consistency, all
+// without setting off the race detector.
+
 import (
 	"testing"
 	"time"
@@ -32,7 +39,7 @@ func TestConcurrency(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		// Create the bad key.
 		badKey := tempPrivKey
-		badKey[0] += byte(i+1)
+		badKey[0] += byte(i + 1)
 
 		// Create a goroutine to repeatedly submit the bad key .
 		go func(key PrivateKey) {
@@ -67,7 +74,7 @@ func TestConcurrency(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		// Create the bad key.
 		badKey := tempPrivKey
-		badKey[0] += byte(i+1)
+		badKey[0] += byte(i + 1)
 
 		// Create a goroutine to repeatedly submit the bad key .
 		go func(key PrivateKey) {
@@ -96,6 +103,53 @@ func TestConcurrency(t *testing.T) {
 			}
 		}(badKey)
 	}
+
+	// Create a few threads that will be repeatedly sending bad reports
+	// from equipment that was never authorized.
+	for i := 0; i < 3; i++ {
+		// Create a real keypair for the equipment, then create the
+		// equipment. The Signature is left blank because no valid
+		// signature auth can exist yet, as we haven't generated the
+		// GCA key yet.
+		ePub, ePriv := GenerateKeyPair()
+		ea := EquipmentAuthorization{
+			ShortID:    5,
+			PublicKey:  ePub,
+			Capacity:   15e9,
+			Debt:       5e6,
+			Expiration: 15e6,
+		}
+		go func(ea EquipmentAuthorization, ePriv PrivateKey) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Try submitting a new report.
+				err := gcas.sendEquipmentReport(ea, ePriv)
+				if err != nil {
+					t.Fatal("even though the reports are invalid, they should still send correctly over UDP")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				i++
+			}
+		}(ea, ePriv)
+	}
+
+	// Let everything run for a bit before the test ends. Most of the loops
+	// sleep for 10 milliseconds at a time and then do work, so every loop
+	// should get plenty of iterations in within 250 milliseconds.
+	time.Sleep(250 * time.Millisecond)
 
 	/* - a bunch of reference code for when we build the real test. Right
 	* now there is no 'by the book' method for setting up the GCA keys with

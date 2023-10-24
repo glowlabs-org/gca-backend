@@ -1,5 +1,10 @@
 package main
 
+// This file launches a GCA server. Most of the work is being done in
+// 'NewGCAServer()', the main purpose of this file is to set up OS related
+// tasks such as creating the homedir for the server and listening for quit
+// signals from the OS.
+
 import (
 	"fmt"
 	"os"

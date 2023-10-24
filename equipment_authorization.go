@@ -1,5 +1,8 @@
 package main
 
+// This file contains helper functions related to managing equipment
+// authorizations.
+
 import (
 	"encoding/binary"
 	"errors"

@@ -1,7 +1,10 @@
 package main
 
 // This file contains some helper methods that are applicable across the whole
-// test suite.
+// test suite. The functions in this file are useful for testing in general and
+// not specific to testing any particular function of the GCA server. Most test
+// suite helper functions can be found in the respective test file that tests
+// the core component that the helper function relates to.
 
 import (
 	"crypto/rand"
@@ -41,10 +44,7 @@ func generateTestDir(testName string) string {
 	unixTime := time.Now().Unix()
 
 	// Generate a 6-digit secure random number
-	randNumber, err := generateSecureRandomInt(100000, 999999)
-	if err != nil {
-		panic(err)
-	}
+	randNumber := generateSecureRandomInt(100000, 999999)
 
 	// Construct the directory name using the test name, UNIX timestamp, and random number
 	dirName := fmt.Sprintf("%s-%d-%d", testName, unixTime, randNumber)
@@ -53,7 +53,7 @@ func generateTestDir(testName string) string {
 	fullPath := fmt.Sprintf("%s/%s", tempDir, dirName)
 
 	// Create the temporary directory
-	err = os.MkdirAll(fullPath, 0755)
+	err := os.MkdirAll(fullPath, 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func generateTestDir(testName string) string {
 // Returns:
 // - int: The secure random integer.
 // - error: Any error that occurs during the random number generation.
-func generateSecureRandomInt(min, max int) (int, error) {
+func generateSecureRandomInt(min, max int) int {
 	// Calculate the range
 	rangeSize := max - min + 1
 
@@ -75,9 +75,9 @@ func generateSecureRandomInt(min, max int) (int, error) {
 	var n uint32
 	err := binary.Read(rand.Reader, binary.LittleEndian, &n)
 	if err != nil {
-		return 0, err
+		panic("secure random number generation is not working")
 	}
 
 	// Map the number to the desired range
-	return int(n)%rangeSize + min, nil
+	return int(n)%rangeSize + min
 }
