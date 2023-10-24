@@ -16,12 +16,10 @@ import (
 	"time"
 )
 
-// TODO: Need to write the endpoints for the auth page where the GCA server
-// can show its recent authorization from the GCA.
-//
-// TODO: Need to write a high concurrency test where all of the major APIs and
-// functions of the server are blasting at once, that way we can detect race
-// conditions.
+// TODO: Need to write the endpoints for the auth page where the GCA server can
+// show its recent authorization from the GCA... actually, instead we're just
+// going to have the GCA include it's own authorization in every GET endpoint
+// that it serves.
 //
 // TODO: Need to write an endpoint that will allow the GCA (and maybe anyone)
 // to fetch all of the data from the server. This would actually just consist
