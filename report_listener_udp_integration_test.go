@@ -39,6 +39,7 @@ func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, eP
 	if err := sendUDPReport(er.Serialize(), gcas.udpPort); err != nil {
 		return fmt.Errorf("Failed to send UDP report for device %d: %v", ea.ShortID, err)
 	}
+	gcas.logger.Infof("successful send: %v :: %v", er.ShortID, er.Timeslot)
 	return nil
 }
 
