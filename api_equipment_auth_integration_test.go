@@ -4,10 +4,75 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
 )
+
+// submitNewHardware will create a new piece of hardware and submit it to the
+// GCA server.
+func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey PrivateKey) (ea EquipmentAuthorization, equipmentKey PrivateKey, err error) {
+	// Verify that the shortID is free. Even if the shortID is not free,
+	// we'll still make the web request because the caller may want the
+	// request to go through.
+	gcas.mu.Lock()
+	_, shortIDAlreadyUsed := gcas.equipment[shortID]
+	gcas.mu.Unlock()
+
+	// Create a keypair for the equipment, then create the equipment
+	// request body.
+	pubkey, equipmentKey := GenerateKeyPair()
+	body := EquipmentAuthorizationRequest{
+		ShortID: shortID,
+		PublicKey: hex.EncodeToString(pubkey[:]),
+		Capacity: 15400300,
+		Debt: 11223344,
+		Expiration: 15000,
+	}
+
+	// Serialize and sign the request.
+	ea, err = body.ToAuthorization()
+	if err != nil {
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("unable to serialize contemplated equipment: %v", err)
+	}
+	sb := ea.SigningBytes()
+	sig := Sign(sb, gcaPrivKey)
+	body.Signature = hex.EncodeToString(sig[:])
+
+	// Convert the request to json and post it.
+	jsonBody, _ := json.Marshal(body)
+	resp, err := http.Post("http://localhost"+gcas.httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
+	}
+
+	// Verify the response.
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+	var response map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("Failed to decode response: %v", err)
+	}
+	if status, exists := response["status"]; !exists || status != "success" {
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("Unexpected response: %v", response)
+	}
+	resp.Body.Close()
+
+	// Verify that the server sees the new equipment.
+	if shortIDAlreadyUsed {
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("shortID already in use")
+	}
+	gcas.mu.Lock()
+	_, exists := gcas.equipment[shortID]
+	gcas.mu.Unlock()
+	if !exists {
+		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("equipment does not appear to have been added to server correctly")
+	}
+	return ea, equipmentKey, nil
+}
 
 // TestAuthorizeEquipmentIntegration checks that the full flow for
 // authorizing new equipment works as intended.
