@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 // TestConcurrency is a large integration test that tries to get actions firing
@@ -12,6 +13,90 @@ import (
 // "by the book" - we try as much as possible to avoid referencing the internal
 // state of the gcaServer and instead just query its APIs.
 func TestConcurrency(t *testing.T) {
+	// The concurrency test starts at time 0 with no GCA key provided, only
+	// the temp key is in place. This means that all of the concurrent
+	// operations will be failing, but that's okay. We want to make sure
+	// everything is failing, and that there are no race conditions.
+	//
+	// That means we start with a server that has no temp key.
+	dir := generateTestDir(t.Name())
+	gcas, tempPrivKey, err := gcaServerWithTempKey(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stopSignal := make(chan struct{})
+
+	// Create a few threads that will be repeatedly submitting GCA keys
+	// with the wrong signature. Every try should fail.
+	for i := 0; i < 3; i++ {
+		// Create the bad key.
+		badKey := tempPrivKey
+		badKey[0] += byte(i+1)
+
+		// Create a goroutine to repeatedly submit the bad key .
+		go func(key PrivateKey) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Try submitting the key.
+				_, err := gcas.submitGCAKey(key)
+				if err == nil {
+					t.Fatal("should not be able to submit a GCA key with a bad private key")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				i++
+			}
+		}(badKey)
+	}
+
+	// Create a few threads that will be repeatedly attempting to authorize
+	// equipment using a bad key. Every try should fail.
+	for i := 0; i < 3; i++ {
+		// Create the bad key.
+		badKey := tempPrivKey
+		badKey[0] += byte(i+1)
+
+		// Create a goroutine to repeatedly submit the bad key .
+		go func(key PrivateKey) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Try submitting some new hardware.
+				_, _, err := gcas.submitNewHardware(666777, key)
+				if err == nil {
+					t.Fatal("should not be able to submit a GCA key with a bad private key")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				i++
+			}
+		}(badKey)
+	}
+
 	/* - a bunch of reference code for when we build the real test. Right
 	* now there is no 'by the book' method for setting up the GCA keys with
 	* the server, so this test can't be built at all without shortcuts.
