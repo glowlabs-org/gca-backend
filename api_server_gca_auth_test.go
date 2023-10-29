@@ -24,6 +24,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -66,17 +67,15 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey PrivateKey, 
 // GCA public key to it. It returns the private key corresponding to
 // the GCA public key and any error encountered during the process.
 func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateKey, err error) {
-	// Generate the new key pair for the GCA. Assume GenerateKeyPair
-	// is a function that returns a public key and a private key.
+	// Generate the new key pair for the GCA.
 	publicKey, privateKey := GenerateKeyPair()
 
-	// Create a GCAKey object. We'll populate this with the newly
-	// generated public key and a corresponding signature.
+	// Create a GCAKey object and populate it with the public key and signature.
 	gk := GCAKey{PublicKey: publicKey}
 	signingBytes := gk.SigningBytes()
 	gk.Signature = Sign(signingBytes, tempPrivKey)
 
-	// Create a new request payload
+	// Create a new request payload for the server.
 	reqPayload := RegisterGCARequest{
 		GCAKey:    fmt.Sprintf("%x", gk.PublicKey),
 		Signature: fmt.Sprintf("%x", gk.Signature),
@@ -86,14 +85,14 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateK
 		return PrivateKey{}, fmt.Errorf("error marshaling payload: %v", err)
 	}
 
-	// Create a new HTTP request
+	// Create a new HTTP request to submit the GCA key.
 	req, err := http.NewRequest("POST", "http://localhost"+gcas.httpPort+"/api/v1/register-gca", bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return PrivateKey{}, fmt.Errorf("error creating new http request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// Send the request
+	// Send the HTTP request.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -101,18 +100,35 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateK
 	}
 	defer resp.Body.Close()
 
-	// Read the response and validate it
+	// Validate the server's response.
 	if resp.StatusCode != http.StatusOK {
-		// Read the full response body for debugging
+		// Read and log the full response body for debugging.
 		respBodyBytes, readErr := ioutil.ReadAll(resp.Body)
 		if readErr != nil {
 			return PrivateKey{}, fmt.Errorf("failed to read response body: %v", readErr)
 		}
-		// Log or print the full response body
 		return PrivateKey{}, fmt.Errorf("received a non-200 status code: %d :: %s", resp.StatusCode, string(respBodyBytes))
 	}
 
-	// Return the private key and no error since the function succeeded.
+	// Decode the JSON response from the server.
+	var jsonResponse map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&jsonResponse); err != nil {
+		return PrivateKey{}, fmt.Errorf("failed to decode json response: %v", err)
+	}
+
+	// Extract the server's public key from the JSON response.
+	serverPubKeyHex, ok := jsonResponse["ServerPublicKey"]
+	if !ok {
+		return PrivateKey{}, fmt.Errorf("ServerPublicKey not found in response")
+	}
+
+	// Verify that the server's public key matches the expected public key.
+	expectedServerPubKeyHex := hex.EncodeToString(gcas.staticPublicKey[:])
+	if serverPubKeyHex != expectedServerPubKeyHex {
+		return PrivateKey{}, fmt.Errorf("mismatch in server public key: expected %s, got %s", expectedServerPubKeyHex, serverPubKeyHex)
+	}
+
+	// Return the GCA private key if everything is successful.
 	return privateKey, nil
 }
 
