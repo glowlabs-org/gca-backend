@@ -16,6 +16,10 @@ import (
 	"time"
 )
 
+// TODO: Need to write an endpoint that will allow a hardware device to sync to
+// the server, identifying all of the data that the hardware has that the
+// server doesn't.
+//
 // TODO: Need to write the endpoints for the auth page where the GCA server can
 // show its recent authorization from the GCA... actually, instead we're just
 // going to have the GCA include it's own authorization in every GET endpoint
@@ -26,8 +30,14 @@ import (
 // of loading up the respective persist files and zipping them together. That
 // would allow anyone to reconstruct all of the equipment, the bans, and the
 // reports.
+//
+// TODO: Need some sort of logrotate or other log protection that prevents spam
+// logging from filling up the server's disk space.
+//
+// TODO: Need to add private keys for the server, and need to tell the GCA
+// client what the pubkey of the GCA server is.
 
-// GCAServer defines the structure for our Grid Control Authority Server.
+// GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
 	equipment              map[uint32]EquipmentAuthorization // Map from a ShortID to the full equipment authorization
 	equipmentBans          map[uint32]struct{}               // Tracks which equipment is banned
@@ -49,6 +59,12 @@ type GCAServer struct {
 	gcaPubkey          PublicKey
 	gcaPubkeyAvailable bool
 	gcaTempKey         PublicKey
+
+	// These are the signing keys for the GCA server. The GCA server will
+	// sign all GET requests so that the caller knows the data is
+	// authentic.
+	staticPrivateKey PrivateKey
+	staticPublicKey PublicKey
 
 	baseDir    string         // Base directory for server files
 	logger     *Logger        // Custom logger for the server
@@ -107,21 +123,28 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		quit: make(chan bool),
 	}
 
+	// Load the GCA Server keys.
+	pub, priv, err := server.loadGCAServerKeys()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load gca server keys: %v", err)
+	}
+	server.staticPublicKey = pub
+	server.staticPrivateKey = priv
 	// Load the temporary Glow Certification Agent public key.
 	if err := server.loadGCATempKey(); err != nil {
-		return nil, fmt.Errorf("Failed to load GCA public key: %v", err)
+		return nil, fmt.Errorf("failed to load GCA public key: %v", err)
 	}
 	// Load the Glow Certification Agent permanent public key
 	if err := server.loadGCAPubkey(); err != nil {
-		return nil, fmt.Errorf("Failed to load GCA public key: %v", err)
+		return nil, fmt.Errorf("failed to load GCA public key: %v", err)
 	}
 	// Load equipment public keys
 	if err := server.loadEquipment(); err != nil {
-		return nil, fmt.Errorf("Failed to load server equipment: %v", err)
+		return nil, fmt.Errorf("failed to load server equipment: %v", err)
 	}
 	// Load all equipment reports
 	if err := server.loadEquipmentReports(); err != nil {
-		return nil, fmt.Errorf("Failed to load equipment reports: %v", err)
+		return nil, fmt.Errorf("failed to load equipment reports: %v", err)
 	}
 
 	// Start the background threads for various server functionalities
@@ -161,6 +184,41 @@ func (server *GCAServer) Close() {
 
 	// Close the logger
 	server.logger.Close()
+}
+
+// loadGCAServerKeys will load the keys for the GCA server from disk, creating
+// new keys if no keys are found.
+func (server *GCAServer) loadGCAServerKeys() (PublicKey, PrivateKey, error) {
+	path := filepath.Join(server.baseDir, "server.keys")
+	data, err := ioutil.ReadFile(path)
+	if os.IsNotExist(err) {
+		server.logger.Info("Creating keys for the GCA server")
+		pub, priv := GenerateKeyPair()
+		f, err := os.Create(path)
+		if err != nil {
+			return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to create file for gca keys: %v", err)
+		}
+		var data [96]byte
+		copy(data[:32], pub[:])
+		copy(data[32:], priv[:])
+		_, err = f.Write(data[:])
+		if err != nil {
+			return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to write keys to disk: %v", err)
+		}
+		err = f.Close()
+		if err != nil {
+			return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to close gca key server file: %v", err)
+		}
+		return pub, priv, nil
+	}
+	if err != nil {
+		return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to read server keyfile: %v", err)
+	}
+	var pub PublicKey
+	var priv PrivateKey
+	copy(pub[:], data[:32])
+	copy(priv[:], data[32:])
+	return pub, priv, nil
 }
 
 // loadGCATempKey loads the temporary key of the Glow Certification Agent.

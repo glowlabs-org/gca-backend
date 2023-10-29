@@ -10,6 +10,7 @@ import (
 
 const (
 	equipmentReportSize      = 80
+	tcpPort                  = ":0"
 	udpPort                  = 0
 	maxRecentReports         = 1e3
 	maxRecentEquipmentAuths  = 1e3

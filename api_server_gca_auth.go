@@ -116,9 +116,20 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Send a success response
+	// Create a JSON object with the hex-encoded public key of the GCA server
+	hexPublicKey := hex.EncodeToString(s.staticPublicKey[:])
+	response := map[string]string{"ServerPublicKey": hexPublicKey}
+
+	// Send the response as JSON with a status code of OK
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		// Handle the error if JSON encoding fails
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		s.logger.Error("Failed to encode JSON response:", err)
+		return
+	}
+
+	// Log the successful registration
 	s.logger.Info("Successfully registered GCA.")
 }
 
