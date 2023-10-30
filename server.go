@@ -28,9 +28,6 @@ import (
 // TODO: Need some sort of logrotate or other log protection that prevents spam
 // logging from filling up the server's disk space.
 //
-// TODO: Need to verify that a report respects the capacity of an equipment
-// before accepting it on the UDP endpoint.
-//
 // TODO: Need to write endpoints that will allow the IoT devices to find other
 // GCA servers and Veto Council servers to publish their reports to. I haven't
 // figured out yet what happens to IoT devices when their GCA gets slashed -

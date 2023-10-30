@@ -278,7 +278,7 @@ func TestParseReportIntegration(t *testing.T) {
 	// Check that the count for the recent reports is correct.
 	server.mu.Lock()
 	if len(server.recentReports) != expectedReports {
-		// t.Error("server state appears incorrect after reboot", len(server.recentReports), expectedReports)
+		t.Error("server state appears incorrect after reboot", len(server.recentReports), expectedReports)
 	}
 	server.mu.Unlock()
 
@@ -296,5 +296,107 @@ func TestParseReportIntegration(t *testing.T) {
 			}
 		}
 		server.mu.Unlock()
+	}
+}
+
+// TestCapacityEnforcement will check that a report gets banned for exceeding
+// the equipment capacity, and that it stays banned after a reset.
+func TestCapacityEnforcement(t *testing.T) {
+	server, dir, gcaPrivKey, err := setupTestEnvironment(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubKey, privKey := GenerateKeyPair()
+	device := EquipmentAuthorization{ShortID: 3, PublicKey: pubKey, Capacity: 100e6}
+	sb := device.SigningBytes()
+	sig := Sign(sb, gcaPrivKey)
+	device.Signature = sig
+	err = server.saveEquipment(device)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.mu.Lock()
+	server.loadEquipmentAuth(device)
+	server.mu.Unlock()
+
+	// Create an equipment report that we expect to get banned for having
+	// too high of a capacity.
+	er := EquipmentReport{
+		ShortID:     device.ShortID,
+		Timeslot:    5,
+		PowerOutput: uint64(200e6),
+	}
+	// Sign report and send over UDP.
+	er.Signature = Sign(er.SigningBytes(), privKey)
+	if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
+		t.Fatalf("Failed to send UDP report")
+	}
+
+	// Check that the server received the report.
+	success := false
+	retries := 0
+	for retries = 0; retries < 10; retries++ {
+		server.mu.Lock()
+		if len(server.recentReports) == 1 {
+			lastReport := server.recentReports[len(server.recentReports)-1]
+			if lastReport.ShortID == device.ShortID && lastReport.Timeslot == 5 && lastReport.PowerOutput == uint64(200e6) {
+				success = true
+				server.mu.Unlock()
+				break
+			}
+		}
+		server.mu.Unlock()
+
+		// Sleep a bit and try sending the report again.
+		time.Sleep(10 * time.Millisecond)
+		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
+			t.Fatalf("Failed to send UDP report")
+		}
+	}
+	if !success {
+		t.Fatalf("No reports in recentReports after sending valid report")
+	}
+	if retries > 3 {
+		t.Log("retries:", retries)
+	}
+	server.mu.Lock()
+	if server.equipmentReports[device.ShortID][5].PowerOutput != 1 {
+		t.Error("report is supposed to be banned now")
+	}
+	server.mu.Unlock()
+
+	// Restart the server and check that the ban is still in place.
+	server.Close()
+	server, err = NewGCAServer(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+
+	// Check that the count for the recent reports is correct.
+	server.mu.Lock()
+	if len(server.recentReports) != 1 {
+		t.Error("server state appears incorrect after reboot", len(server.recentReports), 1)
+	}
+	server.mu.Unlock()
+
+	// Check that the report is banned.
+	server.mu.Lock()
+	if server.equipmentReports[device.ShortID][5].PowerOutput != 1 {
+		t.Error("report is supposed to be banned now")
+	}
+	server.mu.Unlock()
+
+	// Check that the report appears when making a tcp request.
+	offset, bitfield, err := server.requestEquipmentBitfield(device.ShortID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offset != 0 {
+		t.Fatal("offset not 0")
+	}
+	if bitfield[0] != 32 {
+		t.Fatal(bitfield[0])
 	}
 }
