@@ -58,7 +58,7 @@ func TestParseReportIntegration(t *testing.T) {
 
 	for i := 0; i < numDevices; i++ {
 		pubKey, privKey := GenerateKeyPair()
-		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey}
+		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey, Capacity: 100e6}
 		privKeys[i] = privKey
 		sb := devices[i].SigningBytes()
 		sig := Sign(sb, gcaPrivKey)

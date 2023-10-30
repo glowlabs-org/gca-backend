@@ -37,20 +37,6 @@ import (
 // the devices need to find a new home, but they also need some way to realize
 // that their GCA is gone, and they need some way to determine what their new
 // home should be.
-//
-// TODO: Need to think through the consensus flaws in these servers. Namely,
-// the servers aren't always guaranteed to agree on which items are banned,
-// because the servers have a timestamp after which they stop accepting new
-// updates related to a timeslot. Timeslots that get submitted right on the
-// cusp of the ban time may get accepted by some servers and rejected by
-// others. In this case, I guess it doesn't really matter. The GCA client
-// itself will either ban or not ban the timeslot depending on what it reads,
-// and either way is okay with us. Auditors will see that the extra timestamps
-// are on the cusp and can request that the GCA ban the equipment.
-//
-// TODO: GCAs can ban equipment by submitting a second authorization for the
-// same ShortID with a new pubkey. This will trigger the ban process, and auths
-// don't have an expiration (unlike timeslots)
 
 // GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
