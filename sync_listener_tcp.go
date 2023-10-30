@@ -29,13 +29,15 @@ import (
 // threadedListenForSyncRequests creates a TCP listener that will listen for
 // queries that want to see which timeslots have reports for a given piece of
 // hardware.
-func (gcas *GCAServer) threadedListenForSyncRequests(port string) {
+func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 	// Listen on TCP port
 	listener, err := net.Listen("tcp", tcpPort)
 	if err != nil {
 		gcas.logger.Fatalf("Failed to start server: %s", err)
 	}
 	defer listener.Close()
+	gcas.tcpPort = listener.Addr().(*net.TCPAddr).Port
+	close(tcpReady)
 
 	for {
 		// Check for a shutdown signal.

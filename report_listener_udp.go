@@ -147,21 +147,20 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 
 // threadedLaunchUDPServer sets up and starts the UDP server for listening to
 // equipment reports.
-func (server *GCAServer) threadedLaunchUDPServer() {
+func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
 	udpAddress := net.UDPAddr{
 		Port: udpPort,
 		IP:   net.ParseIP(serverIP),
 	}
 
 	var err error
-	server.mu.Lock()
 	server.udpConn, err = net.ListenUDP("udp", &udpAddress)
 	addr, ok := server.udpConn.LocalAddr().(*net.UDPAddr)
 	if !ok {
 		panic("bad type on udpConn")
 	}
 	server.udpPort = addr.Port
-	server.mu.Unlock()
+	close(udpReady)
 	if err != nil {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
