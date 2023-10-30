@@ -62,7 +62,8 @@ func (server *GCAServer) integrateReport(report EquipmentReport) {
 	}
 	// Panic if the timeslot is too new.
 	if report.Timeslot > server.equipmentReportsOffset+4032 {
-		panic("received a report that's too far in the future to integrate")
+		server.logger.Warn("Received report that's too far in the future to integrate")
+		return
 	}
 
 	// Check whether we've seen a duplicate of this report before.
@@ -91,6 +92,10 @@ func (server *GCAServer) integrateReport(report EquipmentReport) {
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset] = report
 	} else {
 		server.logger.Warn("Received second support for timeslot")
+		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput = 1
+	}
+	// Ban the report timeslot if the production is greater than the capacity.
+	if report.PowerOutput > server.equipment[report.ShortID].Capacity {
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput = 1
 	}
 
