@@ -39,7 +39,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	// Read the full response
 	_, err = io.ReadFull(conn, resp[:])
 	if err != nil {
-		return 0, [504]byte{}, err
+		return 0, [504]byte{}, fmt.Errorf("unable to read full response: %v", err)
 	}
 
 	// Separate the signature from the data
@@ -106,7 +106,6 @@ func TestTCPListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	offset, bitfield, err := gcas.requestEquipmentBitfield(0)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +123,8 @@ func TestTCPListener(t *testing.T) {
 	}
 
 	// Submit reports for slots 4031, 4030, and 4028. For these reports to
-	// be accepted, time must be shifted.
+	// be accepted, time must be shifted. This will also trigger a report
+	// migration.
 	setCurrentTimeslot(4000)
 	time.Sleep(150 * time.Millisecond) // Sleep so that report migrations happen.
 	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4031, 50)
@@ -139,7 +139,6 @@ func TestTCPListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	offset, bitfield, err = gcas.requestEquipmentBitfield(0)
 	if err != nil {
 		t.Fatal(err)
@@ -154,5 +153,11 @@ func TestTCPListener(t *testing.T) {
 		if bitfield[i] != 0 && i != 503-252 {
 			t.Fatal("expecting 0")
 		}
+	}
+
+	// Attempt to request the bitfield of an equipment that does not exit.
+	_, _, err = gcas.requestEquipmentBitfield(541)
+	if err == nil {
+		t.Fatal("expecting error when reading non-existant bitfield")
 	}
 }

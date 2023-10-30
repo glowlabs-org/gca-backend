@@ -69,7 +69,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 				i++
 			}
@@ -104,7 +104,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 				i++
 			}
@@ -146,11 +146,43 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 				i++
 			}
 		}(ea, ePriv)
+	}
+
+	// Create a few threads that will be repeatedly sending bitfield
+	// requests over TCP. We are going to use short ids that will not
+	// correspond to any equipment, so that these requests will continue to
+	// produce errors even once the GCA key has been submitted.
+	for i := 0; i < 3; i++ {
+		go func() {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Try requesting a bitfield.
+				_, _, err := gcas.requestEquipmentBitfield(3444555666)
+				if err == nil {
+					t.Fatal("error expected")
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(5 * time.Millisecond)
+				}
+				i++
+			}
+		}()
 	}
 
 	// Let everything run for a bit before the test ends. Most of the loops
@@ -195,7 +227,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 				i++
 			}
@@ -227,7 +259,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 				i++
 			}
@@ -244,9 +276,12 @@ func TestConcurrency(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		go func(ea EquipmentAuthorization, ePriv PrivateKey) {
+		// TODO: Create a second thread that's just constantly calling
+		// 'requestEquipmentBitfield' for each piece of equipment.
+		go func(ea EquipmentAuthorization, ePriv PrivateKey, threadNum int) {
 			// Try until the stop signal is sent.
 			i := 0
+			resends := 0
 			for {
 				// Before submitting a new report, advance the
 				// time.
@@ -256,6 +291,31 @@ func TestConcurrency(t *testing.T) {
 				err := gcas.sendEquipmentReportSpecific(ea, ePriv, slot, 5)
 				if err != nil {
 					t.Fatal("reports should send correctly")
+				}
+
+				// For threads 2 and 3, we use
+				// requestEquipmentBitfield to submit missing
+				// reports.
+				if threadNum == 1 || threadNum == 2 {
+					// Get the bitfield that says which
+					// reports are missing.
+					offset, bitfield, err := gcas.requestEquipmentBitfield(ea.ShortID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					for i := 0; i < len(bitfield)*8 && uint32(i)+offset < currentTimeslot(); i++ {
+						byteIndex := i/8
+						bitIndex := i%8
+						mask := byte(1 << bitIndex)
+						if bitfield[byteIndex] & mask != 0 {
+							continue
+						}
+						err := gcas.sendEquipmentReportSpecific(ea, ePriv, offset+uint32(i), 5)
+						if err != nil {
+							t.Fatal(err)
+						}
+						resends++
+					}
 				}
 
 				// Check for the stop signal.
@@ -282,7 +342,7 @@ func TestConcurrency(t *testing.T) {
 					// NOTE: The target rate of 1/3rd will
 					// change if the number of threads that
 					// are changing the time also changes.
-					t.Logf("equipment %v hit rate: %v :: %v :: %v", ea.ShortID, float64(totalGood)/float64(totalGood+totalBad), totalGood+totalBad, i)
+					t.Logf("equipment %v hit rate: %v :: %v :: %v :: %v", ea.ShortID, float64(totalGood)/float64(totalGood+totalBad), totalGood+totalBad, i, resends)
 					return
 				default:
 				}
@@ -290,11 +350,11 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 				i++
 			}
-		}(ea, ePriv)
+		}(ea, ePriv, i)
 	}
 
 	// Run for another 250 milliseconds to let the new loops have some time
