@@ -276,8 +276,6 @@ func TestConcurrency(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// TODO: Create a second thread that's just constantly calling
-		// 'requestEquipmentBitfield' for each piece of equipment.
 		go func(ea EquipmentAuthorization, ePriv PrivateKey, threadNum int) {
 			// Try until the stop signal is sent.
 			i := 0
@@ -355,6 +353,32 @@ func TestConcurrency(t *testing.T) {
 				i++
 			}
 		}(ea, ePriv, i)
+		go func(e EquipmentAuthorization) {
+			// Try until the stop signal is sent.
+			i := 0
+			for {
+				// Get the bitfield that says which reports are
+				// missing.
+				_, _, err := gcas.requestEquipmentBitfield(e.ShortID)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Check for the stop signal.
+				select {
+				case <-stopSignal:
+					return
+				default:
+				}
+
+				// Wait 10 milliseconds between every 5th
+				// attempt to minimize cpu spam.
+				if i%5 == 0 {
+					time.Sleep(5 * time.Millisecond)
+				}
+				i++
+			}
+		}(ea)
 	}
 
 	// Run for another 250 milliseconds to let the new loops have some time
