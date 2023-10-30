@@ -20,10 +20,8 @@ import (
 // the server, identifying all of the data that the hardware has that the
 // server doesn't.
 //
-// TODO: Need to write the endpoints for the auth page where the GCA server can
-// show its recent authorization from the GCA... actually, instead we're just
-// going to have the GCA include it's own authorization in every GET endpoint
-// that it serves.
+// TODO: Every GET endpoint from the server needs to be signed by the server
+// key with a timestamp.
 //
 // TODO: Need to write an endpoint that will allow the GCA (and maybe anyone)
 // to fetch all of the data from the server. This would actually just consist
@@ -34,8 +32,8 @@ import (
 // TODO: Need some sort of logrotate or other log protection that prevents spam
 // logging from filling up the server's disk space.
 //
-// TODO: Need to add private keys for the server, and need to tell the GCA
-// client what the pubkey of the GCA server is.
+// TODO: Need to verify that a report respects the capacity of an equipment
+// before accepting it on the UDP endpoint.
 
 // GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
@@ -73,6 +71,7 @@ type GCAServer struct {
 	mux        *http.ServeMux // Routing for HTTP requests
 	udpConn    *net.UDPConn   // UDP connection for listening to equipment reports
 	udpPort    int            // The port that the UDP conn is listening on
+	tcpPort    int            // The port that the TCP listener is using
 	quit       chan bool      // A channel to initiate server shutdown
 	mu         sync.Mutex
 }
@@ -147,13 +146,17 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		return nil, fmt.Errorf("failed to load equipment reports: %v", err)
 	}
 
+	udpReady := make(chan struct{})
+	tcpReady := make(chan struct{})
+
 	// Start the background threads for various server functionalities
-	go server.threadedLaunchUDPServer()
+	go server.threadedLaunchUDPServer(udpReady)
 	go server.threadedMigrateReports()
+	go server.threadedListenForSyncRequests(tcpReady)
 	server.launchAPI()
 
-	// Pause for a short duration to allow all the components to load
-	time.Sleep(time.Millisecond * 100)
+	<-udpReady
+	<-tcpReady
 
 	// Return the initialized server
 	return server, nil
