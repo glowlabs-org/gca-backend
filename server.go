@@ -34,6 +34,10 @@ import (
 // the devices need to find a new home, but they also need some way to realize
 // that their GCA is gone, and they need some way to determine what their new
 // home should be.
+//
+// TODO: We want to create a coordination mechanism that makes it unlikely that
+// different GCAs will overlap when they assign ShortIDs. That way we can
+// easily migrate hardware from one GCA to another.
 
 // GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
