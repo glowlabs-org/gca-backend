@@ -45,10 +45,12 @@ def fetch_solar_data(creds, latitude, longitude):
         str: The API response as a text string.
     """
     # Include API key in the URL
-    url = f"http://developer.nrel.gov/api/nsrdb/v2/solar/full-disc-download.json?api_key={creds['api_key']}"
+    url = f"http://developer.nrel.gov/api/nsrdb/v2/solar/psm3-2-2-download.json?api_key={creds['api_key']}"
 
     # Format payload as a URL-encoded string
-    payload = f"api_key={creds['api_key']}&attributes=ghi&names=2022&utc=true&leap_day=true&interval=15&email={creds['email']}&wkt=POINT({longitude} {latitude})"
+    payload = f"names=2021&leap_day=false&interval=60&utc=false&full_name=Honored%2BUser&email=honored.user%40gmail.com&affiliation=NREL&mailing_list=true&reason=Academic&attributes=dhi%2Cdni%2Cwind_speed%2Cair_temperature&wkt=MULTIPOINT(-106.22%2032.9741%2C-106.18%2032.9741%2C-106.1%2032.9741)"
+    
+    #"api_key={creds['api_key']}&attributes=ghi&years=2022&utc=true&leap_day=true&interval=15&email={creds['email']}&location_ids=POINT({longitude} {latitude})"
     
     headers = {
         'content-type': "application/x-www-form-urlencoded",
