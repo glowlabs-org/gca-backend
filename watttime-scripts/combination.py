@@ -1,14 +1,19 @@
-import requests
+import csv
+import os
 import json
+import zipfile
+import requests
 from requests.auth import HTTPBasicAuth
+from os import path
+from statistics import mean
+from collections import defaultdict
 
 def prompt_for_coordinates():
     """
     Prompt the user for latitude and longitude coordinates.
-    
+
     Returns:
-        latitude (float): The latitude input by the user.
-        longitude (float): The longitude input by the user.
+        tuple: (latitude, longitude)
     """
     latitude = float(input("Please enter the latitude: "))
     longitude = float(input("Please enter the longitude: "))
@@ -16,15 +21,16 @@ def prompt_for_coordinates():
 
 def fetch_nasa_data(latitude, longitude):
     """
-    Fetch NASA data for a given latitude and longitude.
-    
+    Fetch data from NASA's POWER API.
+
     Parameters:
-        latitude (float): The latitude coordinate.
-        longitude (float): The longitude coordinate.
-        
+        latitude (float): Latitude coordinate.
+        longitude (float): Longitude coordinate.
+
     Returns:
-        data (dict): The JSON response from the NASA API parsed into a dictionary.
+        dict: NASA POWER API response as a dictionary.
     """
+    # Construct API endpoint and parameters
     url = "https://power.larc.nasa.gov/api/temporal/daily/point"
     params = {
         "parameters": "ALLSKY_SFC_SW_DWN",
@@ -35,67 +41,64 @@ def fetch_nasa_data(latitude, longitude):
         "end": "20221231",
         "format": "json"
     }
+    # Make request and return parsed response
     response = requests.get(url, params=params)
-    data = json.loads(response.text)
-    return data
+    return json.loads(response.text)
 
 def calculate_average_sunlight(data):
     """
-    Calculate the average annual sunlight from the NASA data.
-    
+    Calculate average annual sunlight based on NASA POWER API data.
+
     Parameters:
-        data (dict): The parsed NASA API response.
-        
+        data (dict): NASA POWER API response as a dictionary.
+
     Returns:
-        average_sunlight (float): The average annual sunlight in kW-hr/m^2/day.
+        float: Average annual sunlight in kW-hr/m^2/day.
     """
+    # Extract relevant data and calculate average, ignoring invalid values
     sunlight_data = data["properties"]["parameter"]["ALLSKY_SFC_SW_DWN"].values()
     filtered_data = [x for x in sunlight_data if x != -999.0]
-    average_sunlight = sum(filtered_data) / len(filtered_data) if filtered_data else 0
-    return average_sunlight
+    return sum(filtered_data) / len(filtered_data) if filtered_data else 0
 
-# New function to load credentials from a file
 def load_credentials(filename):
     """
-    Load credentials from a given file.
+    Load API credentials from a file.
 
     Parameters:
-        filename (str): The name of the file containing the credentials.
+        filename (str): File containing API credentials.
 
     Returns:
-        str: The credentials read from the file.
+        str: API credentials as a string.
     """
     with open(filename, 'r') as f:
         return f.read().strip()
 
-# New function to get the WattTime API token
 def get_token(username, password):
     """
-    Fetch the authorization token from WattTime API.
+    Fetch an authorization token from the WattTime API.
 
     Parameters:
-        username (str): The username for the API.
-        password (str): The password for the API.
+        username (str): WattTime API username.
+        password (str): WattTime API password.
 
     Returns:
-        str: The authorization token.
+        str: WattTime API authorization token.
     """
     login_url = 'https://api2.watttime.org/v2/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
-# New function to fetch the balancing authority
 def get_balancing_authority(token, latitude, longitude):
     """
     Fetch the balancing authority based on latitude and longitude.
 
     Parameters:
-        token (str): The authorization token for the WattTime API.
-        latitude (float): The latitude coordinate.
-        longitude (float): The longitude coordinate.
+        token (str): WattTime API authorization token.
+        latitude (float): Latitude coordinate.
+        longitude (float): Longitude coordinate.
 
     Returns:
-        str: The balancing authority.
+        str: Abbreviation of the balancing authority.
     """
     region_url = 'https://api2.watttime.org/v2/ba-from-loc'
     headers = {'Authorization': 'Bearer {}'.format(token)}
@@ -103,26 +106,130 @@ def get_balancing_authority(token, latitude, longitude):
     response = requests.get(region_url, headers=headers, params=params)
     return response.json()['abbrev']
 
+def fetch_and_save_historical_data(token, ba):
+    """
+    Fetch and save historical data for a given balancing authority.
+    
+    Parameters:
+        token (str): WattTime API authorization token.
+        ba (str): Abbreviation of the balancing authority.
+
+    Returns:
+        None
+    """
+    if path.exists(ba):
+        print(f"Data for {ba} already exists locally.")
+    else:
+        # Construct historical data URL and headers
+        historical_url = 'https://api2.watttime.org/v2/historical'
+        headers = {'Authorization': f'Bearer {token}'}
+        params = {'ba': ba}
+        
+        # Fetch historical data
+        rsp = requests.get(historical_url, headers=headers, params=params)
+        
+        # Create a directory for the balancing authority
+        if not os.path.exists(ba):
+            os.mkdir(ba)
+        
+        # Save the zip file
+        zip_path = path.join(ba, f'{ba}_historical.zip')
+        with open(zip_path, 'wb') as fp:
+            fp.write(rsp.content)
+        
+        # Extract the zip file
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(ba)
+        
+        print(f"Wrote and unzipped historical data for {ba} to the directory: {ba}")
+        
+def load_csv_files(folder_path):
+    """
+    Load all CSV files in a folder and return the MOER values organized by year and day.
+    
+    Args:
+        folder_path (str): The path to the folder containing the CSV files.
+    
+    Returns:
+        dict: A nested dictionary containing the MOER values organized by year and day.
+    """
+    data = defaultdict(lambda: defaultdict(list))
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.csv'):
+            filepath = os.path.join(folder_path, filename)
+            with open(filepath, 'r') as csvfile:
+                reader = csv.reader(csvfile)
+                next(reader)
+                for row in reader:
+                    timestamp, moer = row[0], float(row[1])
+                    year, _ = timestamp.split('-', 1)
+                    day = timestamp.split('T')[0]
+                    data[year][day].append(moer)
+    return data
+
+def calculate_carbon_credits(folder_path, avg_sunlight):
+    """
+    Calculate the expected carbon credits for the year 2022 based on the average sunlight hours.
+    
+    Args:
+        folder_path (str): The path to the folder containing the CSV files.
+        avg_sunlight (float): The average annual sunlight in hours.
+    
+    Returns:
+        tuple: A tuple containing carbon credits per year, per kilowatt for solar only and solar+smart batteries.
+    """
+    data = load_csv_files(folder_path)
+    
+    if '2022' not in data:
+        print("No data for 2022 is available.")
+        return None
+    
+    daily_low_avg = []
+    daily_high_avg = []
+    
+    for day, moer_values in data['2022'].items():
+        moer_values.sort()
+        daily_low_avg.append(mean(moer_values[:30]))
+        daily_high_avg.append(mean(moer_values[-120:]))
+    
+    yearly_low_avg = mean(daily_low_avg)
+    yearly_high_avg = mean(daily_high_avg)
+    
+    conversion_factor = avg_sunlight  # hours of sunlight per day
+    conversion_factor *= 365.25  # days per year
+    conversion_factor /= 1000  # kilowatt-hours per megawatt-hour
+    conversion_factor /= 2204.62  # pounds per metric ton
+    
+    low_avg = yearly_low_avg * conversion_factor
+    high_avg = yearly_high_avg * conversion_factor
+    
+    return low_avg, high_avg
+
 if __name__ == "__main__":
-    # Load WattTime API credentials
+    # Load API credentials
     username = load_credentials('username')
     password = load_credentials('password')
 
-    # Get the WattTime API token
+    # Fetch WattTime API token
     token = get_token(username, password)
 
-    # Prompt user for coordinates
+    # Get latitude and longitude from the user
     latitude, longitude = prompt_for_coordinates()
 
-    # Fetch NASA data
-    data = fetch_nasa_data(latitude, longitude)
-  
-    # Calculate the average annual sunlight
-    average_sunlight = calculate_average_sunlight(data)
+    # Fetch NASA data and calculate average sunlight
+    nasa_data = fetch_nasa_data(latitude, longitude)
+    avg_sunlight = calculate_average_sunlight(nasa_data)
 
-    # Fetch and print the balancing authority
-    balancing_authority = get_balancing_authority(token, latitude, longitude)
+    # Fetch balancing authority
+    ba = get_balancing_authority(token, latitude, longitude)
 
-    print(f"The average annual sunlight for the coordinates {latitude}, {longitude} is {average_sunlight} kW-hr/m^2/day.")
-    print(f"The balancing authority for the coordinates {latitude}, {longitude} is {balancing_authority}.")
+    # Fetch and save historical data for the balancing authority
+    fetch_and_save_historical_data(token, ba)
+    
+    # Compute carbon credit averages using the historical data for the ba
+    low_avg, high_avg = calculate_carbon_credits(ba, avg_sunlight)
+    
+    print(f"\nExpected Carbon Credits for 2022 in {ba} with avg sunlight of {avg_sunlight} hours:")
+    print(f"Solar Only:              {low_avg:.3f} carbon credits per year, per kilowatt of solar")
+    print(f"Solar + Smart Batteries: {high_avg:.3f} carbon credits per year, per kilowatt of solar")
 

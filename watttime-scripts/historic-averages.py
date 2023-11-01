@@ -95,10 +95,10 @@ def main():
     sorted_years = sorted(yearly_low_avg.keys())
 
     # Conversion factor
-    conversion_factor = 5.38
-    conversion_factor *= 365.25
-    conversion_factor /= 1000
-    conversion_factor /= 2204.62
+    conversion_factor = 5.38 # hours of sunlight per day
+    conversion_factor *= 365.25 # days per year
+    conversion_factor /= 1000 # kilowatt hours per megawatt hour
+    conversion_factor /= 2204.62 # pounds per metric ton
 
     # Print results
     for year in sorted_years:
