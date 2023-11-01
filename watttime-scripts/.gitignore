@@ -1,7 +1,14 @@
 username
 password
+nsrdb_data.dat
 
 CAISO_NORTH
 FPL
 PACE
 MISO
+TVA
+PJM
+AVA
+AECI
+WACM
+ERCOT_AUSTIN
