@@ -1,6 +1,8 @@
+__pycache__
+
 username
 password
-nsrdb_data.dat
+carbon_credits_sweep.csv
 
 CAISO_NORTH
 FPL
@@ -16,3 +18,6 @@ TEPC
 
 CAISO_LONGBEACH
 PJM_DC
+SEC
+ERCOT_SOUTHTX
+ERCOT_HIDALGO
