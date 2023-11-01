@@ -3,6 +3,7 @@ import os
 import json
 import zipfile
 import requests
+import sys
 from requests.auth import HTTPBasicAuth
 from os import path
 from statistics import mean
@@ -98,13 +99,44 @@ def get_balancing_authority(token, latitude, longitude):
         longitude (float): Longitude coordinate.
 
     Returns:
-        str: Abbreviation of the balancing authority.
+        str: Abbreviation of the balancing authority or None if location not supported.
     """
+    # Define the URL and headers for the API request
     region_url = 'https://api2.watttime.org/v2/ba-from-loc'
     headers = {'Authorization': 'Bearer {}'.format(token)}
     params = {'latitude': latitude, 'longitude': longitude}
+
+    # Make the API request
     response = requests.get(region_url, headers=headers, params=params)
-    return response.json()['abbrev']
+
+    # Check if the API call was successful
+    if response.status_code == 200:
+        return response.json()['abbrev']
+    elif response.status_code == 404:  # Location not supported
+        return None
+    else:
+        print(f"Unexpected error: {response.content}")
+        sys.exit("An unexpected error occurred while fetching the balancing authority.")
+
+def update_gitignore(folder_name):
+    """
+    Update the .gitignore file with the name of a new folder.
+
+    Parameters:
+        folder_name (str): Name of the new folder to add to .gitignore.
+
+    Returns:
+        None
+    """
+    # Open the .gitignore file for appending
+    # If the file doesn't exist, it will be created
+    with open('.gitignore', 'a+') as f:
+        # Ensure the folder name is not already in the file
+        f.seek(0)
+        if folder_name not in f.read().splitlines():
+            # Append the folder name to .gitignore file
+            f.write(f"\n{folder_name}")
+            print(f"Added {folder_name} to .gitignore")
 
 def fetch_and_save_historical_data(token, ba):
     """
@@ -131,6 +163,7 @@ def fetch_and_save_historical_data(token, ba):
         # Create a directory for the balancing authority
         if not os.path.exists(ba):
             os.mkdir(ba)
+            update_gitignore(ba)
         
         # Save the zip file
         zip_path = path.join(ba, f'{ba}_historical.zip')
@@ -215,13 +248,17 @@ if __name__ == "__main__":
 
     # Get latitude and longitude from the user
     latitude, longitude = prompt_for_coordinates()
-
+    
     # Fetch NASA data and calculate average sunlight
     nasa_data = fetch_nasa_data(latitude, longitude)
     avg_sunlight = calculate_average_sunlight(nasa_data)
 
     # Fetch balancing authority
     ba = get_balancing_authority(token, latitude, longitude)
+    
+    # Check if the balancing authority is available for the given location
+    if ba is None:
+        sys.exit("Location not supported")
 
     # Fetch and save historical data for the balancing authority
     fetch_and_save_historical_data(token, ba)
