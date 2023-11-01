@@ -1,4 +1,5 @@
 import csv
+import os
 import combination
 
 def save_to_csv(row, filename):
@@ -16,6 +17,31 @@ def save_to_csv(row, filename):
         writer = csv.writer(csvfile)
         writer.writerow(row)
 
+def get_last_coordinates(filename):
+    """
+    Get the last latitude and longitude from the CSV file.
+    
+    Parameters:
+        filename (str): Name of the CSV file.
+    
+    Returns:
+        tuple: Last latitude and longitude in the CSV file, or None if the file is empty or not found.
+    """
+    try:
+        with open(filename, 'r', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            # Skip the header row
+            next(reader, None)
+            last_row = None
+            for row in reader:
+                last_row = row
+            if last_row:
+                return float(last_row[0]), float(last_row[1])
+    except FileNotFoundError:
+        # If the file is not found, it's likely the first run.
+        return None
+    return None
+
 def main():
     """
     Main function to perform a sweep over the continental US to calculate the expected carbon credits
@@ -31,14 +57,21 @@ def main():
     
     # Initialize CSV file
     filename = 'carbon_credits_sweep.csv'
-    with open(filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["Latitude", "Longitude", "Carbon Credits per Year per KW", "Carbon Credits per Year per KW with Batteries"])
+    # Only write the header if the file doesn't already exist
+    if not os.path.exists(filename):
+        with open(filename, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Latitude", "Longitude", "Carbon Credits per Year per KW", "Carbon Credits per Year per KW with Batteries"])
 
     # Load API credentials and get the WattTime token
     username = combination.load_credentials('username')
     password = combination.load_credentials('password')
     token = combination.get_token(username, password)
+    
+    # Get last coordinates from the CSV to resume from
+    last_coordinates = get_last_coordinates(filename)
+    if last_coordinates:
+        lat_min, lon_min = last_coordinates
     
     # Loop through the grid
     lat = lat_min
@@ -71,7 +104,11 @@ def main():
                     print(f"Skipping unsupported location at Latitude: {lat}, Longitude: {lon}")
                 
             except Exception as e:
-                print(f"An error occurred for Latitude: {lat}, Longitude: {lon}. Error message: {e}")
+                # Check for 403 Forbidden error
+                if '403 Forbidden' in str(e):
+                    print("Received a 403 Forbidden error. Skipping this coordinate.")
+                else:
+                    print(f"An unexpected error occurred for Latitude: {lat}, Longitude: {lon}. Error message: {e}")
             
             lon += granularity
         lat += granularity
