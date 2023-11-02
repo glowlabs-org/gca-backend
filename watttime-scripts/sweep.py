@@ -1,6 +1,7 @@
 import csv
 import os
 import combination
+import time
 
 def save_to_csv(row, filename):
     """
@@ -67,6 +68,7 @@ def main():
     username = combination.load_credentials('username')
     password = combination.load_credentials('password')
     token = combination.get_token(username, password)
+    last_token_time = time.time()  # Store the current timestamp
     
     # Get last coordinates from the CSV to resume from
     last_coordinates = get_last_coordinates(filename)
@@ -78,6 +80,14 @@ def main():
     while lat <= lat_max:
         lon = lon_min
         while lon <= lon_max:
+            # Check if 4 minutes have passed since the last token retrieval
+            current_time = time.time()
+            if current_time - last_token_time >= 240:  # 240 seconds = 4 minutes
+                # Update the token
+                token = combination.get_token(username, password)
+                last_token_time = current_time  # Update the last token retrieval timestamp
+                print(f"Token refreshed at Latitude: {lat}, Longitude: {lon}")
+
             print(f"Attempting for Latitude: {lat}, Longitude: {lon}")  # Print current lat and long being attempted
             
             try:
