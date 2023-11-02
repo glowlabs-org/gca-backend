@@ -19,6 +19,9 @@ import (
 // TODO: Every GET endpoint from the server needs to be signed by the server
 // key with a timestamp.
 //
+// TODO: Write the endpoints that allow the GCA to distribute the failover
+// list, and allow the client to maintain the failover list.
+//
 // TODO: Need to write an endpoint that will allow the GCA (and maybe anyone)
 // to fetch all of the data from the server. This would actually just consist
 // of loading up the respective persist files and zipping them together. That

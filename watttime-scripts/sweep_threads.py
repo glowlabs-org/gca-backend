@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # You can adjust the number of workers based on your requirements
-NUM_THREADS = 12
+NUM_THREADS = 4
 
 def save_to_csv(row, filename):
     """
