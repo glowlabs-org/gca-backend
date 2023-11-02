@@ -2,7 +2,6 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Load the CSV file into a DataFrame
@@ -27,19 +26,18 @@ gdf_clipped = gdf.cx[continental_bbox['west']:continental_bbox['east'],
                      continental_bbox['south']:continental_bbox['north']]
 
 # Define the colors for the custom colormap (blue -> green -> yellow -> orange -> red)
-colors = ['blue', 'green', 'yellow', 'orange', 'red']
+colors = ['white', 'lime', 'yellow', 'orange', 'red', 'purple']
 cmap_name = 'custom_colormap'
-n_bins = 50  # Increase this number to have more fine transitions between colors
+n_bins = 300  # Increase this number to have more fine transitions between colors
 custom_colormap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
 
-# Calculate the range for 'Carbon Credits per Year per KW' within the bounded area
-credit_values_within_bounds = gdf_clipped['Carbon Credits per Year per KW']
-vmin = credit_values_within_bounds.min()
-vmax = credit_values_within_bounds.max()
+# Manually define the range for 'Carbon Credits per Year per KW' for normalization
+vmin = 0  # Start of the colorbar range
+vmax = 2  # End of the colorbar range
 
-# Create a ScalarMappable to be used for legend
-sm = ScalarMappable(cmap=custom_colormap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-sm._A = []  # Dummy array for the ScalarMappable. Required for the next step.
+# Create a ScalarMappable with the new vmin and vmax
+sm = plt.cm.ScalarMappable(cmap=custom_colormap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+sm.set_array([])  # Set the array for the ScalarMappable to an empty list.
 
 # Plotting
 fig, ax = plt.subplots(1, figsize=(15, 25), dpi=300)
@@ -49,20 +47,21 @@ us_states.cx[continental_bbox['west']:continental_bbox['east'],
              continental_bbox['south']:continental_bbox['north']].boundary.plot(ax=ax, linewidth=0.25, color="black")
 
 # Plotting the real data points within the bounding box
+# The `vmin` and `vmax` in the `plot` function will now set the scale for the color map.
 gdf_clipped.plot(column='Carbon Credits per Year per KW', 
          cmap=custom_colormap,
          ax=ax, 
-         marker='o',  # Circle markers
-         markersize=10)  # Size of the markers
+         marker='o',
+         markersize=5,  # Size of the markers
+         vmin=vmin,  # Minimum value for colormap scaling
+         vmax=vmax)  # Maximum value for colormap scaling
 
 # Add color bar
-# Create an axes on the right side of ax. The width of cax will be 5%
-# of ax and the height will be matched to the bounding box of the continental US.
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.1)
 
-# Create a colorbar in the axes cax with the specified tick locations
-cbar = plt.colorbar(sm, cax=cax)
+# Create a colorbar in the axes cax
+cbar = fig.colorbar(sm, cax=cax)
 
 cbar.set_label('Carbon Credits per Year per KW')
 
@@ -70,4 +69,5 @@ cbar.set_label('Carbon Credits per Year per KW')
 cbar.ax.set_aspect(20)
 
 # Show/save the plot
-plt.savefig('heatmap_raw.png', bbox_inches='tight', dpi=200)
+plt.savefig('heatmap_raw.png', bbox_inches='tight', dpi=400)
+
