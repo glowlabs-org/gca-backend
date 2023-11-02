@@ -71,7 +71,7 @@ def main():
     # Get last coordinates from the CSV to resume from
     last_coordinates = get_last_coordinates(filename)
     if last_coordinates:
-        lat_min, lon_min = last_coordinates
+        lat_min, _ = last_coordinates
     
     # Loop through the grid
     lat = lat_min
@@ -104,11 +104,12 @@ def main():
                     print(f"Skipping unsupported location at Latitude: {lat}, Longitude: {lon}")
                 
             except Exception as e:
+                error_message = str(e)
                 # Check for 403 Forbidden error
-                if '403 Forbidden' in str(e):
-                    print("Received a 403 Forbidden error. Skipping this coordinate.")
+                if '403 Forbidden' in error_message:
+                    print(f"Received a 403 Forbidden error. Invalid coordinate at Latitude: {lat}, Longitude: {lon}. Skipping this coordinate.")
                 else:
-                    print(f"An unexpected error occurred for Latitude: {lat}, Longitude: {lon}. Error message: {e}")
+                    print(f"An unexpected error occurred for Latitude: {lat}, Longitude: {lon}. Error message: {error_message}")
             
             lon += granularity
         lat += granularity

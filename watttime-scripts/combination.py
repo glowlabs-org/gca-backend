@@ -113,6 +113,10 @@ def get_balancing_authority(token, latitude, longitude):
     if response.status_code == 200:
         return response.json()['abbrev']
     elif response.status_code == 404:  # Location not supported
+        print("Got 404")
+        return None
+    elif response.status_code == 403:  # Location not supported
+        print("Got 403")
         return None
     else:
         print(f"Unexpected error: {response.content}")
