@@ -96,7 +96,7 @@ gdf.plot(column='Average Value',
          legend=False, 
          legend_kwds={'label': "Average Carbon Credits per Year per KW"},
          marker='s',  # Square markers
-         markersize=0.025,  # Size of the markers
+         markersize=0.01,  # Size of the markers
          missing_kwds={"color": "white"})  # White color for missing data
          
 # Get the bounds of the axes for the continental US after plotting
@@ -116,5 +116,5 @@ sm._A = []  # This is a workaround for Matplotlib's ScalarMappable which expects
 cbar = fig.colorbar(sm, cax=cbar_ax)
 
 # Show/save the plot
-plt.savefig('heatmap.png', bbox_inches='tight', dpi=400)
+plt.savefig('heatmap.png', bbox_inches='tight', dpi=200)
 
