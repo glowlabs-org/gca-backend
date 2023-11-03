@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains methods related to saving reports to disk and loading
 // them off of disk.

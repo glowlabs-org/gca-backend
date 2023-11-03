@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains an endpoint which allows the GCA to authorize a new piece
 // of equipment. That equipment will then be able to submit power recording

@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file provides an endpoint that can only be used one time by the GCA.
 // The GCA will call this endpoint to report its public key, and then this

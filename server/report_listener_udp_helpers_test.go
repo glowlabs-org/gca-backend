@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains helpers related to testing the UDP reports.
 

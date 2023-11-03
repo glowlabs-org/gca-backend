@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains most of the brains of the server, it creates and launches
 // all of the key components and background threads, and it handles shutting

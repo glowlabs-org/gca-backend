@@ -38,21 +38,40 @@ package main
 //
 // TODO: Should probably have the ssh port open just in case.
 
-type Client struct {
-	pubkey glow.PublicKey
-	privkey glow.PrivateKey
-}
+import (
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+)
 
 func main() {
 	// Step 1: Open the file that contains the keypair for the client/iot
+	// + test this
 	// Step 2: Open the file that contains all the historic data.
+	// add a little header that tells us what time the first reading starts
+	// use '0' in the power reading as the sentinal value indiacting that no data is available
+	// 4 bytes per reading, leave blank spaces for no data, that way the file is random access for historics
 	// Step 3: Kick off the background loop that checks for monitoring data and sends UDP reports
 	// Step 4: Kick off the background loop that checks for reports that failed to submit, and checks if a failover is needed
 	// Step 5: Kick off the background loop that checks for new failover servers and new banned servers
 	// Step 6: Kick off the background loop that checks for migration orders
 
+	// Create a new client, using the current directory as the basedir.
+	c, err := NewClient(".")
+	if err != nil {
+		fmt.Println("unable to create client")
+		return
+	}
 
-}
+	// Wait for a shutdown signal from the OS.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
 
-func (c *Client) loadKeypair() error {
+	// Close the client.
+	err = c.Close()
+	if err != nil {
+		fmt.Println("Issue during shutdown:", err)
+	}
 }

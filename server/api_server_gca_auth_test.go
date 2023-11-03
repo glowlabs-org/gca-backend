@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains testing related to the GCA temporary key and the
 // authorization process. The major test is the integration test, which tries

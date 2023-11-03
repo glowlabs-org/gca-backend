@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains helper functions and structs related to the processing of
 // equipment reports.
