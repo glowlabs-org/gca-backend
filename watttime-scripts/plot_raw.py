@@ -26,7 +26,7 @@ gdf_clipped = gdf.cx[continental_bbox['west']:continental_bbox['east'],
                      continental_bbox['south']:continental_bbox['north']]
 
 # Define the colors for the custom colormap (blue -> green -> yellow -> orange -> red)
-colors = ['white', 'lime', 'yellow', 'orange', 'red', 'purple']
+colors = ['lime', 'yellow', 'orange', 'red', 'purple', 'black']
 cmap_name = 'custom_colormap'
 n_bins = 300  # Increase this number to have more fine transitions between colors
 custom_colormap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
@@ -52,7 +52,7 @@ gdf_clipped.plot(column='Carbon Credits per Year per KW',
          cmap=custom_colormap,
          ax=ax, 
          marker='o',
-         markersize=5,  # Size of the markers
+         markersize=5.25,  # Size of the markers
          vmin=vmin,  # Minimum value for colormap scaling
          vmax=vmax)  # Maximum value for colormap scaling
 

@@ -6,9 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import combination
 
 # You can adjust the number of workers based on your requirements
-NUM_THREADS = 1
-# Token refresh time in seconds
-TOKEN_REFRESH_TIME = 240
+NUM_THREADS = 4
 
 def load_existing_points(filename):
     """
@@ -35,7 +33,7 @@ def generate_points_to_scan(filename, offsets):
             for lon_offset in offsets:
                 new_lat = lat + lat_offset
                 new_lon = lon + lon_offset
-                if new_lat > 35:
+                if new_lat > 40:
                     points_to_scan[(new_lat, new_lon)] = None
     # Deduplicate points
     points_to_scan = {point: None for point in points_to_scan if point not in existing_points}
@@ -56,7 +54,7 @@ def save_to_csv(row, filename):
         writer = csv.writer(csvfile)
         writer.writerow(row)
     
-def process_coordinate(lat, lon, token, filename):
+def process_coordinate(lat, lon, username, password, filename):
     """
     Process a single coordinate point.
 
@@ -71,6 +69,7 @@ def process_coordinate(lat, lon, token, filename):
     """
     print(f"Attempting for Latitude: {lat}, Longitude: {lon}")  # Print current lat and long being attempted
     
+    token = combination.get_token(username, password)
     try:
         # Fetch NASA data and calculate average sunlight
         nasa_data = combination.fetch_nasa_data(lat, lon)
@@ -109,27 +108,17 @@ def get_token_and_scan_points(points_to_scan, filename):
     # Load API credentials and get the WattTime token
     username = combination.load_credentials('username')
     password = combination.load_credentials('password')
-    token = combination.get_token(username, password)
-    
-    # Get the current time to track token refresh
-    token_time = time.time()
 
     # Start thread pool to process coordinates
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
         future_to_coordinate = {
-            executor.submit(process_coordinate, lat, lon, token, filename): (lat, lon) 
+            executor.submit(process_coordinate, lat, lon, username, password, filename): (lat, lon) 
             for (lat, lon) in points_to_scan
         }
 
         for future in as_completed(future_to_coordinate):
             lat, lon = future_to_coordinate[future]
             try:
-                # Refresh token if needed
-                current_time = time.time()
-                if current_time - token_time > TOKEN_REFRESH_TIME:
-                    token = combination.get_token(username, password)
-                    token_time = current_time
-                
                 # Attempt to get the result, which will re-raise any exceptions
                 future.result()
             except Exception as exc:

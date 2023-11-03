@@ -38,6 +38,11 @@ package main
 //
 // TODO: Should probably have the ssh port open just in case.
 
+type Client struct {
+	pubkey glow.PublicKey
+	privkey glow.PrivateKey
+}
+
 func main() {
 	// Step 1: Open the file that contains the keypair for the client/iot
 	// Step 2: Open the file that contains all the historic data.
@@ -45,4 +50,9 @@ func main() {
 	// Step 4: Kick off the background loop that checks for reports that failed to submit, and checks if a failover is needed
 	// Step 5: Kick off the background loop that checks for new failover servers and new banned servers
 	// Step 6: Kick off the background loop that checks for migration orders
+
+
+}
+
+func (c *Client) loadKeypair() error {
 }
