@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains helper functions related to managing equipment
 // authorizations.

@@ -1,4 +1,4 @@
-package main
+package server
 
 // sync_listener_tcp.go creates a listener for TCP requests, specifically one
 // type of request that allows a hardware device to see what reports have been

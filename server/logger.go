@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file implements a logging utility for the GCA server.
 

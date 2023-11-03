@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains one large integration test focused on detecting race
 // conditions. It's intentionally a pretty chaotic test that has every API

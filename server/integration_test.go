@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file contains some helper methods that are applicable across the whole
 // test suite. The functions in this file are useful for testing in general and

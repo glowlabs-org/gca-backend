@@ -4,6 +4,10 @@ username
 password
 carbon_credits_sweep.csv
 
+heatmap.png
+heatmap_raw.png
+us_state_outlines.json
+
 CAISO_NORTH
 FPL
 PACE

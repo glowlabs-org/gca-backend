@@ -1,4 +1,4 @@
-package main
+package server
 
 // This file creates an API endpoint that monitoring equipment can hit over
 // UDP. The purpose of the provided API is to collect reports from the
