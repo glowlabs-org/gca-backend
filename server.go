@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // TODO: Every GET endpoint from the server needs to be signed by the server
@@ -61,15 +63,15 @@ type GCAServer struct {
 	// technician puts a temporary key on the lockbook and server, then
 	// after the real key is generated, it can be signed by the temp key to
 	// minimize the risk of a MiTM attack against the server.
-	gcaPubkey          PublicKey
+	gcaPubkey          glow.PublicKey
 	gcaPubkeyAvailable bool
-	gcaTempKey         PublicKey
+	gcaTempKey         glow.PublicKey
 
 	// These are the signing keys for the GCA server. The GCA server will
 	// sign all GET requests so that the caller knows the data is
 	// authentic.
-	staticPrivateKey PrivateKey
-	staticPublicKey PublicKey
+	staticPrivateKey glow.PrivateKey
+	staticPublicKey glow.PublicKey
 
 	baseDir    string         // Base directory for server files
 	logger     *Logger        // Custom logger for the server
@@ -198,34 +200,34 @@ func (server *GCAServer) Close() {
 
 // loadGCAServerKeys will load the keys for the GCA server from disk, creating
 // new keys if no keys are found.
-func (server *GCAServer) loadGCAServerKeys() (PublicKey, PrivateKey, error) {
+func (server *GCAServer) loadGCAServerKeys() (glow.PublicKey, glow.PrivateKey, error) {
 	path := filepath.Join(server.baseDir, "server.keys")
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		server.logger.Info("Creating keys for the GCA server")
-		pub, priv := GenerateKeyPair()
+		pub, priv := glow.GenerateKeyPair()
 		f, err := os.Create(path)
 		if err != nil {
-			return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to create file for gca keys: %v", err)
+			return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create file for gca keys: %v", err)
 		}
 		var data [96]byte
 		copy(data[:32], pub[:])
 		copy(data[32:], priv[:])
 		_, err = f.Write(data[:])
 		if err != nil {
-			return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to write keys to disk: %v", err)
+			return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to write keys to disk: %v", err)
 		}
 		err = f.Close()
 		if err != nil {
-			return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to close gca key server file: %v", err)
+			return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to close gca key server file: %v", err)
 		}
 		return pub, priv, nil
 	}
 	if err != nil {
-		return PublicKey{}, PrivateKey{}, fmt.Errorf("unable to read server keyfile: %v", err)
+		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to read server keyfile: %v", err)
 	}
-	var pub PublicKey
-	var priv PrivateKey
+	var pub glow.PublicKey
+	var priv glow.PrivateKey
 	copy(pub[:], data[:32])
 	copy(priv[:], data[32:])
 	return pub, priv, nil

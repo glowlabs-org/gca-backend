@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // TestParseReport tests the parseReport function of the GCAServer.
@@ -25,9 +27,9 @@ func TestParseReport(t *testing.T) {
 	// Generate multiple test key pairs for equipment.
 	numEquipment := 3
 	equipment := make([]EquipmentAuthorization, numEquipment)
-	privKeys := make([]PrivateKey, numEquipment)
+	privKeys := make([]glow.PrivateKey, numEquipment)
 	for i := 0; i < numEquipment; i++ {
-		pubKey, privKey := GenerateKeyPair()
+		pubKey, privKey := glow.GenerateKeyPair()
 		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
 		equipment[i].PublicKey = pubKey
 		privKeys[i] = privKey
@@ -46,8 +48,8 @@ func TestParseReport(t *testing.T) {
 			PowerOutput: uint64(i * 100),
 		}
 		sb := er.SigningBytes()
-		er.Signature = Sign(sb, privKeys[i])
-		isValid := Verify(e.PublicKey, sb, er.Signature)
+		er.Signature = glow.Sign(sb, privKeys[i])
+		isValid := glow.Verify(e.PublicKey, sb, er.Signature)
 		if !isValid {
 			t.Fatal("Can't even verify my own signature")
 		}
@@ -71,7 +73,7 @@ func TestParseReport(t *testing.T) {
 
 		// Report signed by the wrong device (using next device's private key for signature)
 		if i < numEquipment-1 {
-			er.Signature = Sign(er.Serialize(), privKeys[i+1])
+			er.Signature = glow.Sign(er.Serialize(), privKeys[i+1])
 			_, err = server.parseReport(er.Serialize())
 			if err == nil || err.Error() != "failed to verify signature" {
 				t.Errorf("Expected signature verification failed error for wrong device signature, got: %v", err)

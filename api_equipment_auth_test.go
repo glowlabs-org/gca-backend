@@ -8,17 +8,19 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // TestToAuthorization verifies that an EquipmentAuthorizationRequest
 // correctly converts into an EquipmentAuthorization.
 func TestToAuthorization(t *testing.T) {
 	// Generate a real ECDSA public-private key pair using the secp256k1 curve.
-	pubKey, privKey := GenerateKeyPair()
+	pubKey, privKey := glow.GenerateKeyPair()
 
 	// Generate a real signature using the ECDSA private key.
 	message := []byte("test message")
-	signature := Sign(message, privKey)
+	signature := glow.Sign(message, privKey)
 
 	// Hex-encode the real public key and signature.
 	hexPublicKey := hex.EncodeToString(pubKey[:])
@@ -75,7 +77,7 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature := Sign(sb, gcaPrivKey)
+	signature := glow.Sign(sb, gcaPrivKey)
 	body.Signature = hex.EncodeToString(signature[:])
 
 	// Convert the request body to JSON.

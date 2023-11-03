@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // parseReport converts raw bytes into an EquipmentReport and validates its signature.
@@ -46,7 +48,7 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 
 	// Hash the data and then verify the signature.
 	sb := report.SigningBytes()
-	if !Verify(equipment.PublicKey, sb, report.Signature) {
+	if !glow.Verify(equipment.PublicKey, sb, report.Signature) {
 		return report, errors.New("failed to verify signature")
 	}
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // loadEquipmentAuths is responsible for populating the equipment map
@@ -61,7 +63,7 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 		Expiration: 1000,
 	}
 	signingBytes := ea.SigningBytes()
-	ea.Signature = Sign(signingBytes, gcaPrivateKey)
+	ea.Signature = glow.Sign(signingBytes, gcaPrivateKey)
 
 	// Test case 1: Valid EquipmentAuthorization should pass verification
 	if err := server.verifyEquipmentAuthorization(ea); err != nil {
@@ -77,7 +79,7 @@ func TestVerifyEquipmentAuthorization(t *testing.T) {
 		Expiration: 2000,
 	}
 	eaInvalidBytes := eaInvalid.SigningBytes()
-	ea.Signature = Sign(eaInvalidBytes, gcaPrivateKey)
+	ea.Signature = glow.Sign(eaInvalidBytes, gcaPrivateKey)
 
 	// Tamper with the EquipmentAuthorization to make it invalid
 	eaInvalid.Debt = 100

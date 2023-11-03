@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // sendEquipmentReport will take an equipment authorization and the private key
@@ -16,7 +18,7 @@ import (
 // the test suite will occasionally fail to send the udp packet even over
 // localhost. Therefore this function doesn't do any checking itself to see
 // whether the report successfully arrived.
-func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv PrivateKey) error {
+func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv glow.PrivateKey) error {
 	// Generate a number between 2 and the capacity for the PowerOutput. We
 	// cannot use 0 or 1 because both of those values are sentinel values
 	// and thus the report will simply be ignored by the server.
@@ -26,14 +28,14 @@ func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv Priv
 
 // sendEquipmentReportSpecific is the same as sendEquipmentReport, but takes
 // specific values for the power output and the timeslot.
-func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, ePriv PrivateKey, timeslot uint32, output uint64) error {
+func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, ePriv glow.PrivateKey, timeslot uint32, output uint64) error {
 	// Create the report and sign it using the provided private key.
 	er := EquipmentReport{
 		ShortID:     ea.ShortID,
 		Timeslot:    timeslot,
 		PowerOutput: output,
 	}
-	er.Signature = Sign(er.SigningBytes(), ePriv)
+	er.Signature = glow.Sign(er.SigningBytes(), ePriv)
 
 	// Send the report over UDP.
 	if err := sendUDPReport(er.Serialize(), gcas.udpPort); err != nil {
@@ -54,14 +56,14 @@ func TestParseReportIntegration(t *testing.T) {
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
 	devices := make([]EquipmentAuthorization, numDevices)
-	privKeys := make([]PrivateKey, numDevices)
+	privKeys := make([]glow.PrivateKey, numDevices)
 
 	for i := 0; i < numDevices; i++ {
-		pubKey, privKey := GenerateKeyPair()
+		pubKey, privKey := glow.GenerateKeyPair()
 		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey, Capacity: 100e6}
 		privKeys[i] = privKey
 		sb := devices[i].SigningBytes()
-		sig := Sign(sb, gcaPrivKey)
+		sig := glow.Sign(sb, gcaPrivKey)
 		devices[i].Signature = sig
 		err := server.saveEquipment(devices[i])
 		if err != nil {
@@ -83,7 +85,7 @@ func TestParseReportIntegration(t *testing.T) {
 			PowerOutput: uint64(5 + i*100),
 		}
 		// Correctly signed report
-		er.Signature = Sign(er.SigningBytes(), privKeys[i])
+		er.Signature = glow.Sign(er.SigningBytes(), privKeys[i])
 
 		// Send the report over UDP
 		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
@@ -148,7 +150,7 @@ func TestParseReportIntegration(t *testing.T) {
 		// change the state of the server at all so we have to
 		// non-deterministically catch this.
 		if i < numDevices-1 {
-			er.Signature = Sign(er.Serialize(), privKeys[i+1])
+			er.Signature = glow.Sign(er.Serialize(), privKeys[i+1])
 			if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 				t.Fatalf("Failed to send wrongly signed UDP report for device %d: %v", i, err)
 			}
@@ -185,7 +187,7 @@ func TestParseReportIntegration(t *testing.T) {
 			PowerOutput: uint64(6 + i*100),
 		}
 		// Correctly sign the report
-		er.Signature = Sign(er.SigningBytes(), privKeys[i])
+		er.Signature = glow.Sign(er.SigningBytes(), privKeys[i])
 		// Send the report over UDP
 		if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 			t.Fatalf("Failed to send UDP report for device %d: %v", i, err)
@@ -234,7 +236,7 @@ func TestParseReportIntegration(t *testing.T) {
 			PowerOutput: uint64(7 + i*100),
 		}
 		// Correctly sign the report
-		er.Signature = Sign(er.SigningBytes(), privKeys[i])
+		er.Signature = glow.Sign(er.SigningBytes(), privKeys[i])
 		// Send the report over UDP. Since the server state isn't
 		// supposed to change, we need to send it multiple times just
 		// to be certain it gets through.
@@ -307,10 +309,10 @@ func TestCapacityEnforcement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pubKey, privKey := GenerateKeyPair()
+	pubKey, privKey := glow.GenerateKeyPair()
 	device := EquipmentAuthorization{ShortID: 3, PublicKey: pubKey, Capacity: 100e6}
 	sb := device.SigningBytes()
-	sig := Sign(sb, gcaPrivKey)
+	sig := glow.Sign(sb, gcaPrivKey)
 	device.Signature = sig
 	err = server.saveEquipment(device)
 	if err != nil {
@@ -328,7 +330,7 @@ func TestCapacityEnforcement(t *testing.T) {
 		PowerOutput: uint64(200e6),
 	}
 	// Sign report and send over UDP.
-	er.Signature = Sign(er.SigningBytes(), privKey)
+	er.Signature = glow.Sign(er.SigningBytes(), privKey)
 	if err := sendUDPReport(er.Serialize(), server.udpPort); err != nil {
 		t.Fatalf("Failed to send UDP report")
 	}

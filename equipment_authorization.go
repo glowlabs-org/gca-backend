@@ -6,6 +6,8 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // EquipmentAuthorization struct reflects an authorization request,
@@ -93,7 +95,7 @@ func DeserializeEquipmentAuthorization(data []byte) (EquipmentAuthorization, err
 // The method returns an error if the verification fails.
 func (gcas *GCAServer) verifyEquipmentAuthorization(ea EquipmentAuthorization) error {
 	signingBytes := ea.SigningBytes()
-	isValid := Verify(gcas.gcaPubkey, signingBytes, ea.Signature)
+	isValid := glow.Verify(gcas.gcaPubkey, signingBytes, ea.Signature)
 	if !isValid {
 		return errors.New("invalid signature on EquipmentAuthorization")
 	}

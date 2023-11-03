@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // TestThreadedMigrateReports tests the migration of equipment reports.
@@ -20,7 +22,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 	}()
 
 	// Generate a dummy EquipmentAuthorization
-	ePubKey, _ := GenerateKeyPair()
+	ePubKey, _ := glow.GenerateKeyPair()
 	dummyEquipment := EquipmentAuthorization{ShortID: 1, PublicKey: ePubKey}
 	server.loadEquipmentAuth(dummyEquipment)
 
