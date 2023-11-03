@@ -7,6 +7,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // requestEquipmentBitfield opens a TCP connection, sends a request for a
@@ -54,7 +56,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	}
 
 	// Verify the signature
-	if !Verify(gcas.staticPublicKey, resp[:32+4+504+8], sig) {
+	if !glow.Verify(gcas.staticPublicKey, resp[:32+4+504+8], sig) {
 		return 0, [504]byte{}, fmt.Errorf("Signature verification failed")
 	}
 	
@@ -81,10 +83,10 @@ func TestTCPListener(t *testing.T) {
 	}()
 
 	// Generate a keypair for a device.
-	authPub, authPriv := GenerateKeyPair()
+	authPub, authPriv := glow.GenerateKeyPair()
 	auth := EquipmentAuthorization{ShortID: 0, PublicKey: authPub}
 	sb := auth.SigningBytes()
-	sig := Sign(sb, gcaPrivKey)
+	sig := glow.Sign(sb, gcaPrivKey)
 	auth.Signature = sig
 	gcas.mu.Lock()
 	err = gcas.saveEquipment(auth)

@@ -1,4 +1,4 @@
-package main
+package glow
 
 import (
 	"testing"

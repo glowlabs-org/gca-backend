@@ -24,6 +24,8 @@ import (
 	"io"
 	"net"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // threadedListenForSyncRequests creates a TCP listener that will listen for
@@ -124,7 +126,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	timestamp := time.Now().Unix()
 	binary.BigEndian.PutUint64(resp[540:548], uint64(timestamp))
 	// Create the signature
-	sig := Sign(resp[:548], gcas.staticPrivateKey)
+	sig := glow.Sign(resp[:548], gcas.staticPrivateKey)
 	copy(resp[548:], sig[:])
 	_, err = conn.Write(resp[:])
 	if err != nil {

@@ -12,19 +12,21 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // setupTestEnvironment will return a fully initialized gca server that is
 // ready to be used.
-func setupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey PrivateKey, err error) {
+func setupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey glow.PrivateKey, err error) {
 	dir = generateTestDir(testName)
 	server, tempPrivKey, err := gcaServerWithTempKey(dir)
 	if err != nil {
-		return nil, "", PrivateKey{}, fmt.Errorf("unable to create gca server with temp key: %v", err)
+		return nil, "", glow.PrivateKey{}, fmt.Errorf("unable to create gca server with temp key: %v", err)
 	}
 	gcaPrivKey, err = server.submitGCAKey(tempPrivKey)
 	if err != nil {
-		return nil, "", PrivateKey{}, fmt.Errorf("unable to submit gca priv key: %v", err)
+		return nil, "", glow.PrivateKey{}, fmt.Errorf("unable to submit gca priv key: %v", err)
 	}
 	return server, dir, gcaPrivKey, nil
 }

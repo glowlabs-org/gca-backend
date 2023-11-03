@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // TestHandleEquipmentReport_MaxRecentReports tests the GCAServer's
@@ -21,9 +23,9 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
 	var devices []EquipmentAuthorization
-	var privKeys []PrivateKey
+	var privKeys []glow.PrivateKey
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
-		pubKey, privKey := GenerateKeyPair()
+		pubKey, privKey := glow.GenerateKeyPair()
 		device := EquipmentAuthorization{
 			ShortID:   uint32(i),
 			PublicKey: pubKey,

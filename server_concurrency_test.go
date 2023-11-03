@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // TestConcurrency is a large integration test that tries to get actions firing
@@ -49,7 +51,7 @@ func TestConcurrency(t *testing.T) {
 		badKey[0] += byte(i + 1)
 
 		// Create a goroutine to repeatedly submit the bad key .
-		go func(key PrivateKey) {
+		go func(key glow.PrivateKey) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -84,7 +86,7 @@ func TestConcurrency(t *testing.T) {
 		badKey[0] += byte(i + 1)
 
 		// Create a goroutine to repeatedly submit the bad key .
-		go func(key PrivateKey) {
+		go func(key glow.PrivateKey) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -118,7 +120,7 @@ func TestConcurrency(t *testing.T) {
 		// equipment. The Signature is left blank because no valid
 		// signature auth can exist yet, as we haven't generated the
 		// GCA key yet.
-		ePub, ePriv := GenerateKeyPair()
+		ePub, ePriv := glow.GenerateKeyPair()
 		ea := EquipmentAuthorization{
 			ShortID:    5,
 			PublicKey:  ePub,
@@ -126,7 +128,7 @@ func TestConcurrency(t *testing.T) {
 			Debt:       5e6,
 			Expiration: 15e6,
 		}
-		go func(ea EquipmentAuthorization, ePriv PrivateKey) {
+		go func(ea EquipmentAuthorization, ePriv glow.PrivateKey) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -207,7 +209,7 @@ func TestConcurrency(t *testing.T) {
 	// fail.
 	for i := 0; i < 3; i++ {
 		// Create a goroutine to repeatedly submit the bad key .
-		go func(key PrivateKey) {
+		go func(key glow.PrivateKey) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -238,7 +240,7 @@ func TestConcurrency(t *testing.T) {
 	// equipment.
 	for i := 0; i < 3; i++ {
 		// Create a goroutine to repeatedly authorize new hardware.
-		go func(key PrivateKey) {
+		go func(key glow.PrivateKey) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -276,7 +278,7 @@ func TestConcurrency(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		go func(ea EquipmentAuthorization, ePriv PrivateKey, threadNum int) {
+		go func(ea EquipmentAuthorization, ePriv glow.PrivateKey, threadNum int) {
 			// Try until the stop signal is sent.
 			i := 0
 			resends := 0

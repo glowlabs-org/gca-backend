@@ -31,6 +31,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // gcaServerWithTempKey creates a temporary GCA key, saves its public key to a
@@ -39,26 +41,26 @@ import (
 // dir specifies the directory where the temporary public key will be stored.
 // The function returns the created GCAServer instance and any errors that
 // occur.
-func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey PrivateKey, err error) {
+func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey glow.PrivateKey, err error) {
 	// Create the temp priv key, corresponding directory and file, and
 	// write the public key to disk where the GCAServer will look for it at
 	// startup.
-	tempPubKey, tempPrivKey := GenerateKeyPair()
+	tempPubKey, tempPrivKey := glow.GenerateKeyPair()
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
-			return nil, PrivateKey{}, fmt.Errorf("unable to create gca dir: %v", err)
+			return nil, glow.PrivateKey{}, fmt.Errorf("unable to create gca dir: %v", err)
 		}
 	}
 	pubKeyPath := filepath.Join(dir, "gca.tempkey")
 	if err := ioutil.WriteFile(pubKeyPath, tempPubKey[:], 0644); err != nil {
-		return nil, PrivateKey{}, fmt.Errorf("failed to write public key to file: %v", err)
+		return nil, glow.PrivateKey{}, fmt.Errorf("failed to write public key to file: %v", err)
 	}
 
 	// Initialize and launch the GCAServer.
 	gcas, err = NewGCAServer(dir)
 	if err != nil {
-		return nil, PrivateKey{}, fmt.Errorf("failed to create gca server: %v", err)
+		return nil, glow.PrivateKey{}, fmt.Errorf("failed to create gca server: %v", err)
 	}
 	return gcas, tempPrivKey, nil
 }
@@ -66,14 +68,14 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey PrivateKey, 
 // submitGCAKey takes in a GCAServer object and submits the 'real'
 // GCA public key to it. It returns the private key corresponding to
 // the GCA public key and any error encountered during the process.
-func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateKey, err error) {
+func (gcas *GCAServer) submitGCAKey(tempPrivKey glow.PrivateKey) (gcaPrivKey glow.PrivateKey, err error) {
 	// Generate the new key pair for the GCA.
-	publicKey, privateKey := GenerateKeyPair()
+	publicKey, privateKey := glow.GenerateKeyPair()
 
 	// Create a GCAKey object and populate it with the public key and signature.
 	gk := GCAKey{PublicKey: publicKey}
 	signingBytes := gk.SigningBytes()
-	gk.Signature = Sign(signingBytes, tempPrivKey)
+	gk.Signature = glow.Sign(signingBytes, tempPrivKey)
 
 	// Create a new request payload for the server.
 	reqPayload := RegisterGCARequest{
@@ -82,13 +84,13 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateK
 	}
 	payloadBytes, err := json.Marshal(reqPayload)
 	if err != nil {
-		return PrivateKey{}, fmt.Errorf("error marshaling payload: %v", err)
+		return glow.PrivateKey{}, fmt.Errorf("error marshaling payload: %v", err)
 	}
 
 	// Create a new HTTP request to submit the GCA key.
 	req, err := http.NewRequest("POST", "http://localhost"+gcas.httpPort+"/api/v1/register-gca", bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		return PrivateKey{}, fmt.Errorf("error creating new http request: %v", err)
+		return glow.PrivateKey{}, fmt.Errorf("error creating new http request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -96,7 +98,7 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateK
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return PrivateKey{}, fmt.Errorf("error sending request: %v", err)
+		return glow.PrivateKey{}, fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -105,27 +107,27 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey PrivateKey) (gcaPrivKey PrivateK
 		// Read and log the full response body for debugging.
 		respBodyBytes, readErr := ioutil.ReadAll(resp.Body)
 		if readErr != nil {
-			return PrivateKey{}, fmt.Errorf("failed to read response body: %v", readErr)
+			return glow.PrivateKey{}, fmt.Errorf("failed to read response body: %v", readErr)
 		}
-		return PrivateKey{}, fmt.Errorf("received a non-200 status code: %d :: %s", resp.StatusCode, string(respBodyBytes))
+		return glow.PrivateKey{}, fmt.Errorf("received a non-200 status code: %d :: %s", resp.StatusCode, string(respBodyBytes))
 	}
 
 	// Decode the JSON response from the server.
 	var jsonResponse map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&jsonResponse); err != nil {
-		return PrivateKey{}, fmt.Errorf("failed to decode json response: %v", err)
+		return glow.PrivateKey{}, fmt.Errorf("failed to decode json response: %v", err)
 	}
 
 	// Extract the server's public key from the JSON response.
 	serverPubKeyHex, ok := jsonResponse["ServerPublicKey"]
 	if !ok {
-		return PrivateKey{}, fmt.Errorf("ServerPublicKey not found in response")
+		return glow.PrivateKey{}, fmt.Errorf("ServerPublicKey not found in response")
 	}
 
 	// Verify that the server's public key matches the expected public key.
 	expectedServerPubKeyHex := hex.EncodeToString(gcas.staticPublicKey[:])
 	if serverPubKeyHex != expectedServerPubKeyHex {
-		return PrivateKey{}, fmt.Errorf("mismatch in server public key: expected %s, got %s", expectedServerPubKeyHex, serverPubKeyHex)
+		return glow.PrivateKey{}, fmt.Errorf("mismatch in server public key: expected %s, got %s", expectedServerPubKeyHex, serverPubKeyHex)
 	}
 
 	// Return the GCA private key if everything is successful.

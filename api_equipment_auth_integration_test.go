@@ -8,11 +8,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // submitNewHardware will create a new piece of hardware and submit it to the
 // GCA server.
-func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey PrivateKey) (ea EquipmentAuthorization, equipmentKey PrivateKey, err error) {
+func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.PrivateKey) (ea EquipmentAuthorization, equipmentKey glow.PrivateKey, err error) {
 	// Verify that the shortID is free. Even if the shortID is not free,
 	// we'll still make the web request because the caller may want the
 	// request to go through.
@@ -22,7 +24,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey PrivateKey) 
 
 	// Create a keypair for the equipment, then create the equipment
 	// request body.
-	pubkey, equipmentKey := GenerateKeyPair()
+	pubkey, equipmentKey := glow.GenerateKeyPair()
 	body := EquipmentAuthorizationRequest{
 		ShortID:    shortID,
 		PublicKey:  hex.EncodeToString(pubkey[:]),
@@ -35,42 +37,42 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey PrivateKey) 
 	// Serialize and sign the request.
 	ea, err = body.ToAuthorization()
 	if err != nil {
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("unable to serialize contemplated equipment: %v", err)
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to serialize contemplated equipment: %v", err)
 	}
 	sb := ea.SigningBytes()
-	sig := Sign(sb, gcaPrivKey)
+	sig := glow.Sign(sb, gcaPrivKey)
 	body.Signature = hex.EncodeToString(sig[:])
 
 	// Convert the request to json and post it.
 	jsonBody, _ := json.Marshal(body)
 	resp, err := http.Post("http://localhost"+gcas.httpPort+"/api/v1/authorize-equipment", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
 	}
 
 	// Verify the response.
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(bodyBytes))
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 	var response map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("Failed to decode response: %v", err)
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("Failed to decode response: %v", err)
 	}
 	if status, exists := response["status"]; !exists || status != "success" {
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("Unexpected response: %v", response)
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("Unexpected response: %v", response)
 	}
 	resp.Body.Close()
 
 	// Verify that the server sees the new equipment.
 	if shortIDAlreadyUsed {
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("shortID already in use")
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("shortID already in use")
 	}
 	gcas.mu.Lock()
 	_, exists := gcas.equipment[shortID]
 	gcas.mu.Unlock()
 	if !exists {
-		return EquipmentAuthorization{}, PrivateKey{}, fmt.Errorf("equipment does not appear to have been added to server correctly")
+		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("equipment does not appear to have been added to server correctly")
 	}
 	return ea, equipmentKey, nil
 }
@@ -99,7 +101,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature := Sign(sb, gcaPrivKey)
+	signature := glow.Sign(sb, gcaPrivKey)
 	body.Signature = hex.EncodeToString(signature[:])
 
 	// Convert the request body to JSON format.
@@ -172,7 +174,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	// Sign the authorization request with GCA's private key.
 	sb = ea.SigningBytes()
-	signature = Sign(sb, gcaPrivKey)
+	signature = glow.Sign(sb, gcaPrivKey)
 	body.Signature = hex.EncodeToString(signature[:])
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)
@@ -220,7 +222,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 	// Sign the authorization request with GCA's private key.
 	sb = ea.SigningBytes()
-	signature = Sign(sb, gcaPrivKey)
+	signature = glow.Sign(sb, gcaPrivKey)
 	body.Signature = hex.EncodeToString(signature[:])
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(body)

@@ -29,6 +29,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // RegisterGCARequest defines the inputs that need to be collected to secure
@@ -41,8 +43,8 @@ type RegisterGCARequest struct {
 
 // GCAKey struct represents the GCA's public key and a signature to verify it.
 type GCAKey struct {
-	PublicKey PublicKey
-	Signature Signature
+	PublicKey glow.PublicKey
+	Signature glow.Signature
 }
 
 // ToGCAKey converts a RegisterGCARequest to a GCAKey struct.
@@ -172,7 +174,7 @@ func (gcas *GCAServer) verifyGCAKey(gk GCAKey) error {
 
 	// Perform the signature verification. Assume Verify is a function that exists
 	// to verify the signature.
-	isValid := Verify(gcas.gcaTempKey, signingBytes, gk.Signature)
+	isValid := glow.Verify(gcas.gcaTempKey, signingBytes, gk.Signature)
 
 	// Check if the signature is valid
 	if !isValid {
