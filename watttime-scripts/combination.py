@@ -32,7 +32,7 @@ def fetch_nasa_data(latitude, longitude):
         dict: NASA POWER API response as a dictionary.
     """
     # Construct API endpoint and parameters
-    url = "https://power.larc.nasa.gov/api/temporal/daily/point"
+    url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
     params = {
         "parameters": "ALLSKY_SFC_SW_DWN",
         "community": "RE",
@@ -240,7 +240,7 @@ def calculate_carbon_credits(folder_path, avg_sunlight):
     low_avg = yearly_low_avg * conversion_factor
     high_avg = yearly_high_avg * conversion_factor
     
-    return low_avg, high_avg
+    return low_avg, yearly_low_avg/2204.62, high_avg, yearly_high_avg/2204.62
 
 if __name__ == "__main__":
     # Load API credentials
@@ -268,9 +268,9 @@ if __name__ == "__main__":
     fetch_and_save_historical_data(token, ba)
     
     # Compute carbon credit averages using the historical data for the ba
-    low_avg, high_avg = calculate_carbon_credits(ba, avg_sunlight)
+    low_avg, low_avg_mwh, high_avg, high_avg_mwh = calculate_carbon_credits(ba, avg_sunlight)
     
     print(f"\nExpected Carbon Credits for 2022 in {ba} with avg sunlight of {avg_sunlight} hours:")
-    print(f"Solar Only:              {low_avg:.3f} carbon credits per year, per kilowatt of solar")
-    print(f"Solar + Smart Batteries: {high_avg:.3f} carbon credits per year, per kilowatt of solar")
+    print(f"Solar Only:              {low_avg:.3f} carbon credits per year, per kilowatt of solar ({low_avg_mwh:.3f})")
+    print(f"Solar + Smart Batteries: {high_avg:.3f} carbon credits per year, per kilowatt of solar ({high_avg_mwh:.3f})")
 
