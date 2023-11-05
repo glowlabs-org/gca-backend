@@ -93,6 +93,7 @@ for latitude in latitudes:
     csvfile.flush()
     for longitude in longitudes:
         # Load the solar data for this coordinate.
+        print(latitude, longitude)
         solar_history = load_solar_history(latitude, longitude)
 
         # We will produce a 4x4 grid for each solar data point. This
