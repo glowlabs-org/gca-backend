@@ -130,7 +130,6 @@ def calculate_carbon_credits(nasa_data, moer_data):
     total_kwh = 0
     total_hours = 0
     total_moer = 0
-    count_moer = 0
 
     # Iterate over each day in the NASA data
     for day_data, sun_intensity in nasa_data['properties']['parameter']['ALLSKY_SFC_SW_DWN'].items():
@@ -147,7 +146,6 @@ def calculate_carbon_credits(nasa_data, moer_data):
 
         # Skip if there is no MOER data for the hour
         if not moer_values:
-            # print("skipping due to lack of moer data")
             continue
 
         # Calculate the average MOER value for the hour
@@ -156,26 +154,59 @@ def calculate_carbon_credits(nasa_data, moer_data):
         average_moer_metric_tons = average_moer / 2204.62
         # Convert the sun intensity from w/m2 to kW/m2 
         sun_intensity_kw = sun_intensity / 1000
-
         # Calculate the carbon credits for this hour and add it to the total
         total_kwh += sun_intensity_kw
-        #print(sun_intensity_kw, average_moer_metric_tons, carbon_credits, total_carbon_credits)
 
         # Accumulate MOER for average calculation
-        total_moer += average_moer_metric_tons
-        count_moer += 1
+        total_moer += average_moer_metric_tons * sun_intensity_kw
         total_hours += 1
 
     # Calculate the average MOER value per megawatt hour
-    average_moer_per_mwh = (total_moer / count_moer) if count_moer else 0
-    total_carbon_credits = average_moer_per_mwh/1000*total_kwh
+    average_moer_per_mwh = (total_moer / total_kwh)
+    avg_hour = total_kwh / total_hours
+    total_carbon_credits = average_moer_per_mwh/1000*avg_hour*8766
     
     # Print the results
     print()
-    print(f"Average Sunlight Per Day: {total_kwh/total_hours*24}")
+    print(f"No Batteries:")
+    print(f"Average Sunlight Per Day: {avg_hour*24}")
     print(f"Average Carbon Credits per MWh: {average_moer_per_mwh:.2f}")
     print(f"Total Carbon Credits for 1 kW of Solar Panels: {total_carbon_credits:.2f} metric tons CO2")
-    return total_carbon_credits
+    
+def calculate_carbon_credits_b(nasa_data, moer_data):
+    total_kwh = 0
+    total_hours = 0
+    total_moer = 0
+    count_moer = 0
+
+    # Iterate over the moer data.
+    for year in moer_data.items():
+        for day in year[1].items():
+            for hour in day[1].items():
+                avg_hr = sum(hour[1]) / len(hour[1]) if len(hour[1]) else 0
+                avg_hr_tons = avg_hr / 2204.62
+                total_moer += avg_hr_tons
+                count_moer += 1
+
+    for day_data, sun_intensity in nasa_data['properties']['parameter']['ALLSKY_SFC_SW_DWN'].items():
+        if sun_intensity is None:
+            continue
+        sun_intensity_kw = sun_intensity / 1000
+        total_kwh += sun_intensity_kw
+        total_hours += 1
+
+    # Calculate the average MOER value per megawatt hour
+    average_moer_per_mwh = (total_moer / count_moer)
+    average_sunlight_per_hour = total_kwh / total_hours
+    kwh_per_year = average_sunlight_per_hour * 8766
+    total_carbon_credits = average_moer_per_mwh/1000*kwh_per_year
+    
+    # Print the results
+    print()
+    print(f"Naive Battery Strategy:")
+    print(f"Average Sunlight Per Day: {average_sunlight_per_hour*24}")
+    print(f"Average Carbon Credits per MWh: {average_moer_per_mwh:.2f}")
+    print(f"Total Carbon Credits for 1 kW of Solar Panels: {total_carbon_credits:.2f} metric tons CO2")
 
 if __name__ == "__main__":
     # Load API credentials
@@ -202,4 +233,5 @@ if __name__ == "__main__":
     nasa_data = fetch_nasa_data(latitude, longitude)
     moer_data = load_csv_files(ba)
     combo_print = calculate_carbon_credits(nasa_data, moer_data)
+    combo_print = calculate_carbon_credits_b(nasa_data, moer_data)
 
