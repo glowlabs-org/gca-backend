@@ -22,7 +22,7 @@ func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv glow
 	// Generate a number between 2 and the capacity for the PowerOutput. We
 	// cannot use 0 or 1 because both of those values are sentinel values
 	// and thus the report will simply be ignored by the server.
-	output := generateSecureRandomInt(2, int(ea.Capacity))
+	output := glow.GenerateSecureRandomInt(2, int(ea.Capacity))
 	return gcas.sendEquipmentReportSpecific(ea, ePriv, currentTimeslot(), uint64(output))
 }
 
