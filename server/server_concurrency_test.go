@@ -35,7 +35,7 @@ func TestConcurrency(t *testing.T) {
 	// everything is failing, and that there are no race conditions.
 	//
 	// That means we start with a server that has no temp key.
-	dir := generateTestDir(t.Name())
+	dir := glow.GenerateTestDir(t.Name())
 	gcas, tempPrivKey, err := gcaServerWithTempKey(dir)
 	if err != nil {
 		t.Fatal(err)

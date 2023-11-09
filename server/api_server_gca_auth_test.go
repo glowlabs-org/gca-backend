@@ -138,7 +138,7 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey glow.PrivateKey) (gcaPrivKey glo
 // including temporary key creation, server startup, real key submission, and validation.
 func TestGCAKeyLifecycle(t *testing.T) {
 	// Generate a test directory.
-	dir := generateTestDir(t.Name())
+	dir := glow.GenerateTestDir(t.Name())
 
 	// Setup the test environment and launch the GCAServer.
 	gcas, tempPrivKey, err := gcaServerWithTempKey(dir)
