@@ -72,7 +72,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 // TestTCPListener does some basic testing to make sure that the TCP listener
 // is returning the right values.
 func TestTCPListener(t *testing.T) {
-	gcas, _, gcaPrivKey, err := setupTestEnvironment(t.Name())
+	gcas, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

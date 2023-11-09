@@ -48,7 +48,7 @@ func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, eP
 // TestParseReportIntegration tests the GCAServer's ability to correctly
 // process and record device reports that are sent over UDP.
 func TestParseReportIntegration(t *testing.T) {
-	server, dir, gcaPrivKey, err := setupTestEnvironment(t.Name())
+	server, dir, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestParseReportIntegration(t *testing.T) {
 // TestCapacityEnforcement will check that a report gets banned for exceeding
 // the equipment capacity, and that it stays banned after a reset.
 func TestCapacityEnforcement(t *testing.T) {
-	server, dir, gcaPrivKey, err := setupTestEnvironment(t.Name())
+	server, dir, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

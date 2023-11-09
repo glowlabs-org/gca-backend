@@ -12,9 +12,9 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-// setupTestEnvironment will return a fully initialized gca server that is
+// SetupTestEnvironment will return a fully initialized gca server that is
 // ready to be used.
-func setupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey glow.PrivateKey, err error) {
+func SetupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey glow.PrivateKey, err error) {
 	dir = glow.GenerateTestDir(testName)
 	server, tempPrivKey, err := gcaServerWithTempKey(dir)
 	if err != nil {
