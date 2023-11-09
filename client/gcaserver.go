@@ -12,10 +12,11 @@ import (
 type GCAServer struct {
 	Banned   bool
 	Location string
-	Pubkey   glow.PublicKey
+	HttpPort uint16
+	TcpPort  uint16
+	UdpPort  uint16
 }
 
-// Serialize serializes the map[glow.PublicKey]GCAServer into a byte slice.
 func SerializeGCAServerMap(gcaMap map[glow.PublicKey]GCAServer) ([]byte, error) {
 	var buffer bytes.Buffer
 
@@ -45,12 +46,22 @@ func SerializeGCAServerMap(gcaMap map[glow.PublicKey]GCAServer) ([]byte, error) 
 		if _, err := buffer.WriteString(server.Location); err != nil {
 			return nil, err
 		}
+
+		// Serialize the ports (HttpPort, TcpPort, UdpPort) as uint16
+		if err := binary.Write(&buffer, binary.LittleEndian, server.HttpPort); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(&buffer, binary.LittleEndian, server.TcpPort); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(&buffer, binary.LittleEndian, server.UdpPort); err != nil {
+			return nil, err
+		}
 	}
 
 	return buffer.Bytes(), nil
 }
 
-// Deserialize a byte slice into a map[glow.PublicKey]GCAServer.
 func DeserializeGCAServerMap(data []byte) (map[glow.PublicKey]GCAServer, error) {
 	gcaMap := make(map[glow.PublicKey]GCAServer)
 	reader := bytes.NewReader(data)
@@ -81,10 +92,25 @@ func DeserializeGCAServerMap(data []byte) (map[glow.PublicKey]GCAServer, error) 
 			return nil, err
 		}
 
+		// Deserialize the ports (HttpPort, TcpPort, UdpPort)
+		var httpPort, tcpPort, udpPort uint16
+		if err := binary.Read(reader, binary.LittleEndian, &httpPort); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(reader, binary.LittleEndian, &tcpPort); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(reader, binary.LittleEndian, &udpPort); err != nil {
+			return nil, err
+		}
+
 		// Add the deserialized key-value pair to the map
 		gcaMap[key] = GCAServer{
 			Banned:   banned,
 			Location: string(location),
+			HttpPort: httpPort,
+			TcpPort:  tcpPort,
+			UdpPort:  udpPort,
 		}
 	}
 

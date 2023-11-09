@@ -3,7 +3,6 @@ package server
 import (
 	"net"
 	"net/http"
-	"strconv"
 )
 
 // launchAPI sets up the HTTP API endpoints and starts the HTTP server.
@@ -20,7 +19,7 @@ func (gcas *GCAServer) launchAPI() {
 	if err != nil {
 		panic("unable to launch gca api")
 	}
-	gcas.httpPort = ":" + strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+	gcas.httpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
 
 	// Launch the background thread that keeps the API running.
 	go func() {

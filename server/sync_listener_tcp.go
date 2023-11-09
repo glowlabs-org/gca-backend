@@ -38,7 +38,7 @@ func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 		gcas.logger.Fatalf("Failed to start server: %s", err)
 	}
 	defer listener.Close()
-	gcas.tcpPort = listener.Addr().(*net.TCPAddr).Port
+	gcas.tcpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
 	close(tcpReady)
 
 	for {
@@ -67,11 +67,11 @@ func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 // the equipment that we want history from.
 //
 // If successful, the response will be:
-//     + 32 bytes, contianing the public key of the equipment
-//     + 4 bytes, containing the timeslot where the history starts
-//     + 504 bytes, containing the bitfield exposing the missing history
-//     + 8 bytes, containing a Unix timestamp for when the response was authorized
-//     + 64 bytes, containing a signature from the GCA server asserting the authenticity of the data
+//   - 32 bytes, contianing the public key of the equipment
+//   - 4 bytes, containing the timeslot where the history starts
+//   - 504 bytes, containing the bitfield exposing the missing history
+//   - 8 bytes, containing a Unix timestamp for when the response was authorized
+//   - 64 bytes, containing a signature from the GCA server asserting the authenticity of the data
 //
 // If unsuccessful, the response will be a single zero byte followed by the
 // connection closing.
@@ -95,8 +95,8 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	reports, exists := gcas.equipmentReports[id]
 	if exists {
 		for i, report := range reports {
-			byteIndex := i/8
-			bitIndex := i%8
+			byteIndex := i / 8
+			bitIndex := i % 8
 			if report.PowerOutput > 0 {
 				bitfield[byteIndex] |= 1 << bitIndex
 			}
@@ -115,7 +115,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	}
 
 	// Prepare the response.
-	var resp [32+4+504+8+64]byte
+	var resp [32 + 4 + 504 + 8 + 64]byte
 	// Copy in the public key.
 	copy(resp[:32], equipment.PublicKey[:])
 	// Copy in the reports offset

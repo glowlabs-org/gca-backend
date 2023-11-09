@@ -23,8 +23,8 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -88,7 +88,7 @@ func (gcas *GCAServer) submitGCAKey(tempPrivKey glow.PrivateKey) (gcaPrivKey glo
 	}
 
 	// Create a new HTTP request to submit the GCA key.
-	req, err := http.NewRequest("POST", "http://localhost"+gcas.httpPort+"/api/v1/register-gca", bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost:%v/api/v1/register-gca", gcas.httpPort), bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return glow.PrivateKey{}, fmt.Errorf("error creating new http request: %v", err)
 	}

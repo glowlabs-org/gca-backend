@@ -43,6 +43,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/glowlabs-org/gca-backend/client"
 )
 
 func main() {
@@ -58,7 +60,7 @@ func main() {
 	// Step 6: Kick off the background loop that checks for migration orders
 
 	// Create a new client, using the current directory as the basedir.
-	c, err := NewClient(".")
+	c, err := client.NewClient(".")
 	if err != nil {
 		fmt.Println("unable to create client")
 		return

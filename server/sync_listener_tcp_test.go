@@ -36,7 +36,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	}
 
 	// Prepare a buffer to store the incoming response
-	var resp [32+4+504+8+64]byte
+	var resp [32 + 4 + 504 + 8 + 64]byte
 
 	// Read the full response
 	_, err = io.ReadFull(conn, resp[:])
@@ -59,7 +59,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	if !glow.Verify(gcas.staticPublicKey, resp[:32+4+504+8], sig) {
 		return 0, [504]byte{}, fmt.Errorf("Signature verification failed")
 	}
-	
+
 	// Extract the timeslot offset
 	timeslotOffset = binary.BigEndian.Uint32(resp[32:36])
 
