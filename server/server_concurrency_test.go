@@ -304,10 +304,10 @@ func TestConcurrency(t *testing.T) {
 						t.Fatal(err)
 					}
 					for i := 0; i < len(bitfield)*8 && uint32(i)+offset < currentTimeslot(); i++ {
-						byteIndex := i/8
-						bitIndex := i%8
+						byteIndex := i / 8
+						bitIndex := i % 8
 						mask := byte(1 << bitIndex)
-						if bitfield[byteIndex] & mask != 0 {
+						if bitfield[byteIndex]&mask != 0 {
 							continue
 						}
 						err := gcas.sendEquipmentReportSpecific(ea, ePriv, offset+uint32(i), 5)

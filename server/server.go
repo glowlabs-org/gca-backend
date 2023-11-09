@@ -71,16 +71,16 @@ type GCAServer struct {
 	// sign all GET requests so that the caller knows the data is
 	// authentic.
 	staticPrivateKey glow.PrivateKey
-	staticPublicKey glow.PublicKey
+	staticPublicKey  glow.PublicKey
 
 	baseDir    string         // Base directory for server files
 	logger     *Logger        // Custom logger for the server
 	httpServer *http.Server   // Web server for handling API requests
-	httpPort   string         // Records the port that is being used to serve the api
+	httpPort   uint16         // Records the port that is being used to serve the api
 	mux        *http.ServeMux // Routing for HTTP requests
 	udpConn    *net.UDPConn   // UDP connection for listening to equipment reports
-	udpPort    int            // The port that the UDP conn is listening on
-	tcpPort    int            // The port that the TCP listener is using
+	udpPort    uint16         // The port that the UDP conn is listening on
+	tcpPort    uint16         // The port that the TCP listener is using
 	quit       chan bool      // A channel to initiate server shutdown
 	mu         sync.Mutex
 }

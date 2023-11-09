@@ -166,7 +166,7 @@ func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
 	if !ok {
 		panic("bad type on udpConn")
 	}
-	server.udpPort = addr.Port
+	server.udpPort = uint16(addr.Port)
 	close(udpReady)
 	if err != nil {
 		server.logger.Fatal("UDP server launch failed: ", err)
