@@ -47,8 +47,7 @@ func setupTestEnvironment(baseDir string, gcaServers []server.GCAServer) (glow.P
 	if err != nil {
 		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create the gca pubkey file: %v", err)
 	}
-	copy(data[:], gcaPub[:])
-	_, err = f.Write(data[:])
+	_, err = f.Write(gcaPub[:])
 	if err != nil {
 		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
 	}
@@ -72,6 +71,23 @@ func setupTestEnvironment(baseDir string, gcaServers []server.GCAServer) (glow.P
 			TcpPort:  tcp,
 			UdpPort:  udp,
 		}
+	}
+	mapData, err := SerializeGCAServerMap(serverMap)
+	if err != nil {
+		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to serialize the server map: %v", err)
+	}
+	path = filepath.Join(baseDir, GCAServerMapFile)
+	f, err = os.Create(path)
+	if err != nil {
+		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create the gca pubkey file: %v", err)
+	}
+	_, err = f.Write(mapData)
+	if err != nil {
+		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
+	}
+	err = f.Close()
+	if err != nil {
+		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to close the gca pubkey file: %v", err)
 	}
 
 	return gcaPub, gcaPriv, nil
