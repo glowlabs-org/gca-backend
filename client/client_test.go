@@ -110,6 +110,26 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers [
 	return nil
 }
 
+// FullClientTestEnvironment is a helper function for setting up a test
+// environment for the client, including creating a server.
+func FullClientTestEnvironment(name string) (*Client, error) {
+	gcas, _, _, err := server.SetupTestEnvironment(name + "_server1")
+	if err != nil {
+		return nil, fmt.Errorf("unable to set up the test environment for a server: %v", err)
+	}
+	gcaPubkey := gcas.GCAPublicKey()
+	clientDir := glow.GenerateTestDir(name + "_client1")
+	err = SetupTestEnvironment(clientDir, gcaPubkey, []*server.GCAServer{gcas})
+	if err != nil {
+		return nil, fmt.Errorf("unable to set up the client test environment: %v", err)
+	}
+	c, err := NewClient(clientDir)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create client: %v", err)
+	}
+	return c, nil
+}
+
 // TestBasicClient does minimal testing of the client object.
 func TestBasicClient(t *testing.T) {
 	gcas, _, _, err := server.SetupTestEnvironment(t.Name() + "_server1")
