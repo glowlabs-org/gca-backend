@@ -30,7 +30,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 		PublicKey:  hex.EncodeToString(pubkey[:]),
 		Capacity:   15400300,
 		Debt:       11223344,
-		Expiration: 100e6 + currentTimeslot(),                                                                                                          // ensure the hardware won't be invalid for a while, but leave enough room for tests to intentionally expire the hardware
+		Expiration: 100e6 + glow.CurrentTimeslot(),                                                                                                     // ensure the hardware won't be invalid for a while, but leave enough room for tests to intentionally expire the hardware
 		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // need a dummy signature
 	}
 

@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // addRecentEquipmentAuth will add a recent auth to the list of recent auths in the
@@ -172,7 +174,7 @@ func (gcas *GCAServer) threadedMigrateReports() {
 		// We only update if we are progressed most of the way through
 		// the second week.
 		gcas.mu.Lock()
-		now := currentTimeslot()
+		now := glow.CurrentTimeslot()
 		if int64(now)-int64(gcas.equipmentReportsOffset) > 4000 {
 			// panic, because the system has entered incoherency.
 			gcas.mu.Unlock()

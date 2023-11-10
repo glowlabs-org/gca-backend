@@ -18,7 +18,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 	// Because we mess with the global time during this test, we need to
 	// make sure it gets reset to 0 when the test ends.
 	defer func() {
-		setCurrentTimeslot(0)
+		glow.SetCurrentTimeslot(0)
 	}()
 
 	// Generate a dummy EquipmentAuthorization
@@ -59,7 +59,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 	}
 
 	// Update the timeslot just enough that we shouldn't be getting pruned still.
-	setCurrentTimeslot(3000)
+	glow.SetCurrentTimeslot(3000)
 	// Wait 150 milliseconds, which should trigger a prune. Except that no
 	// prune should be triggered because we aren't inside the prune window.
 	time.Sleep(150 * time.Millisecond)
@@ -73,7 +73,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 	}
 
 	// Update the timeslot just enough that things should be getting pruned now.
-	setCurrentTimeslot(3300)
+	glow.SetCurrentTimeslot(3300)
 	// Wait 150 milliseconds, which should trigger a prune. Except that no
 	// prune should be triggered because we aren't inside the prune window.
 	time.Sleep(150 * time.Millisecond)
@@ -129,7 +129,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 
 	// Update the current timeslot to trigger another migration, now all of
 	// the reports should be migrated out.
-	setCurrentTimeslot(5300)
+	glow.SetCurrentTimeslot(5300)
 	time.Sleep(150 * time.Millisecond)
 	for i := 0; i < 4032; i++ {
 		server.mu.Lock()

@@ -23,7 +23,7 @@ func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv glow
 	// cannot use 0 or 1 because both of those values are sentinel values
 	// and thus the report will simply be ignored by the server.
 	output := glow.GenerateSecureRandomInt(2, int(ea.Capacity))
-	return gcas.sendEquipmentReportSpecific(ea, ePriv, currentTimeslot(), uint64(output))
+	return gcas.sendEquipmentReportSpecific(ea, ePriv, glow.CurrentTimeslot(), uint64(output))
 }
 
 // sendEquipmentReportSpecific is the same as sendEquipmentReport, but takes
@@ -76,7 +76,7 @@ func TestParseReportIntegration(t *testing.T) {
 	}
 	server.mu.Unlock()
 
-	now := currentTimeslot()
+	now := glow.CurrentTimeslot()
 	expectedReports := 0
 	for i, device := range devices {
 		er := EquipmentReport{

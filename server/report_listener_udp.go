@@ -134,7 +134,7 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 	//
 	// When doing the comparison, we cast everything to int64 to handle
 	// potential overflows and underflows.
-	now := currentTimeslot()
+	now := glow.CurrentTimeslot()
 	if int64(report.Timeslot) < int64(now)-432 || int64(report.Timeslot) > int64(now)+432 {
 		server.logger.Warn("Received out of bounds timeslot: ", now, " ", report.Timeslot)
 		return

@@ -26,7 +26,7 @@ func TestConcurrency(t *testing.T) {
 	// This test adjusts the flow of time. Defer a statement that resets
 	// the time for future tests.
 	defer func() {
-		setCurrentTimeslot(0)
+		glow.SetCurrentTimeslot(0)
 	}()
 
 	// The concurrency test starts at time 0 with no GCA key provided, only
@@ -285,7 +285,7 @@ func TestConcurrency(t *testing.T) {
 			for {
 				// Before submitting a new report, advance the
 				// time.
-				slot := atomic.AddUint32(&manualCurrentTimeslot, 1)
+				slot := atomic.AddUint32(&glow.ManualCurrentTimeslot, 1)
 
 				// Try submitting a new report.
 				err := gcas.sendEquipmentReportSpecific(ea, ePriv, slot, 5)
@@ -303,7 +303,7 @@ func TestConcurrency(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					for i := 0; i < len(bitfield)*8 && uint32(i)+offset < currentTimeslot(); i++ {
+					for i := 0; i < len(bitfield)*8 && uint32(i)+offset < glow.CurrentTimeslot(); i++ {
 						byteIndex := i / 8
 						bitIndex := i % 8
 						mask := byte(1 << bitIndex)
@@ -326,7 +326,7 @@ func TestConcurrency(t *testing.T) {
 					gcas.mu.Lock()
 					totalGood := 0
 					totalBad := 0
-					for i := gcas.equipmentReportsOffset; i < currentTimeslot() && i < gcas.equipmentReportsOffset+4032; i++ {
+					for i := gcas.equipmentReportsOffset; i < glow.CurrentTimeslot() && i < gcas.equipmentReportsOffset+4032; i++ {
 						if gcas.equipmentReports[ea.ShortID][i-gcas.equipmentReportsOffset].PowerOutput > 1 {
 							totalGood++
 						} else {

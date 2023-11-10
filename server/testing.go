@@ -26,6 +26,11 @@ func (gcas *GCAServer) PublicKey() glow.PublicKey {
 	return gcas.staticPublicKey
 }
 
+// GCAPublicKey returns the public key of the GCA.
+func (gcas *GCAServer) GCAPublicKey() glow.PublicKey {
+	return gcas.gcaPubkey
+}
+
 // SetupTestEnvironment will return a fully initialized gca server that is
 // ready to be used.
 func SetupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey glow.PrivateKey, err error) {
