@@ -2,9 +2,11 @@ package client
 
 import (
 	"testing"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-func TestClientHistoryExtended(t *testing.T) {
+func TestClientHistory(t *testing.T) {
 	c, err := FullClientTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -79,5 +81,31 @@ func TestClientHistoryExtended(t *testing.T) {
 		if amt != 0 {
 			t.Fatal("Expected 0, got", amt)
 		}
+	}
+
+	// Do the same test, but now with a Client that was created at a future
+	// timeslot, so that it's possible to request data that doesn't exist.
+	glow.SetCurrentTimeslot(25)
+	c2, err := FullClientTestEnvironment(t.Name() + "_c2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initial check: All entries should be empty.
+	for i := uint32(0); i < 100; i++ {
+		amt, err := c2.loadReading(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if amt != 0 {
+			t.Fatal("Expected 0, got", amt)
+		}
+	}
+
+	// Should get an error when trying to write to timeslot '5', as the
+	// file should be starting at slot 25.
+	err = c2.saveReading(5, 500)
+	if err == nil {
+		t.Fatal("bad")
 	}
 }
