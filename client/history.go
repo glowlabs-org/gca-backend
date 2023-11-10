@@ -75,11 +75,13 @@ func (c *Client) saveReading(timeslot uint32, reading uint32) error {
 // error if it is out of bounds. If no reading exists, '0' will be returned.
 func (c *Client) loadReading(timeslot uint32) (uint32, error) {
 	if timeslot < c.historyOffset {
-		return 0, fmt.Errorf("cannot save a reading for a timeslot that predates the history file genesis")
+		// This timeslot doesn't have data, so the natural response is
+		// nothing.
+		return 0, nil
 	}
-	byteOffset := 4 * (1 + timeslot - c.historyOffset)
 
 	var data [4]byte
+	byteOffset := 4 * (1 + timeslot - c.historyOffset)
 	_, err := c.historyFile.ReadAt(data[:], int64(byteOffset))
 	if err == io.EOF {
 		return 0, nil
