@@ -108,4 +108,29 @@ func TestClientHistory(t *testing.T) {
 	if err == nil {
 		t.Fatal("bad")
 	}
+
+	// Initial check: All entries should be empty.
+	for i := uint32(0); i < 100; i++ {
+		amt, err := c2.loadReading(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if amt != 0 {
+			t.Fatal("Expected 0, got", amt)
+		}
+	}
+
+	// Should get an error when trying to write to timeslot '5', as the
+	// file should be starting at slot 25.
+	err = c2.saveReading(25, 510)
+	if err != nil {
+		t.Fatal("bad")
+	}
+	amt, err = c2.loadReading(25)
+	if err != nil {
+		t.Fatal("bad")
+	}
+	if amt != 510 {
+		t.Fatal("bad")
+	}
 }
