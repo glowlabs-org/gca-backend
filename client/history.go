@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -20,7 +21,7 @@ import (
 func (c *Client) loadHistory() error {
 	// Open the history file and make it part of the client.
 	path := filepath.Join(c.baseDir, HistoryFile)
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to open history file: %v", err)
 	}
@@ -80,6 +81,9 @@ func (c *Client) loadReading(timeslot uint32) (uint32, error) {
 
 	var data [4]byte
 	_, err := c.historyFile.ReadAt(data[:], int64(byteOffset))
+	if err == io.EOF {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, fmt.Errorf("cannot load a reading: %v", err)
 	}
