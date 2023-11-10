@@ -108,7 +108,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 
 	// Compute the timeslot that should be used as the reports offset.
 	// This is aimed to be 0:00:00 on Monday UTC.
-	now := currentTimeslot()
+	now := glow.CurrentTimeslot()
 	closestWeek := uint32(0)
 	for now-closestWeek > 3200 {
 		closestWeek += 2016

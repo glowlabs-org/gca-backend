@@ -79,7 +79,7 @@ func TestTCPListener(t *testing.T) {
 	// This test is going to be messing with time, therefore defer a reset
 	// of the time.
 	defer func() {
-		setCurrentTimeslot(0)
+		glow.SetCurrentTimeslot(0)
 	}()
 
 	// Generate a keypair for a device.
@@ -127,7 +127,7 @@ func TestTCPListener(t *testing.T) {
 	// Submit reports for slots 4031, 4030, and 4028. For these reports to
 	// be accepted, time must be shifted. This will also trigger a report
 	// migration.
-	setCurrentTimeslot(4000)
+	glow.SetCurrentTimeslot(4000)
 	time.Sleep(150 * time.Millisecond) // Sleep so that report migrations happen.
 	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4031, 50)
 	if err != nil {

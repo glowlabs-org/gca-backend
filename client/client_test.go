@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,49 +19,48 @@ import (
 // + a list of GCA servers where reports can be submitted
 //
 // The public key and private key of the GCA is what gets returned.
-func setupTestEnvironment(baseDir string, gcaServers []server.GCAServer) (glow.PublicKey, glow.PrivateKey, error) {
+func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers []*server.GCAServer) error {
 	// Create the public key and private key for the hardware.
 	pub, priv := glow.GenerateKeyPair()
-	gcaPub, gcaPriv := glow.GenerateKeyPair()
 
 	// Save the keys for the client.
 	path := filepath.Join(baseDir, ClientKeyfile)
 	f, err := os.Create(path)
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create the client keyfile: %v", err)
+		return fmt.Errorf("unable to create the client keyfile: %v", err)
 	}
 	var data [96]byte
 	copy(data[:32], pub[:])
 	copy(data[32:], priv[:])
 	_, err = f.Write(data[:])
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to write the client keys to disk: %v", err)
+		return fmt.Errorf("unable to write the client keys to disk: %v", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to close the client keys file: %v", err)
+		return fmt.Errorf("unable to close the client keys file: %v", err)
 	}
 
 	// Save the public key for the GCA.
 	path = filepath.Join(baseDir, GCAPubfile)
 	f, err = os.Create(path)
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create the gca pubkey file: %v", err)
+		return fmt.Errorf("unable to create the gca pubkey file: %v", err)
 	}
-	_, err = f.Write(gcaPub[:])
+	_, err = f.Write(gcaPubkey[:])
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
+		return fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to close the gca pubkey file: %v", err)
+		return fmt.Errorf("unable to close the gca pubkey file: %v", err)
 	}
 
 	// Write the GCA server file for the client, based on the list of
 	// servers that has been passed in.
 	serverMap := make(map[glow.PublicKey]GCAServer)
 	if len(gcaServers) == 0 {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create client with no servers")
+		return fmt.Errorf("unable to create client with no servers")
 	}
 	for _, server := range gcaServers {
 		http, tcp, udp := server.Ports()
@@ -74,26 +74,56 @@ func setupTestEnvironment(baseDir string, gcaServers []server.GCAServer) (glow.P
 	}
 	mapData, err := SerializeGCAServerMap(serverMap)
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to serialize the server map: %v", err)
+		return fmt.Errorf("unable to serialize the server map: %v", err)
 	}
 	path = filepath.Join(baseDir, GCAServerMapFile)
 	f, err = os.Create(path)
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create the gca pubkey file: %v", err)
+		return fmt.Errorf("unable to create the gca pubkey file: %v", err)
 	}
 	_, err = f.Write(mapData)
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
+		return fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to close the gca pubkey file: %v", err)
+		return fmt.Errorf("unable to close the gca pubkey file: %v", err)
 	}
 
-	return gcaPub, gcaPriv, nil
+	// Create the history file.
+	var offsetBytes [4]byte
+	binary.LittleEndian.PutUint32(offsetBytes[:], glow.CurrentTimeslot())
+	path = filepath.Join(baseDir, HistoryFile)
+	f, err = os.Create(path)
+	if err != nil {
+		return fmt.Errorf("unable to create the history file: %v", err)
+	}
+	_, err = f.Write(offsetBytes[:])
+	if err != nil {
+		return fmt.Errorf("unable to write the history file: %v", err)
+	}
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("unable to close the history file: %v", err)
+	}
+
+	return nil
 }
 
 // TestBasicClient does minimal testing of the client object.
 func TestBasicClient(t *testing.T) {
-
+	gcas, _, _, err := server.SetupTestEnvironment(t.Name() + "_server1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcaPubkey := gcas.GCAPublicKey()
+	clientDir := glow.GenerateTestDir(t.Name() + "_client1")
+	err = SetupTestEnvironment(clientDir, gcaPubkey, []*server.GCAServer{gcas})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
