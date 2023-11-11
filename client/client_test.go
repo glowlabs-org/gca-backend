@@ -15,6 +15,10 @@ import (
 	"github.com/glowlabs-org/gca-backend/server"
 )
 
+// TODO: Make sure that the CSV parser is correctly handling timeslots which
+// have an error message rather than a proper value. "Correctly" in this case
+// means completely ignoring those entries.
+
 // Create the environment that every client will expect to have upon startup.
 // This environment is going to include:
 //
@@ -167,22 +171,22 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 
 // FullClientTestEnvironment is a helper function for setting up a test
 // environment for the client, including creating a server.
-func FullClientTestEnvironment(name string) (*Client, glow.PrivateKey, error) {
+func FullClientTestEnvironment(name string) (*Client, *server.GCAServer, glow.PrivateKey, error) {
 	gcas, _, gcaPrivKey, err := server.SetupTestEnvironment(name + "_server1")
 	if err != nil {
-		return nil, glow.PrivateKey{}, fmt.Errorf("unable to set up the test environment for a server: %v", err)
+		return nil, nil, glow.PrivateKey{}, fmt.Errorf("unable to set up the test environment for a server: %v", err)
 	}
 	gcaPubkey := gcas.GCAPublicKey()
 	clientDir := glow.GenerateTestDir(name + "_client1")
 	err = SetupTestEnvironment(clientDir, gcaPubkey, gcaPrivKey, []*server.GCAServer{gcas})
 	if err != nil {
-		return nil, glow.PrivateKey{}, fmt.Errorf("unable to set up the client test environment: %v", err)
+		return nil, nil, glow.PrivateKey{}, fmt.Errorf("unable to set up the client test environment: %v", err)
 	}
 	c, err := NewClient(clientDir)
 	if err != nil {
-		return nil, glow.PrivateKey{}, fmt.Errorf("unable to create client: %v", err)
+		return nil, nil, glow.PrivateKey{}, fmt.Errorf("unable to create client: %v", err)
 	}
-	return c, gcaPrivKey, nil
+	return c, gcas, gcaPrivKey, nil
 }
 
 // TestBasicClient does minimal testing of the client object.
