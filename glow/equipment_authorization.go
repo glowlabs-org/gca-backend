@@ -1,4 +1,4 @@
-package server
+package glow
 
 // This file contains helper functions related to managing equipment
 // authorizations.
@@ -6,8 +6,6 @@ package server
 import (
 	"encoding/binary"
 	"errors"
-
-	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // EquipmentAuthorization struct reflects an authorization request,
@@ -87,17 +85,4 @@ func DeserializeEquipmentAuthorization(data []byte) (EquipmentAuthorization, err
 	ea.Expiration = binary.LittleEndian.Uint32(data[52:56]) // Updated indices
 	copy(ea.Signature[:], data[56:])                        // Updated indices
 	return ea, nil
-}
-
-// verifyEquipmentAuthorization checks the validity of the signature on an EquipmentAuthorization.
-//
-// It uses the public key of the Grid Control Authority (gcaPubkey) to verify the signature.
-// The method returns an error if the verification fails.
-func (gcas *GCAServer) verifyEquipmentAuthorization(ea EquipmentAuthorization) error {
-	signingBytes := ea.SigningBytes()
-	isValid := glow.Verify(gcas.gcaPubkey, signingBytes, ea.Signature)
-	if !isValid {
-		return errors.New("invalid signature on EquipmentAuthorization")
-	}
-	return nil
 }

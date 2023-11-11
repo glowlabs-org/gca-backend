@@ -84,7 +84,7 @@ func TestTCPListener(t *testing.T) {
 
 	// Generate a keypair for a device.
 	authPub, authPriv := glow.GenerateKeyPair()
-	auth := EquipmentAuthorization{ShortID: 0, PublicKey: authPub}
+	auth := glow.EquipmentAuthorization{ShortID: 0, PublicKey: authPub}
 	sb := auth.SigningBytes()
 	sig := glow.Sign(sb, gcaPrivKey)
 	auth.Signature = sig

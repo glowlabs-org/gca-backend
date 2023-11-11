@@ -14,7 +14,7 @@ import (
 
 // submitNewHardware will create a new piece of hardware and submit it to the
 // GCA server.
-func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.PrivateKey) (ea EquipmentAuthorization, equipmentKey glow.PrivateKey, err error) {
+func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.PrivateKey) (ea glow.EquipmentAuthorization, equipmentKey glow.PrivateKey, err error) {
 	// Verify that the shortID is free. Even if the shortID is not free,
 	// we'll still make the web request because the caller may want the
 	// request to go through.
@@ -37,7 +37,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 	// Serialize and sign the request.
 	ea, err = body.ToAuthorization()
 	if err != nil {
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to serialize contemplated equipment: %v", err)
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to serialize contemplated equipment: %v", err)
 	}
 	sb := ea.SigningBytes()
 	sig := glow.Sign(sb, gcaPrivKey)
@@ -47,32 +47,32 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 	jsonBody, _ := json.Marshal(body)
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
 	}
 
 	// Verify the response.
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := ioutil.ReadAll(resp.Body)
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(bodyBytes))
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 	var response map[string]string
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("Failed to decode response: %v", err)
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("Failed to decode response: %v", err)
 	}
 	if status, exists := response["status"]; !exists || status != "success" {
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("Unexpected response: %v", response)
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("Unexpected response: %v", response)
 	}
 	resp.Body.Close()
 
 	// Verify that the server sees the new equipment.
 	if shortIDAlreadyUsed {
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("shortID already in use")
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("shortID already in use")
 	}
 	gcas.mu.Lock()
 	_, exists := gcas.equipment[shortID]
 	gcas.mu.Unlock()
 	if !exists {
-		return EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("equipment does not appear to have been added to server correctly")
+		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("equipment does not appear to have been added to server correctly")
 	}
 	return ea, equipmentKey, nil
 }

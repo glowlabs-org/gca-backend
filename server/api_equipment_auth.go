@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // EquipmentAuthorizationRequest is a struct that maps the JSON request payload.
@@ -24,24 +26,24 @@ type EquipmentAuthorizationRequest struct {
 
 // ToAuthorization converts an EquipmentAuthorizationRequest to an EquipmentAuthorization.
 // It decodes the hex-encoded PublicKey and Signature.
-func (req *EquipmentAuthorizationRequest) ToAuthorization() (EquipmentAuthorization, error) {
+func (req *EquipmentAuthorizationRequest) ToAuthorization() (glow.EquipmentAuthorization, error) {
 	if len(req.PublicKey) != 64 {
-		return EquipmentAuthorization{}, errors.New("public key is wrong length")
+		return glow.EquipmentAuthorization{}, errors.New("public key is wrong length")
 	}
 	decodedPublicKey, err := hex.DecodeString(req.PublicKey)
 	if err != nil {
-		return EquipmentAuthorization{}, err
+		return glow.EquipmentAuthorization{}, err
 	}
 
 	if len(req.Signature) != 128 {
-		return EquipmentAuthorization{}, fmt.Errorf("signature is wrong length: %v", len(req.Signature))
+		return glow.EquipmentAuthorization{}, fmt.Errorf("signature is wrong length: %v", len(req.Signature))
 	}
 	decodedSignature, err := hex.DecodeString(req.Signature)
 	if err != nil {
-		return EquipmentAuthorization{}, err
+		return glow.EquipmentAuthorization{}, err
 	}
 
-	ea := EquipmentAuthorization{
+	ea := glow.EquipmentAuthorization{
 		ShortID:    req.ShortID,
 		Capacity:   req.Capacity,
 		Debt:       req.Debt,
@@ -108,6 +110,19 @@ func (gcas *GCAServer) managedAuthorizeEquipment(req EquipmentAuthorizationReque
 	if err != nil {
 		gcas.logger.Warn("Unable to save equipment:", auth)
 		return fmt.Errorf("unable to save equipment: %v", err)
+	}
+	return nil
+}
+
+// verifyEquipmentAuthorization checks the validity of the signature on an EquipmentAuthorization.
+//
+// It uses the public key of the Grid Control Authority (gcaPubkey) to verify the signature.
+// The method returns an error if the verification fails.
+func (gcas *GCAServer) verifyEquipmentAuthorization(ea glow.EquipmentAuthorization) error {
+	signingBytes := ea.SigningBytes()
+	isValid := glow.Verify(gcas.gcaPubkey, signingBytes, ea.Signature)
+	if !isValid {
+		return errors.New("invalid signature on EquipmentAuthorization")
 	}
 	return nil
 }

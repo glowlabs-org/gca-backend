@@ -18,7 +18,7 @@ import (
 // the test suite will occasionally fail to send the udp packet even over
 // localhost. Therefore this function doesn't do any checking itself to see
 // whether the report successfully arrived.
-func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv glow.PrivateKey) error {
+func (gcas *GCAServer) sendEquipmentReport(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey) error {
 	// Generate a number between 2 and the capacity for the PowerOutput. We
 	// cannot use 0 or 1 because both of those values are sentinel values
 	// and thus the report will simply be ignored by the server.
@@ -28,7 +28,7 @@ func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv glow
 
 // sendEquipmentReportSpecific is the same as sendEquipmentReport, but takes
 // specific values for the power output and the timeslot.
-func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, ePriv glow.PrivateKey, timeslot uint32, output uint64) error {
+func (gcas *GCAServer) sendEquipmentReportSpecific(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey, timeslot uint32, output uint64) error {
 	// Create the report and sign it using the provided private key.
 	er := glow.EquipmentReport{
 		ShortID:     ea.ShortID,
@@ -55,12 +55,12 @@ func TestParseReportIntegration(t *testing.T) {
 
 	// Generate multiple test key pairs for devices.
 	numDevices := 3
-	devices := make([]EquipmentAuthorization, numDevices)
+	devices := make([]glow.EquipmentAuthorization, numDevices)
 	privKeys := make([]glow.PrivateKey, numDevices)
 
 	for i := 0; i < numDevices; i++ {
 		pubKey, privKey := glow.GenerateKeyPair()
-		devices[i] = EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey, Capacity: 100e6}
+		devices[i] = glow.EquipmentAuthorization{ShortID: uint32(i), PublicKey: pubKey, Capacity: 100e6}
 		privKeys[i] = privKey
 		sb := devices[i].SigningBytes()
 		sig := glow.Sign(sb, gcaPrivKey)
@@ -310,7 +310,7 @@ func TestCapacityEnforcement(t *testing.T) {
 	}
 
 	pubKey, privKey := glow.GenerateKeyPair()
-	device := EquipmentAuthorization{ShortID: 3, PublicKey: pubKey, Capacity: 100e6}
+	device := glow.EquipmentAuthorization{ShortID: 3, PublicKey: pubKey, Capacity: 100e6}
 	sb := device.SigningBytes()
 	sig := glow.Sign(sb, gcaPrivKey)
 	device.Signature = sig

@@ -23,7 +23,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 
 	// Generate a dummy EquipmentAuthorization
 	ePubKey, _ := glow.GenerateKeyPair()
-	dummyEquipment := EquipmentAuthorization{ShortID: 1, PublicKey: ePubKey}
+	dummyEquipment := glow.EquipmentAuthorization{ShortID: 1, PublicKey: ePubKey}
 	server.loadEquipmentAuth(dummyEquipment)
 
 	// Generate reports that will fill out the first 2 migrations.
