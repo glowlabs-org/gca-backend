@@ -31,6 +31,39 @@ func (gcas *GCAServer) GCAPublicKey() glow.PublicKey {
 	return gcas.gcaPubkey
 }
 
+// CheckInvariants is a function which will ensure that the data on the server
+// is self-consistent. If something is broken, it means the struct has corrupted
+// and a panic is necessary to prevent grey goo from infecting the system.
+//
+// This function is primarily used during testing, but doesn't hurt to run
+// occasionally in prod.
+func (server *GCAServer) CheckInvariants() {
+	// Lock the server for concurrency safety if needed
+	server.mu.Lock()
+	defer server.mu.Unlock()
+
+	// Check if equipmentShortID has the same number of elements as equipment
+	if len(server.equipment) != len(server.equipmentShortID) {
+		panic("equipment and equipmentShortID maps have different sizes")
+	}
+
+	// Create a map to track unique PublicKeys
+	pubKeys := make(map[glow.PublicKey]struct{})
+
+	for shortID, auth := range server.equipment {
+		// Check for unique PublicKey
+		if _, exists := pubKeys[auth.PublicKey]; exists {
+			panic("duplicate PublicKey found in equipment map")
+		}
+		pubKeys[auth.PublicKey] = struct{}{}
+
+		// Check if equipmentShortID correctly maps to equipment
+		if mappedShortID, exists := server.equipmentShortID[auth.PublicKey]; !exists || mappedShortID != shortID {
+			panic("mismatch between equipment and equipmentShortID maps")
+		}
+	}
+}
+
 // SetupTestEnvironment will return a fully initialized gca server that is
 // ready to be used.
 func SetupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPrivKey glow.PrivateKey, err error) {

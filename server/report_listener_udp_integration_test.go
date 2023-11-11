@@ -369,12 +369,15 @@ func TestCapacityEnforcement(t *testing.T) {
 	server.mu.Unlock()
 
 	// Restart the server and check that the ban is still in place.
+	server.CheckInvariants()
 	server.Close()
 	server, err = NewGCAServer(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer server.Close()
+	defer server.CheckInvariants()
+	server.CheckInvariants()
 
 	// Check that the count for the recent reports is correct.
 	server.mu.Lock()
