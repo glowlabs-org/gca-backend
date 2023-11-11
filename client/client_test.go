@@ -19,6 +19,9 @@ import (
 // + a list of GCA servers where reports can be submitted
 //
 // The public key and private key of the GCA is what gets returned.
+//
+// TODO: We need to take the steps to authorize the client with the server /
+// GCA.
 func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers []*server.GCAServer) error {
 	// Create the public key and private key for the hardware.
 	pub, priv := glow.GenerateKeyPair()
@@ -105,6 +108,22 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers [
 	err = f.Close()
 	if err != nil {
 		return fmt.Errorf("unable to close the history file: %v", err)
+	}
+
+	// Save the ShortID for the device.
+	path = filepath.Join(baseDir, ShortIDFile)
+	f, err = os.Create(path)
+	if err != nil {
+		return fmt.Errorf("unable to create the gca pubkey file: %v", err)
+	}
+	var shortIDBytes [4]byte // Use ID of 0 for now. TODO: dynamically asign short id
+	_, err = f.Write(shortIDBytes[:])
+	if err != nil {
+		return fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
+	}
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("unable to close the gca pubkey file: %v", err)
 	}
 
 	return nil

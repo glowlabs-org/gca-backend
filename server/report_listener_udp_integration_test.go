@@ -30,7 +30,7 @@ func (gcas *GCAServer) sendEquipmentReport(ea EquipmentAuthorization, ePriv glow
 // specific values for the power output and the timeslot.
 func (gcas *GCAServer) sendEquipmentReportSpecific(ea EquipmentAuthorization, ePriv glow.PrivateKey, timeslot uint32, output uint64) error {
 	// Create the report and sign it using the provided private key.
-	er := EquipmentReport{
+	er := glow.EquipmentReport{
 		ShortID:     ea.ShortID,
 		Timeslot:    timeslot,
 		PowerOutput: output,
@@ -79,7 +79,7 @@ func TestParseReportIntegration(t *testing.T) {
 	now := glow.CurrentTimeslot()
 	expectedReports := 0
 	for i, device := range devices {
-		er := EquipmentReport{
+		er := glow.EquipmentReport{
 			ShortID:     device.ShortID,
 			Timeslot:    uint32(i) + now,
 			PowerOutput: uint64(5 + i*100),
@@ -181,7 +181,7 @@ func TestParseReportIntegration(t *testing.T) {
 
 		// Now send a report with a correct sig, but have it be a
 		// duplicate, which should cause the report to get banned.
-		er = EquipmentReport{
+		er = glow.EquipmentReport{
 			ShortID:     device.ShortID,
 			Timeslot:    uint32(i) + now,
 			PowerOutput: uint64(6 + i*100),
@@ -230,7 +230,7 @@ func TestParseReportIntegration(t *testing.T) {
 		// Now send a report with a correct sig, but have it be yet
 		// another duplicate. The report should be entirely ignored and
 		// not added to the list of recent reports.
-		er = EquipmentReport{
+		er = glow.EquipmentReport{
 			ShortID:     device.ShortID,
 			Timeslot:    uint32(i) + now,
 			PowerOutput: uint64(7 + i*100),
@@ -324,7 +324,7 @@ func TestCapacityEnforcement(t *testing.T) {
 
 	// Create an equipment report that we expect to get banned for having
 	// too high of a capacity.
-	er := EquipmentReport{
+	er := glow.EquipmentReport{
 		ShortID:     device.ShortID,
 		Timeslot:    5,
 		PowerOutput: uint64(200e6),

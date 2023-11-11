@@ -42,7 +42,7 @@ func TestParseReport(t *testing.T) {
 
 	// Run some reports on each piece of equipment.
 	for i, e := range equipment {
-		er := EquipmentReport{
+		er := glow.EquipmentReport{
 			ShortID:     e.ShortID,
 			Timeslot:    uint32(i * 10),
 			PowerOutput: uint64(i * 100),

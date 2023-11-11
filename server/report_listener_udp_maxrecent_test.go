@@ -52,7 +52,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	}
 
 	// Store a reference to the second half of the original recentReports list.
-	expectedReports := append([]EquipmentReport(nil), server.recentReports[maxRecentReports/2:]...)
+	expectedReports := append([]glow.EquipmentReport(nil), server.recentReports[maxRecentReports/2:]...)
 
 	// Submit another report, using the final device.
 	report := generateTestReport(devices[maxRecentReports/50].ShortID, 0, privKeys[maxRecentReports/50]) // Use a new device ID, timeslot = 0

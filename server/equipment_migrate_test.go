@@ -27,9 +27,9 @@ func TestThreadedMigrateReports(t *testing.T) {
 	server.loadEquipmentAuth(dummyEquipment)
 
 	// Generate reports that will fill out the first 2 migrations.
-	dummyReport := [4032]EquipmentReport{}
+	dummyReport := [4032]glow.EquipmentReport{}
 	for i := 0; i < len(dummyReport); i++ {
-		dummyReport[i] = EquipmentReport{
+		dummyReport[i] = glow.EquipmentReport{
 			ShortID:     dummyEquipment.ShortID,
 			Timeslot:    uint32(i),
 			PowerOutput: uint64(1000 + i),
