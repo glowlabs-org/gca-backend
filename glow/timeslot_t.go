@@ -5,6 +5,11 @@ package glow
 
 import (
 	"sync/atomic"
+	"time"
+)
+
+var (
+	GenesisTime = time.Now().Unix()
 )
 
 // This is a special variable only available in testing which allows the test

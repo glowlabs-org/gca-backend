@@ -4,7 +4,6 @@ package server
 
 import (
 	"fmt"
-	"net"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
@@ -12,7 +11,7 @@ import (
 // generateTestReport creates a mock report for testing purposes.
 // The report includes a signature based on the provided private key.
 func generateTestReport(shortID uint32, timeslot uint32, privKey glow.PrivateKey) []byte {
-	er := EquipmentReport{
+	er := glow.EquipmentReport{
 		ShortID:     shortID,
 		Timeslot:    timeslot,
 		PowerOutput: 5,
@@ -24,12 +23,5 @@ func generateTestReport(shortID uint32, timeslot uint32, privKey glow.PrivateKey
 // sendUDPReport simulates sending a report to the server via UDP.
 // The server should be listening on the given IP and port.
 func sendUDPReport(report []byte, port uint16) error {
-	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", serverIP, int(port)))
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	_, err = conn.Write(report)
-	return err
+	return glow.SendUDPReport(report, fmt.Sprintf("%s:%d", serverIP, int(port)))
 }

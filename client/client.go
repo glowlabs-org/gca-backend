@@ -41,11 +41,13 @@ package client
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
@@ -54,24 +56,23 @@ import (
 type Client struct {
 	primaryServer glow.PublicKey
 	gcaServers    map[glow.PublicKey]GCAServer
+	serverMu      sync.Mutex
 
 	// NOTE: technically all of these fields should have a 'static' prefix,
 	// I guess at some point we can look into having an LLM go through and
 	// fix it all.
 	baseDir       string
+	closeChan     chan struct{}
 	gcaPubkey     glow.PublicKey
 	historyFile   *os.File
 	historyOffset uint32
 	pubkey        glow.PublicKey
 	privkey       glow.PrivateKey
+	shortID       uint32
 }
 
 // NewClient will return a new client that is running smoothly.
 func NewClient(baseDir string) (*Client, error) {
-	// Step 2: Open the file that contains all the historic data.
-	// add a little header that tells us what time the first reading starts
-	// use '0' in the power reading as the sentinal value indiacting that no data is available
-	// 4 bytes per reading, leave blank spaces for no data, that way the file is random access for historics
 	// Step 3: Kick off the background loop that checks for monitoring data and sends UDP reports
 	// Step 4: Kick off the background loop that checks for reports that failed to submit, and checks if a failover is needed
 	// Step 5: Kick off the background loop that checks for new failover servers and new banned servers
@@ -79,7 +80,8 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Create an empty client.
 	c := &Client{
-		baseDir: baseDir,
+		baseDir:   baseDir,
+		closeChan: make(chan struct{}),
 	}
 
 	// Load the keypair for the client.
@@ -105,6 +107,15 @@ func NewClient(baseDir string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to open the history file: %v", err)
 	}
+
+	// Load the ShortID for the hardware.
+	err = c.loadShortID()
+	if err != nil {
+		return nil, fmt.Errorf("unable to load the short id: %v", err)
+	}
+
+	// Launch the loop that will send UDP reports to the GCA server.
+	go c.threadedSendReports()
 
 	return c, nil
 }
@@ -196,5 +207,23 @@ func (c *Client) loadGCAServers() error {
 		}
 	}
 
+	return nil
+}
+
+// loadShortID will load the short id of the client, which is used in lieu of a
+// public key to communicate with the GCA servers. Using a shortID saves 28
+// bytes per message, which is valuable on IoT networks sending messages every
+// 5 minutes for 10 years.
+func (c *Client) loadShortID() error {
+	path := filepath.Join(c.baseDir, ShortIDFile)
+	data, err := ioutil.ReadFile(path)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("client shortID not found, the client was configured incorrectly")
+	}
+	if err != nil {
+		return fmt.Errorf("unable to read short id file: %v", err)
+	}
+	c.shortID = binary.LittleEndian.Uint32(data)
+	copy(c.gcaPubkey[:], data[:32])
 	return nil
 }

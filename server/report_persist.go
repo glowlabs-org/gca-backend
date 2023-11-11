@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // loadEquipmentReports will load all of the equipment reports that are saved
@@ -46,7 +48,7 @@ func (gcas *GCAServer) loadEquipmentReports() error {
 
 // saveEquipmentReport will save an equipment report to disk, so that the
 // report will still be available after a restart.
-func (gcas *GCAServer) saveEquipmentReport(ea EquipmentReport) error {
+func (gcas *GCAServer) saveEquipmentReport(ea glow.EquipmentReport) error {
 	filepath := filepath.Join(gcas.baseDir, "equipment-reports.dat")
 	file, err := os.OpenFile(filepath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {

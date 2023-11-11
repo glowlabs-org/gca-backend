@@ -28,8 +28,8 @@ import (
 // parseReport converts raw bytes into an EquipmentReport and validates its signature.
 // This function assumes the server object has a map called 'equipment' which maps
 // equipment ShortIDs to a struct containing their ECDSA public keys.
-func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
-	var report EquipmentReport
+func (server *GCAServer) parseReport(rawData []byte) (glow.EquipmentReport, error) {
+	var report glow.EquipmentReport
 	if len(rawData) != 80 {
 		return report, fmt.Errorf("unexpected data length: expected 80 bytes, got %d bytes", len(rawData))
 	}
@@ -57,7 +57,7 @@ func (server *GCAServer) parseReport(rawData []byte) (EquipmentReport, error) {
 
 // integrateReport will take an equipment report and use it to update the live
 // state of the server.
-func (server *GCAServer) integrateReport(report EquipmentReport) {
+func (server *GCAServer) integrateReport(report glow.EquipmentReport) {
 	// Nothing to integrate if the report is too old.
 	if report.Timeslot < server.equipmentReportsOffset {
 		return

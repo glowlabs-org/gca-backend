@@ -90,7 +90,7 @@ func (gcas *GCAServer) loadEquipment() error {
 		// If no conflict exists, add the equipment
 		if !exists {
 			gcas.equipment[ea.ShortID] = ea
-			gcas.equipmentReports[ea.ShortID] = new([4032]EquipmentReport)
+			gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
 			continue
 		}
 		// If a conflict exists, ban the equipment.
@@ -151,7 +151,7 @@ func (gcas *GCAServer) saveEquipment(ea EquipmentAuthorization) error {
 	// If there is no conflict, add the new auth and exit.
 	if !exists {
 		gcas.equipment[ea.ShortID] = ea
-		gcas.equipmentReports[ea.ShortID] = new([4032]EquipmentReport)
+		gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
 		return nil
 	}
 
@@ -184,7 +184,7 @@ func (gcas *GCAServer) threadedMigrateReports() {
 			// Copy the last half of every report into the first
 			// half, then blank out the last half.
 			for _, report := range gcas.equipmentReports {
-				var blankReports [2016]EquipmentReport
+				var blankReports [2016]glow.EquipmentReport
 				copy(report[:2016], report[2016:])
 				copy(report[2016:], blankReports[:])
 			}

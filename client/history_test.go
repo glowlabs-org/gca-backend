@@ -44,6 +44,20 @@ func TestClientHistory(t *testing.T) {
 		t.Fatal("Saving the same reading twice should not result in error")
 	}
 
+	// Test saving a different reading for the same timesot.
+	err = c.saveReading(5, 501)
+	if err == nil {
+		t.Fatal("bad")
+	}
+	// What we load should not have changed.
+	amt, err = c.loadReading(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if amt != 500 {
+		t.Fatal("Expected 500, got", amt)
+	}
+
 	// Test saving a different reading in the same timeslot.
 	err = c.saveReading(5, 400)
 	if err == nil {

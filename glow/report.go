@@ -1,4 +1,4 @@
-package server
+package glow
 
 // This file contains helper functions and structs related to the processing of
 // equipment reports.
@@ -6,16 +6,14 @@ package server
 import (
 	"encoding/binary"
 	"errors"
-
-	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 // EquipmentReport defines the structure for a report received from a piece of equipment.
 type EquipmentReport struct {
-	ShortID     uint32         // A unique identifier for the equipment
-	Timeslot    uint32         // A field denoting the time of the report
-	PowerOutput uint64         // The power output from the equipment
-	Signature   glow.Signature // A digital signature for the report's authenticity
+	ShortID     uint32    // A unique identifier for the equipment
+	Timeslot    uint32    // A field denoting the time of the report
+	PowerOutput uint64    // The power output from the equipment
+	Signature   Signature // A digital signature for the report's authenticity
 }
 
 // SigningBytes returns the bytes that should be signed when sending an
