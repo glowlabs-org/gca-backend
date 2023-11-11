@@ -22,11 +22,11 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	defer server.Close() // Ensure resources are cleaned up after the test.
 
 	// Create enough devices to fill out all the maxRecentReports in the current time period.
-	var devices []EquipmentAuthorization
+	var devices []glow.EquipmentAuthorization
 	var privKeys []glow.PrivateKey
 	for i := 0; i < 1+(maxRecentReports/50); i++ {
 		pubKey, privKey := glow.GenerateKeyPair()
-		device := EquipmentAuthorization{
+		device := glow.EquipmentAuthorization{
 			ShortID:   uint32(i),
 			PublicKey: pubKey,
 		}

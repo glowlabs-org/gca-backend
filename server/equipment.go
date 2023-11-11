@@ -17,7 +17,7 @@ import (
 // addRecentEquipmentAuth will add a recent auth to the list of recent auths in the
 // GCAServer. If the number of recent auths exceeds maxRecentAuths, the least recent
 // half of the auths will be tossed.
-func (gcas *GCAServer) addRecentEquipmentAuth(ea EquipmentAuthorization) {
+func (gcas *GCAServer) addRecentEquipmentAuth(ea glow.EquipmentAuthorization) {
 	gcas.recentEquipmentAuths = append(gcas.recentEquipmentAuths, ea)
 
 	// Drop the first half of the recent equipments if the list is too long.
@@ -53,11 +53,11 @@ func (gcas *GCAServer) loadEquipment() error {
 	}
 
 	// Proceed to deserialize and verify the EquipmentAuthorizations if any data was read
-	var equipment []EquipmentAuthorization
+	var equipment []glow.EquipmentAuthorization
 	buffer := bytes.NewBuffer(rawData)
 	for buffer.Len() > 0 {
 		// Deserialize the EquipmentAuthorization
-		ea, err := DeserializeEquipmentAuthorization(buffer.Next(120)) // 120 bytes = 4 (ShortID) + 32 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 64 (Signature)
+		ea, err := glow.DeserializeEquipmentAuthorization(buffer.Next(120)) // 120 bytes = 4 (ShortID) + 32 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 64 (Signature)
 		if err != nil {
 			return err
 		}
@@ -108,7 +108,7 @@ func (gcas *GCAServer) loadEquipment() error {
 //
 // The method returns an error if it fails to open the file, write to it,
 // or close it after writing.
-func (gcas *GCAServer) saveEquipment(ea EquipmentAuthorization) error {
+func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 	// Before saving, check if the equipment is already on the banlist.
 	_, exists := gcas.equipmentBans[ea.ShortID]
 	if exists {

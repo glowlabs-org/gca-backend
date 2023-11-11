@@ -46,13 +46,13 @@ import (
 
 // GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
-	equipment              map[uint32]EquipmentAuthorization      // Map from a ShortID to the full equipment authorization
+	equipment              map[uint32]glow.EquipmentAuthorization // Map from a ShortID to the full equipment authorization
 	equipmentBans          map[uint32]struct{}                    // Tracks which equipment is banned
 	equipmentReports       map[uint32]*[4032]glow.EquipmentReport // Keeps all recent reports in memory
 	equipmentReportsOffset uint32                                 // What timeslot the equipmentReports arrays start at
 
-	recentEquipmentAuths []EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
-	recentReports        []glow.EquipmentReport   // Keep recent reports to more easily synchronize with redundant servers
+	recentEquipmentAuths []glow.EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
+	recentReports        []glow.EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
 
 	// The GCA interacts with the server in two stages. The first stage
 	// uses a temporary key which is created by the technicians before the
@@ -117,7 +117,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// Initialize GCAServer with the necessary fields
 	server := &GCAServer{
 		baseDir:                baseDir,
-		equipment:              make(map[uint32]EquipmentAuthorization),
+		equipment:              make(map[uint32]glow.EquipmentAuthorization),
 		equipmentBans:          make(map[uint32]struct{}),
 		equipmentReports:       make(map[uint32]*[4032]glow.EquipmentReport),
 		equipmentReportsOffset: closestWeek,

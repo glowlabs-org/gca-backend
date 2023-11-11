@@ -26,11 +26,11 @@ func TestParseReport(t *testing.T) {
 
 	// Generate multiple test key pairs for equipment.
 	numEquipment := 3
-	equipment := make([]EquipmentAuthorization, numEquipment)
+	equipment := make([]glow.EquipmentAuthorization, numEquipment)
 	privKeys := make([]glow.PrivateKey, numEquipment)
 	for i := 0; i < numEquipment; i++ {
 		pubKey, privKey := glow.GenerateKeyPair()
-		equipment[i] = EquipmentAuthorization{ShortID: uint32(i)}
+		equipment[i] = glow.EquipmentAuthorization{ShortID: uint32(i)}
 		equipment[i].PublicKey = pubKey
 		privKeys[i] = privKey
 	}

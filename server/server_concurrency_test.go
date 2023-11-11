@@ -121,14 +121,14 @@ func TestConcurrency(t *testing.T) {
 		// signature auth can exist yet, as we haven't generated the
 		// GCA key yet.
 		ePub, ePriv := glow.GenerateKeyPair()
-		ea := EquipmentAuthorization{
+		ea := glow.EquipmentAuthorization{
 			ShortID:    5,
 			PublicKey:  ePub,
 			Capacity:   15e9,
 			Debt:       5e6,
 			Expiration: 15e6,
 		}
-		go func(ea EquipmentAuthorization, ePriv glow.PrivateKey) {
+		go func(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -278,7 +278,7 @@ func TestConcurrency(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		go func(ea EquipmentAuthorization, ePriv glow.PrivateKey, threadNum int) {
+		go func(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey, threadNum int) {
 			// Try until the stop signal is sent.
 			i := 0
 			resends := 0
@@ -355,7 +355,7 @@ func TestConcurrency(t *testing.T) {
 				i++
 			}
 		}(ea, ePriv, i)
-		go func(e EquipmentAuthorization) {
+		go func(e glow.EquipmentAuthorization) {
 			// Try until the stop signal is sent.
 			i := 0
 			for {

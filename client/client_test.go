@@ -110,6 +110,8 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers [
 		return fmt.Errorf("unable to close the history file: %v", err)
 	}
 
+	// TODO: Authorize the device, which will give you a ShortID.
+
 	// Save the ShortID for the device.
 	path = filepath.Join(baseDir, ShortIDFile)
 	f, err = os.Create(path)
