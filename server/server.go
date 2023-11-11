@@ -47,6 +47,7 @@ import (
 // GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
 	equipment              map[uint32]glow.EquipmentAuthorization // Map from a ShortID to the full equipment authorization
+	equipmentShortID       map[glow.PublicKey]uint32              // Map from a public key to a ShortID
 	equipmentBans          map[uint32]struct{}                    // Tracks which equipment is banned
 	equipmentReports       map[uint32]*[4032]glow.EquipmentReport // Keeps all recent reports in memory
 	equipmentReportsOffset uint32                                 // What timeslot the equipmentReports arrays start at
