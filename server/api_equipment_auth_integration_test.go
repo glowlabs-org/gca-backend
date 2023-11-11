@@ -74,6 +74,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 	if !exists {
 		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("equipment does not appear to have been added to server correctly")
 	}
+	gcas.CheckInvariants()
 	return ea, equipmentKey, nil
 }
 
@@ -241,6 +242,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 
 	// Restart the server again, make sure the state is maintained.
+	server.CheckInvariants()
 	server.Close()
 	server, err = NewGCAServer(dir)
 	if err != nil {
@@ -259,4 +261,5 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	server.CheckInvariants()
 }

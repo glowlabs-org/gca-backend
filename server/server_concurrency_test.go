@@ -71,6 +71,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -106,6 +107,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -148,6 +150,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -180,6 +183,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -229,6 +233,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -261,6 +266,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -350,6 +356,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
@@ -376,6 +383,7 @@ func TestConcurrency(t *testing.T) {
 				// Wait 10 milliseconds between every 5th
 				// attempt to minimize cpu spam.
 				if i%5 == 0 {
+					gcas.CheckInvariants()
 					time.Sleep(5 * time.Millisecond)
 				}
 				i++
