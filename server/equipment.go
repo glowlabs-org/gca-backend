@@ -89,6 +89,7 @@ func (gcas *GCAServer) loadEquipment() error {
 		gcas.addRecentEquipmentAuth(ea)
 		// If no conflict exists, add the equipment
 		if !exists {
+			gcas.equipmentShortID[ea.PublicKey] = ea.ShortID
 			gcas.equipment[ea.ShortID] = ea
 			gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
 			continue
@@ -96,6 +97,7 @@ func (gcas *GCAServer) loadEquipment() error {
 		// If a conflict exists, ban the equipment.
 		delete(gcas.equipment, ea.ShortID)
 		delete(gcas.equipmentReports, ea.ShortID)
+		delete(gcas.equipmentShortID, ea.PublicKey)
 		gcas.equipmentBans[ea.ShortID] = struct{}{}
 	}
 
@@ -150,6 +152,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 
 	// If there is no conflict, add the new auth and exit.
 	if !exists {
+		gcas.equipmentShortID[ea.PublicKey] = ea.ShortID
 		gcas.equipment[ea.ShortID] = ea
 		gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
 		return nil
@@ -157,6 +160,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 
 	// There is a conflict, so we need to delete the equipment from the list of
 	// equipment and also add a ban.
+	delete(gcas.equipmentShortID, ea.PublicKey)
 	delete(gcas.equipment, ea.ShortID)
 	delete(gcas.equipmentReports, ea.ShortID)
 	gcas.equipmentBans[ea.ShortID] = struct{}{}

@@ -119,6 +119,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	server := &GCAServer{
 		baseDir:                baseDir,
 		equipment:              make(map[uint32]glow.EquipmentAuthorization),
+		equipmentShortID:       make(map[glow.PublicKey]uint32),
 		equipmentBans:          make(map[uint32]struct{}),
 		equipmentReports:       make(map[uint32]*[4032]glow.EquipmentReport),
 		equipmentReportsOffset: closestWeek,
