@@ -11,6 +11,7 @@ func (gcas *GCAServer) launchAPI() {
 	// Attach all of the handlers to the mux.
 	gcas.mux.HandleFunc("/api/v1/authorize-equipment", gcas.AuthorizeEquipmentHandler)
 	gcas.mux.HandleFunc("/api/v1/register-gca", gcas.RegisterGCAHandler)
+	gcas.mux.HandleFunc("/api/v1/recent-reports", gcas.RecentReportsHandler)
 
 	// Create a listener. In prod it's a specfic port, during testing it's
 	// ":0". Because we don't know what the port is during testing, we need
