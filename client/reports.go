@@ -1,8 +1,6 @@
 package client
 
-// TODO: WHERE TO PICK UP: We need to create the ShortID file for the client
-// within the test suite, and we need to authorize the hardware with the GCA
-// server in the SetupTestEnvironment function.
+// TODO: Need to test that the client sends reports properly.
 //
 // Then we need to keep making progress on this file. Currently we submit
 // reports but not all of the functions are complete, then we'll need to test
@@ -176,9 +174,8 @@ func (c *Client) threadedSendReports() {
 
 		// Sleep for a minute before checking again.
 		//
-		// TODO: Need to turn this into a soft sleep, and need to
-		// change the duration for testing.
-		time.Sleep(time.Minute)
+		// TODO: Need to turn this into a soft sleep
+		time.Sleep(sendReportTime)
 
 		ticks++
 		if ticks >= 300 {
