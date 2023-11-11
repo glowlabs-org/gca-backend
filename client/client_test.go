@@ -1,8 +1,12 @@
 package client
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,10 +23,7 @@ import (
 // + a list of GCA servers where reports can be submitted
 //
 // The public key and private key of the GCA is what gets returned.
-//
-// TODO: We need to take the steps to authorize the client with the server /
-// GCA.
-func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers []*server.GCAServer) error {
+func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey glow.PrivateKey, gcaServers []*server.GCAServer) error {
 	// Create the public key and private key for the hardware.
 	pub, priv := glow.GenerateKeyPair()
 
@@ -110,7 +111,39 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers [
 		return fmt.Errorf("unable to close the history file: %v", err)
 	}
 
-	// TODO: Authorize the device, which will give you a ShortID.
+	// Authorize the device.
+	shortID := uint32(1)
+	ea := glow.EquipmentAuthorization{
+		ShortID:    shortID,
+		PublicKey:  pub,
+		Capacity:   12341234,
+		Debt:       11223344,
+		Expiration: 100e6 + glow.CurrentTimeslot(),
+	}
+	sb := ea.SigningBytes()
+	sig := glow.Sign(sb, gcaPrivKey)
+	ear := server.EquipmentAuthorizationRequest{
+		ShortID:    shortID,
+		PublicKey:  hex.EncodeToString(pub[:]),
+		Capacity:   12341234,
+		Debt:       11223344,
+		Expiration: 100e6 + glow.CurrentTimeslot(),
+		Signature:  hex.EncodeToString(sig[:]),
+	}
+	jsonEAR, err := json.Marshal(ear)
+	if err != nil {
+		return fmt.Errorf("unable to marshal the auth request")
+	}
+	for _, server := range gcaServers {
+		httpX, _, _ := server.Ports()
+		resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpX), "application/json", bytes.NewBuffer(jsonEAR))
+		if err != nil {
+			return fmt.Errorf("unable to authorize device on GCA server: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("got non-OK status code when authorizing gca client")
+		}
+	}
 
 	// Save the ShortID for the device.
 	path = filepath.Join(baseDir, ShortIDFile)
@@ -118,7 +151,8 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers [
 	if err != nil {
 		return fmt.Errorf("unable to create the gca pubkey file: %v", err)
 	}
-	var shortIDBytes [4]byte // Use ID of 0 for now. TODO: dynamically asign short id
+	var shortIDBytes [4]byte
+	binary.LittleEndian.PutUint32(shortIDBytes[:], shortID)
 	_, err = f.Write(shortIDBytes[:])
 	if err != nil {
 		return fmt.Errorf("unable to write the gca pubkey to disk: %v", err)
@@ -133,33 +167,33 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaServers [
 
 // FullClientTestEnvironment is a helper function for setting up a test
 // environment for the client, including creating a server.
-func FullClientTestEnvironment(name string) (*Client, error) {
-	gcas, _, _, err := server.SetupTestEnvironment(name + "_server1")
+func FullClientTestEnvironment(name string) (*Client, glow.PrivateKey, error) {
+	gcas, _, gcaPrivKey, err := server.SetupTestEnvironment(name + "_server1")
 	if err != nil {
-		return nil, fmt.Errorf("unable to set up the test environment for a server: %v", err)
+		return nil, glow.PrivateKey{}, fmt.Errorf("unable to set up the test environment for a server: %v", err)
 	}
 	gcaPubkey := gcas.GCAPublicKey()
 	clientDir := glow.GenerateTestDir(name + "_client1")
-	err = SetupTestEnvironment(clientDir, gcaPubkey, []*server.GCAServer{gcas})
+	err = SetupTestEnvironment(clientDir, gcaPubkey, gcaPrivKey, []*server.GCAServer{gcas})
 	if err != nil {
-		return nil, fmt.Errorf("unable to set up the client test environment: %v", err)
+		return nil, glow.PrivateKey{}, fmt.Errorf("unable to set up the client test environment: %v", err)
 	}
 	c, err := NewClient(clientDir)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create client: %v", err)
+		return nil, glow.PrivateKey{}, fmt.Errorf("unable to create client: %v", err)
 	}
-	return c, nil
+	return c, gcaPrivKey, nil
 }
 
 // TestBasicClient does minimal testing of the client object.
 func TestBasicClient(t *testing.T) {
-	gcas, _, _, err := server.SetupTestEnvironment(t.Name() + "_server1")
+	gcas, _, gcaPrivkey, err := server.SetupTestEnvironment(t.Name() + "_server1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	gcaPubkey := gcas.GCAPublicKey()
 	clientDir := glow.GenerateTestDir(t.Name() + "_client1")
-	err = SetupTestEnvironment(clientDir, gcaPubkey, []*server.GCAServer{gcas})
+	err = SetupTestEnvironment(clientDir, gcaPubkey, gcaPrivkey, []*server.GCAServer{gcas})
 	if err != nil {
 		t.Fatal(err)
 	}
