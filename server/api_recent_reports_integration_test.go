@@ -50,6 +50,11 @@ func TestRecentReportsIntegration(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
+	rj, err := json.Marshal(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(len(rj))
 
 	// Validate the response
 	if len(response.Reports) != 4032 {
