@@ -54,8 +54,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	time.Sleep(time.Second * 3)
+	<-client.syncThread
 
 	// Update the monitoring file so that there is data to read.
 	err = updateMonitorFile(client.baseDir, []uint32{1, 5}, []uint64{500, 3000})
@@ -65,7 +64,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 
 	// Sleep for long enough that the client will send messages to the
 	// server based on the readings if everything is working right.
-	time.Sleep(12 * sendReportTime)
+	time.Sleep(2 * sendReportTime)
 
 	// Check whether the server got the reports.
 	httpPort, _, _ := gcas.Ports()

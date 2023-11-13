@@ -69,6 +69,7 @@ type Client struct {
 	pubkey        glow.PublicKey
 	privkey       glow.PrivateKey
 	shortID       uint32
+	syncThread    chan struct{}
 }
 
 // NewClient will return a new client that is running smoothly.
@@ -80,8 +81,9 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Create an empty client.
 	c := &Client{
-		baseDir:   baseDir,
-		closeChan: make(chan struct{}),
+		baseDir:    baseDir,
+		closeChan:  make(chan struct{}),
+		syncThread: make(chan struct{}),
 	}
 
 	// Load the keypair for the client.
