@@ -149,6 +149,7 @@ func (c *Client) threadedSendReports() {
 	// boot loop scenario, we don't want to blow all of our bandwidth doing
 	// sync operations.
 	ticks := 280
+	close(c.syncThread)
 	for {
 		// Quit if the closeChan was closed.
 		select {
