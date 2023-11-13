@@ -105,7 +105,7 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 		// Append the data to the records slice
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
-			Energy:   uint64(energy - 1),
+			Energy:   uint64(energy),
 		})
 	}
 
@@ -115,11 +115,22 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 // threadedSendReports will wake up every minute, check whether there's a new
 // report available, and if so it'll send a report for the corresponding
 // timeslot.
+//
+// TODO: Need to pick an arbitrary point within the 5 minute period to send
+// data to the server so that the devices are spread out nicely.
 func (c *Client) threadedSendReports() {
-	// Right at startup, we save all of the existing records.
+	// Right at startup, we save all of the existing records. We don't
+	// bother sending them because we assume we already sent them, and if
+	// we haven't already sent them, the periodic synchronization will fix
+	// it up.
 	latestRecord := uint32(0)
 	records, err := c.readEnergyFile()
-	// We'll no-op if there's an error.
+	// We'll no-op if there's an error. One error that gets caught is if
+	// the monitoring equipment saves a duplicate reading. The monitoring
+	// equipment shouldn't have this issue, because it should be doing
+	// everything using Unix timestamps and therefore be immune to timezone
+	// and daylight savings related issues, but if the hardware clock
+	// messes up somehow we would rather ignore the error.
 	if err == nil {
 		for _, record := range records {
 			err := c.saveReading(record.Timeslot, uint32(record.Energy))
@@ -132,8 +143,12 @@ func (c *Client) threadedSendReports() {
 		}
 	}
 
-	// Infinite loop to send reports.
-	ticks := 0
+	// Infinite loop to send reports. We start ticks at 250 so that the
+	// catchup function will run about 20 minutes after boot. We don't want
+	// to run it immediately after boot because if we get stuck in a short
+	// boot loop scenario, we don't want to blow all of our bandwidth doing
+	// sync operations.
+	ticks := 280
 	for {
 		// Quit if the closeChan was closed.
 		select {
@@ -164,7 +179,8 @@ func (c *Client) threadedSendReports() {
 			}
 			// The above loop doesn't update the latestRecord
 			// because if there are multiple new records we want to
-			// send all of them.
+			// send all of them, and then update the latest record
+			// after all outstanding readings have been sent.
 			for _, record := range records {
 				if record.Timeslot > latestRecord {
 					latestRecord = record.Timeslot

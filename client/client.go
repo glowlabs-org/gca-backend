@@ -201,7 +201,7 @@ func (c *Client) loadGCAServers() error {
 
 	// Iterate over the randomized array and return the first non-banned server
 	for _, server := range servers {
-		if c.gcaServers[server].Banned {
+		if !c.gcaServers[server].Banned {
 			c.primaryServer = server
 			break
 		}
