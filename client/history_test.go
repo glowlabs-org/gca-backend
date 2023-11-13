@@ -100,6 +100,9 @@ func TestClientHistory(t *testing.T) {
 	// Do the same test, but now with a Client that was created at a future
 	// timeslot, so that it's possible to request data that doesn't exist.
 	glow.SetCurrentTimeslot(25)
+	defer func() {
+		glow.SetCurrentTimeslot(0)
+	}()
 	c2, _, _, err := FullClientTestEnvironment(t.Name() + "_c2")
 	if err != nil {
 		t.Fatal(err)

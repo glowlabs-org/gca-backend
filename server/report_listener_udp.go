@@ -93,7 +93,7 @@ func (server *GCAServer) integrateReport(report glow.EquipmentReport) {
 	if server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput == 0 {
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset] = report
 	} else {
-		server.logger.Warn("Received second support for timeslot")
+		server.logger.Warn("Received second report for timeslot")
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput = 1
 	}
 	// Ban the report timeslot if the production is greater than the capacity.

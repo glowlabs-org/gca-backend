@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -164,6 +165,14 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 	err = f.Close()
 	if err != nil {
 		return fmt.Errorf("unable to close the gca pubkey file: %v", err)
+	}
+
+	// Save a blank monitoring file.
+	newFileDataStr := "timestamp,energy (mWh)"
+	path = filepath.Join(baseDir, EnergyFile)
+	err = ioutil.WriteFile(path, []byte(newFileDataStr), 0644)
+	if err != nil {
+		return fmt.Errorf("unable to write the new monitor file: %v", err)
 	}
 
 	return nil
