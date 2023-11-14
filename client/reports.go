@@ -190,9 +190,11 @@ func (c *Client) threadedSendReports() {
 		}
 
 		// Sleep for a minute before checking again.
-		//
-		// TODO: Need to turn this into a soft sleep
-		time.Sleep(sendReportTime)
+		select {
+		case <-c.closeChan:
+			return
+		case <-time.After(sendReportTime):
+		}
 
 		ticks++
 		if ticks >= 300 {
