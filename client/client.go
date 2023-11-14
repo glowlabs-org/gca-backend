@@ -54,8 +54,10 @@ import (
 
 // The stateful object for the client.
 type Client struct {
-	primaryServer glow.PublicKey
+	gcaPubkey     glow.PublicKey
 	gcaServers    map[glow.PublicKey]GCAServer
+	primaryServer glow.PublicKey
+	shortID       uint32
 	serverMu      sync.Mutex
 
 	// NOTE: technically all of these fields should have a 'static' prefix,
@@ -63,12 +65,10 @@ type Client struct {
 	// fix it all.
 	baseDir       string
 	closeChan     chan struct{}
-	gcaPubkey     glow.PublicKey
 	historyFile   *os.File
 	historyOffset uint32
 	pubkey        glow.PublicKey
 	privkey       glow.PrivateKey
-	shortID       uint32
 	syncThread    chan struct{}
 }
 

@@ -45,7 +45,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	}
 
 	// Separate the signature from the data
-	var sig [64]byte
+	var sig glow.Signature
 	copy(sig[:], resp[32+4+504+8:])
 
 	// Extract the signing time.

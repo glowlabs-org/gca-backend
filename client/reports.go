@@ -23,9 +23,14 @@ package client
 // just have to have some way to tell that some report got squished into the
 // wrong timeslot.
 
+// TODO: Make sure we have the server failover in place.
+
 import (
+	"encoding/binary"
 	"encoding/csv"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"path"
 	"strconv"
@@ -41,7 +46,7 @@ type EnergyRecord struct {
 }
 
 // Create an energy report from the provided energy record.
-func (c *Client) sendReport(er EnergyRecord) {
+func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr := glow.EquipmentReport{
 		ShortID:     c.shortID,
 		Timeslot:    er.Timeslot,
@@ -50,12 +55,7 @@ func (c *Client) sendReport(er EnergyRecord) {
 	sb := eqr.SigningBytes()
 	eqr.Signature = glow.Sign(sb, c.privkey)
 	data := eqr.Serialize()
-
-	c.serverMu.Lock()
-	gcas := c.gcaServers[c.primaryServer]
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
-	c.serverMu.Unlock()
-
 	glow.SendUDPReport(data, location)
 }
 
@@ -112,6 +112,86 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 	return records, nil
 }
 
+// syncWithServer will make a request to the server to figure out which reports
+// did not successfully get received by the server, and it will re-send those
+// reports.
+//
+// TODO: This is the function that will decide if the hardware needs to fail
+// over to another server. Best way to do that would be by wrapping this
+// function with some retry/failover code. The retry/failover code needs to
+// operate a lot faster than the tick timer so that this thread is definitely
+// closed out by the time the next one is going.
+func (c *Client) threadedSyncWithServer(latestReading uint32) error {
+	// Grab the state we need from the client under the safety of a mutex.
+	c.serverMu.Lock()
+	gcas := c.gcaServers[c.primaryServer]
+	gcasKey := c.primaryServer
+	c.serverMu.Unlock()
+
+	// The first step is to make a connection to the server and download
+	// the list of reports that it current has.
+	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
+	conn, err := net.Dial("tcp", location)
+	if err != nil {
+		return fmt.Errorf("unable to dial the gca server")
+	}
+	defer conn.Close()
+
+	// Send the request.
+	var buf [4]byte
+	binary.BigEndian.PutUint32(buf[:], c.shortID)
+	_, err = conn.Write(buf[:])
+	if err != nil {
+		return fmt.Errorf("unable to send reqeust to gca server")
+	}
+
+	// Receive the response.
+	var respBuf [32 + 4 + 504 + 8 + 64]byte
+	_, err = io.ReadFull(conn, respBuf[:])
+	if err != nil {
+		return fmt.Errorf("unable to read response from gca server")
+	}
+
+	// Verify the signature.
+	signingTime := binary.BigEndian.Uint64(respBuf[32+4+504:])
+	now := uint64(time.Now().Unix())
+	if now+24*3600 < signingTime || now-24*3600 > signingTime {
+		return fmt.Errorf("received response from server that is out of bounds temporally")
+	}
+	var sig glow.Signature
+	copy(sig[:], respBuf[32+4+504+8:])
+	if !glow.Verify(gcasKey, respBuf[:32+4+504+8], sig) {
+		return fmt.Errorf("received response from server with invalid signature")
+	}
+
+	// Extract the timeslot offset and bitfield.
+	var bitfield [504]byte
+	copy(bitfield[:], respBuf[36:540])
+	timeslotOffset := binary.BigEndian.Uint32(respBuf[32:36])
+
+	// Scan through the bitfield
+	// productive.
+	lastIndex := latestReading - timeslotOffset
+	for i := uint32(0); i < lastIndex; i++ {
+		if bitfield[i/8]&1>>i%8 == 0 {
+			// Server is missing this index, check locally to see
+			// if we have it, and send it if we do. The server will
+			// ignore any power output below 2, so we ignore those
+			// values as well as errors.
+			powerOutput, err := c.staticLoadReading(i + timeslotOffset)
+			if err != nil || powerOutput < 2 {
+				continue
+			}
+			record := EnergyRecord{
+				Timeslot: i + timeslotOffset,
+				Energy:   uint64(powerOutput),
+			}
+			c.staticSendReport(gcas, record)
+		}
+	}
+	return nil
+}
+
 // threadedSendReports will wake up every minute, check whether there's a new
 // report available, and if so it'll send a report for the corresponding
 // timeslot.
@@ -158,6 +238,11 @@ func (c *Client) threadedSendReports() {
 		default:
 		}
 
+		// Grab the gca server for use when sending the report.
+		c.serverMu.Lock()
+		gcas := c.gcaServers[c.primaryServer]
+		c.serverMu.Unlock()
+
 		// Read the energy file. No-op if there's an error. Can't
 		// continue because we still want to sleep.
 		records, err := c.readEnergyFile()
@@ -175,7 +260,7 @@ func (c *Client) threadedSendReports() {
 					continue
 				}
 				if record.Timeslot > latestRecord {
-					c.sendReport(record)
+					c.staticSendReport(gcas, record)
 				}
 			}
 			// The above loop doesn't update the latestRecord
@@ -199,7 +284,7 @@ func (c *Client) threadedSendReports() {
 		ticks++
 		if ticks >= 300 {
 			ticks = 0
-			// TODO: go syncWithServer()
+			go c.threadedSyncWithServer(latestRecord)
 		}
 	}
 }
