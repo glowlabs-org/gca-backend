@@ -11,6 +11,12 @@ func TestClientHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := c.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Initial check: All entries should be empty.
 	for i := uint32(0); i < 100; i++ {
@@ -107,6 +113,12 @@ func TestClientHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := c2.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Initial check: All entries should be empty.
 	for i := uint32(0); i < 100; i++ {

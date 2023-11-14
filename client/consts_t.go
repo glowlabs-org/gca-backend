@@ -8,6 +8,8 @@ import (
 )
 
 const (
-	// reports will get sent every 15 milliseconds during testing.
-	sendReportTime = time.Millisecond * 15
+	// reports will get sent every 50 milliseconds during testing. 50
+	// milliseconds was chosen because it is slow enough that our reports
+	// testing can happen in real time.
+	sendReportTime = 50 * time.Millisecond
 )

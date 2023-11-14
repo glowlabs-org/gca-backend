@@ -124,6 +124,7 @@ func NewClient(baseDir string) (*Client, error) {
 
 // Currently only closes the history file.
 func (c *Client) Close() error {
+	close(c.closeChan)
 	return c.historyFile.Close()
 }
 
