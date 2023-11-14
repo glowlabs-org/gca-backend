@@ -14,7 +14,7 @@ func TestClientHistory(t *testing.T) {
 
 	// Initial check: All entries should be empty.
 	for i := uint32(0); i < 100; i++ {
-		amt, err := c.loadReading(i)
+		amt, err := c.staticLoadReading(i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -30,7 +30,7 @@ func TestClientHistory(t *testing.T) {
 	}
 
 	// Verify the saved reading.
-	amt, err := c.loadReading(5)
+	amt, err := c.staticLoadReading(5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestClientHistory(t *testing.T) {
 		t.Fatal("bad")
 	}
 	// What we load should not have changed.
-	amt, err = c.loadReading(5)
+	amt, err = c.staticLoadReading(5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestClientHistory(t *testing.T) {
 	}
 
 	// Test reading from an uninitialized timeslot.
-	amt, err = c.loadReading(99)
+	amt, err = c.staticLoadReading(99)
 	if err != nil || amt != 0 {
 		t.Fatal("Expected 0, got", amt, "with error", err)
 	}
@@ -77,7 +77,7 @@ func TestClientHistory(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		amt, err = c.loadReading(i)
+		amt, err = c.staticLoadReading(i)
 		if err != nil || amt != i*100 {
 			t.Fatal("Expected", i*100, "got", amt, "with error", err)
 		}
@@ -88,7 +88,7 @@ func TestClientHistory(t *testing.T) {
 		if i >= 10 && i < 15 || i == 5 {
 			continue
 		}
-		amt, err := c.loadReading(i)
+		amt, err := c.staticLoadReading(i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +110,7 @@ func TestClientHistory(t *testing.T) {
 
 	// Initial check: All entries should be empty.
 	for i := uint32(0); i < 100; i++ {
-		amt, err := c2.loadReading(i)
+		amt, err := c2.staticLoadReading(i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestClientHistory(t *testing.T) {
 
 	// Initial check: All entries should be empty.
 	for i := uint32(0); i < 100; i++ {
-		amt, err := c2.loadReading(i)
+		amt, err := c2.staticLoadReading(i)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,7 +143,7 @@ func TestClientHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal("bad")
 	}
-	amt, err = c2.loadReading(25)
+	amt, err = c2.staticLoadReading(25)
 	if err != nil {
 		t.Fatal("bad")
 	}

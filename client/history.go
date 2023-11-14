@@ -50,7 +50,7 @@ func (c *Client) saveReading(timeslot uint32, reading uint32) error {
 	byteOffset := 4 * (1 + timeslot - c.historyOffset)
 
 	// Load the reading from this offset.
-	current, err := c.loadReading(timeslot)
+	current, err := c.staticLoadReading(timeslot)
 	if err != nil {
 		return fmt.Errorf("unable to load reading for this timeslot: %v", err)
 	}
@@ -71,9 +71,9 @@ func (c *Client) saveReading(timeslot uint32, reading uint32) error {
 	return nil
 }
 
-// loadReading will load a reading from the provided timelsot, returning an
-// error if it is out of bounds. If no reading exists, '0' will be returned.
-func (c *Client) loadReading(timeslot uint32) (uint32, error) {
+// staticLoadReading will load a reading from the provided timelsot, returning
+// an error if it is out of bounds. If no reading exists, '0' will be returned.
+func (c *Client) staticLoadReading(timeslot uint32) (uint32, error) {
 	if timeslot < c.historyOffset {
 		// This timeslot doesn't have data, so the natural response is
 		// nothing.
