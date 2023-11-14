@@ -1,35 +1,31 @@
 package client
 
-// TODO: Need to test that the client sends reports properly.
-//
-// Then we need to keep making progress on this file. Currently we submit
-// reports but not all of the functions are complete, then we'll need to test
-// that, then we'll need to write and test the syncing function. Finally after
-// that we'll be able to move on to writing failover code, migration code, and
-// server reliability code.
-
 // reports.go contains all of the code for sending reports to the server.
 //
 // TODO: We will have to create a simlink between the client directory's
 // 'energy_data.csv' and the '/opt/halki/energy_data.csv' file.
-//
-// TODO: Need to confirm with the monitoring guys that every 5 minute period
-// will get exactly 1 record in the CSV, and that every second is accounted for
-// in some report or another.
-//
-// TODO: We're going to need to handle the case where two reports from the
-// monitoring equipment end up in the same timeslot. Probably the correct
-// solution is to roll the second reading into the next unread timeslot. We'll
-// just have to have some way to tell that some report got squished into the
-// wrong timeslot.
-
-// TODO: Make sure we have the server failover in place.
 
 // TODO: Add concurrency testing. Since the client doesn't have APIs, the
 // concurrency testing can be a bit less intensive than for when there's an API
 // to bash.
 
 // TODO: Need to add testing around how banned servers get handled.
+
+// TODO: Need to pick a random offset that is preferred for sending new reports
+// to the server, to avoid overwhelming the server DoS style.
+
+// TODO: The test suite needs to have some optional randomization on the
+// reports sending so that we can sometimes control the report not to send,
+// simulating a UDP failure.
+
+// Remaining for tomorrow:
+//
+// 1. Get multiple servers so the hardware can have them
+// 2. Configure the first hardware files (probably by hand)
+// 3. Contemplate writing code to grab new GCA servers from the existing one
+// 4. Contemplate writing code to complete GCA migration
+//
+// TODO TODO TODO
 
 import (
 	"crypto/rand"
@@ -170,11 +166,8 @@ func (c *Client) staticServerReadings(gcas GCAServer, gcasKey glow.PublicKey) (t
 // did not successfully get received by the server, and it will re-send those
 // reports.
 //
-// TODO: This is the function that will decide if the hardware needs to fail
-// over to another server. Best way to do that would be by wrapping this
-// function with some retry/failover code. The retry/failover code needs to
-// operate a lot faster than the tick timer so that this thread is definitely
-// closed out by the time the next one is going.
+// If the function fails to complete a successful sync operation with the
+// server, it will attempt to migrate to a new server.
 func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Grab the state we need from the client under the safety of a mutex.
 	c.serverMu.Lock()
@@ -187,8 +180,8 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	if err != nil {
 		// Try up to 3 times to get a successful interaction with a
 		// server. Wait 10 ticks between each attempt.
-		for i := 0; i < 4; i++ {
-			if i == 3 {
+		for i := 0; i < 5; i++ {
+			if i == 4 {
 				// Give up entirely after 3 attempts.
 				return
 			}
