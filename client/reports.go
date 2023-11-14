@@ -112,6 +112,52 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 	return records, nil
 }
 
+// c.staticServerReadings is a wrapper for the networking call that happens in
+// threadedSyncServer, it allows us to isolate failures which indicate that a
+// failover needs to happen.
+func (c *Client) staticServerReadings(gcas GCAServer, gcasKey glow.PublicKey) (timeslotOffset uint32, bitfield [504]byte, err error) {
+	// The first step is to make a connection to the server and download
+	// the list of reports that it current has.
+	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
+	conn, err := net.Dial("tcp", location)
+	if err != nil {
+		return 0, [504]byte{}, fmt.Errorf("unable to dial the gca server")
+	}
+	defer conn.Close()
+
+	// Send the request.
+	var buf [4]byte
+	binary.BigEndian.PutUint32(buf[:], c.shortID)
+	_, err = conn.Write(buf[:])
+	if err != nil {
+		return 0, [504]byte{}, fmt.Errorf("unable to send reqeust to gca server")
+	}
+
+	// Receive the response.
+	var respBuf [32 + 4 + 504 + 8 + 64]byte
+	_, err = io.ReadFull(conn, respBuf[:])
+	if err != nil {
+		return 0, [504]byte{}, fmt.Errorf("unable to read response from gca server")
+	}
+
+	// Verify the signature.
+	signingTime := binary.BigEndian.Uint64(respBuf[32+4+504:])
+	now := uint64(time.Now().Unix())
+	if now+24*3600 < signingTime || now-24*3600 > signingTime {
+		return 0, [504]byte{}, fmt.Errorf("received response from server that is out of bounds temporally")
+	}
+	var sig glow.Signature
+	copy(sig[:], respBuf[32+4+504+8:])
+	if !glow.Verify(gcasKey, respBuf[:32+4+504+8], sig) {
+		return 0, [504]byte{}, fmt.Errorf("received response from server with invalid signature")
+	}
+
+	// Extract the timeslot offset and bitfield.
+	copy(bitfield[:], respBuf[36:540])
+	timeslotOffset = binary.BigEndian.Uint32(respBuf[32:36])
+	return timeslotOffset, bitfield, nil
+}
+
 // syncWithServer will make a request to the server to figure out which reports
 // did not successfully get received by the server, and it will re-send those
 // reports.
@@ -121,53 +167,19 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 // function with some retry/failover code. The retry/failover code needs to
 // operate a lot faster than the tick timer so that this thread is definitely
 // closed out by the time the next one is going.
-func (c *Client) threadedSyncWithServer(latestReading uint32) error {
+func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Grab the state we need from the client under the safety of a mutex.
 	c.serverMu.Lock()
 	gcas := c.gcaServers[c.primaryServer]
 	gcasKey := c.primaryServer
 	c.serverMu.Unlock()
 
-	// The first step is to make a connection to the server and download
-	// the list of reports that it current has.
-	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
-	conn, err := net.Dial("tcp", location)
+	// Perform the network call
+	timeslotOffset, bitfield, err := c.staticServerReadings(gcas, gcasKey)
 	if err != nil {
-		return fmt.Errorf("unable to dial the gca server")
+		// TODO: Execute failover logic here.
+		return
 	}
-	defer conn.Close()
-
-	// Send the request.
-	var buf [4]byte
-	binary.BigEndian.PutUint32(buf[:], c.shortID)
-	_, err = conn.Write(buf[:])
-	if err != nil {
-		return fmt.Errorf("unable to send reqeust to gca server")
-	}
-
-	// Receive the response.
-	var respBuf [32 + 4 + 504 + 8 + 64]byte
-	_, err = io.ReadFull(conn, respBuf[:])
-	if err != nil {
-		return fmt.Errorf("unable to read response from gca server")
-	}
-
-	// Verify the signature.
-	signingTime := binary.BigEndian.Uint64(respBuf[32+4+504:])
-	now := uint64(time.Now().Unix())
-	if now+24*3600 < signingTime || now-24*3600 > signingTime {
-		return fmt.Errorf("received response from server that is out of bounds temporally")
-	}
-	var sig glow.Signature
-	copy(sig[:], respBuf[32+4+504+8:])
-	if !glow.Verify(gcasKey, respBuf[:32+4+504+8], sig) {
-		return fmt.Errorf("received response from server with invalid signature")
-	}
-
-	// Extract the timeslot offset and bitfield.
-	var bitfield [504]byte
-	copy(bitfield[:], respBuf[36:540])
-	timeslotOffset := binary.BigEndian.Uint32(respBuf[32:36])
 
 	// Scan through the bitfield
 	// productive.
@@ -189,7 +201,6 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) error {
 			c.staticSendReport(gcas, record)
 		}
 	}
-	return nil
 }
 
 // threadedSendReports will wake up every minute, check whether there's a new
