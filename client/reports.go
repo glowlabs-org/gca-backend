@@ -25,11 +25,19 @@ package client
 
 // TODO: Make sure we have the server failover in place.
 
+// TODO: Add concurrency testing. Since the client doesn't have APIs, the
+// concurrency testing can be a bit less intensive than for when there's an API
+// to bash.
+
+// TODO: Need to add testing around how banned servers get handled.
+
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/csv"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"os"
 	"path"
@@ -177,8 +185,52 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Perform the network call
 	timeslotOffset, bitfield, err := c.staticServerReadings(gcas, gcasKey)
 	if err != nil {
-		// TODO: Execute failover logic here.
-		return
+		// Try up to 3 times to get a successful interaction with a
+		// server. Wait 10 ticks between each attempt.
+		for i := 0; i < 4; i++ {
+			if i == 3 {
+				// Give up entirely after 3 attempts.
+				return
+			}
+
+			// Sleep for 10 ticks.
+			select {
+			case <-c.closeChan:
+				return
+			case <-time.After(10 * sendReportTime):
+			}
+
+			// Pick a new random primary server. The steps are:
+			//
+			// 1. Pull all the servers into an array.
+			// 2. Randomly shuffle the array.
+			// 3. Select the first non-banned server.
+			c.serverMu.Lock()
+			servers := make([]glow.PublicKey, 0, len(c.gcaServers))
+			for server, _ := range c.gcaServers {
+				servers = append(servers, server)
+			}
+			for i := range servers {
+				j, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+				if err != nil {
+					continue
+				}
+				servers[i], servers[j.Int64()] = servers[j.Int64()], servers[i]
+			}
+			for _, server := range servers {
+				if !c.gcaServers[server].Banned {
+					c.primaryServer = server
+					break
+				}
+			}
+			c.serverMu.Unlock()
+
+			// Retry grabbing the bitfield.
+			timeslotOffset, bitfield, err = c.staticServerReadings(gcas, gcasKey)
+			if err == nil {
+				break
+			}
+		}
 	}
 
 	// Scan through the bitfield
