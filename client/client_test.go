@@ -210,7 +210,11 @@ func TestBasicClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewClient(clientDir)
+	c, err := NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

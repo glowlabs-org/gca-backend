@@ -89,4 +89,78 @@ func TestPeriodicMonitoring(t *testing.T) {
 			t.Fatal("server has reports we didn't send")
 		}
 	}
+
+	// Update the monitoring file so that there are now server readings
+	// that go back in time a bit. The logic of the reporting thread will
+	// not send any readings that it picks up if they are old readings; it
+	// assumes that it already sent all of the old readings.
+	//
+	// This means that we can retroactively add readings during testing to
+	// test the sync function, as the only way those readings will get to
+	// the server is if the sync function identifies that they are missing
+	// and sends them.
+	err = updateMonitorFile(client.baseDir, []uint32{1, 2, 5}, []uint64{500, 100, 3000})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep for long enough that the client would send a message for
+	// report '2' to the server if we are too late and its caught in the
+	// main thread. We do this check because we want to make sure that we
+	// are testing the actual sync functions and not picking up a false
+	// positive because the normal reporting function picked up the number.
+	time.Sleep(2 * sendReportTime)
+
+	// Verify the server had the same reports as before.
+	httpPort, _, _ = gcas.Ports()
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			t.Fatal("server does not seem to have the report", report.PowerOutput)
+		} else if i == 5 && report.PowerOutput != 2999 {
+			t.Fatal("server does not seem to have expected report", report.PowerOutput)
+		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
+			t.Fatal("server has reports we didn't send")
+		}
+	}
+
+	// Give the server enough time to execute a sync. We only need to sleep
+	// 20 cycles because the first sync check happens 20 ticks after
+	// startup, and we haven't spent 20 ticks yet testing things.
+	time.Sleep(25 * sendReportTime)
+
+	// Verify the server had the same reports as before.
+	httpPort, _, _ = gcas.Ports()
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			t.Fatal("server does not seem to have the report", report.PowerOutput)
+		} else if i == 5 && report.PowerOutput != 2999 {
+			t.Fatal("server does not seem to have expected report", report.PowerOutput)
+		} else if i == 2 && report.PowerOutput != 99 {
+			t.Fatal("server does not seem to have expected report", report.PowerOutput)
+		} else if i != 1 && i != 5 && i != 2 && report.PowerOutput != 0 {
+			t.Fatal("server has reports we didn't send")
+		}
+	}
 }

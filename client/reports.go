@@ -234,12 +234,12 @@ func (c *Client) threadedSendReports() {
 		}
 	}
 
-	// Infinite loop to send reports. We start ticks at 250 so that the
+	// Infinite loop to send reports. We start ticks at 270 so that the
 	// catchup function will run about 20 minutes after boot. We don't want
 	// to run it immediately after boot because if we get stuck in a short
 	// boot loop scenario, we don't want to blow all of our bandwidth doing
 	// sync operations.
-	ticks := 280
+	ticks := 270
 	close(c.syncThread)
 	for {
 		// Quit if the closeChan was closed.
