@@ -13,7 +13,7 @@ func main() {
 	// Create a new client, using the current directory as the basedir.
 	c, err := client.NewClient(".")
 	if err != nil {
-		fmt.Println("unable to create client")
+		fmt.Println("unable to create client: ", err)
 		return
 	}
 

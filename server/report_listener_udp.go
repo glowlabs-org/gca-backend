@@ -109,6 +109,7 @@ func (server *GCAServer) integrateReport(report glow.EquipmentReport) {
 		copy(server.recentReports[:], server.recentReports[halfIndex:])
 		server.recentReports = server.recentReports[:halfIndex]
 	}
+	server.saveEquipmentReport(report)
 }
 
 // managedHandleEquipmentReport processes the raw data received from equipment.
@@ -149,7 +150,6 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 
 	// Integrate and save the report.
 	server.integrateReport(report)
-	server.saveEquipmentReport(report)
 }
 
 // threadedLaunchUDPServer sets up and starts the UDP server for listening to

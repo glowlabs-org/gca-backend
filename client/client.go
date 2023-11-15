@@ -227,6 +227,5 @@ func (c *Client) loadShortID() error {
 		return fmt.Errorf("unable to read short id file: %v", err)
 	}
 	c.shortID = binary.LittleEndian.Uint32(data)
-	copy(c.gcaPubkey[:], data[:32])
 	return nil
 }

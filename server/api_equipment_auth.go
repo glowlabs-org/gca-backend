@@ -18,8 +18,8 @@ import (
 type EquipmentAuthorizationRequest struct {
 	ShortID    uint32 `json:"ShortID"`
 	PublicKey  string `json:"Public Key"`
-	Capacity   uint64 `json:"Capacity"`
-	Debt       uint64 `json:"Debt"`
+	Capacity   uint64 `json:"Capacity"` // Milliwatt hours that can be generated in 5 minutes
+	Debt       uint64 `json:"Debt"`     // milligrams of CO2
 	Expiration uint32 `json:"Expiration"`
 	Signature  string `json:"Signature"`
 }
