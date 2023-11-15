@@ -66,8 +66,13 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 // readEnergyFile will read the data from the energy file and return an array
 // that contains all of the values.
 func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
-	// Open the CSV file
-	filePath := path.Join(c.baseDir, EnergyFile)
+	// Open the CSV file. We do a quick conditional switch because in prod
+	// the energy file is actually located in an absolute location rather
+	// than being part of the energy monitor directory.
+	filePath := EnergyFile
+	if EnergyFile[0] != '/' {
+		filePath = path.Join(c.baseDir, EnergyFile)
+	}
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open monitoring file: %v", err)
@@ -178,19 +183,23 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Perform the network call
 	timeslotOffset, bitfield, err := c.staticServerReadings(gcas, gcasKey)
 	if err != nil {
-		// Try up to 3 times to get a successful interaction with a
+		// Try up to 5 times to get a successful interaction with a
 		// server. Wait 10 ticks between each attempt.
-		for i := 0; i < 5; i++ {
-			if i == 4 {
-				// Give up entirely after 3 attempts.
+		for i := 0; i < 6; i++ {
+			if i == 5 {
+				// Give up entirely after 3 attempts. We use
+				// this control structure to exit the loop so
+				// that we can have relevant bits of logic
+				// after the loop which assume that a
+				// connection was made successfully.
 				return
 			}
 
-			// Sleep for 10 ticks.
+			// Sleep for 2 ticks.
 			select {
 			case <-c.closeChan:
 				return
-			case <-time.After(10 * sendReportTime):
+			case <-time.After(2 * sendReportTime):
 			}
 
 			// Pick a new random primary server. The steps are:
@@ -216,6 +225,8 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 					break
 				}
 			}
+			gcas = c.gcaServers[c.primaryServer]
+			gcasKey = c.primaryServer
 			c.serverMu.Unlock()
 
 			// Retry grabbing the bitfield.
@@ -229,8 +240,8 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Scan through the bitfield
 	// productive.
 	lastIndex := latestReading - timeslotOffset
-	for i := uint32(0); i < lastIndex; i++ {
-		if bitfield[i/8]&1>>i%8 == 0 {
+	for i := uint32(0); i < lastIndex && int(i)/8 < len(bitfield); i++ {
+		if bitfield[i/8]&(1<<(i%8)) == 0 {
 			// Server is missing this index, check locally to see
 			// if we have it, and send it if we do. The server will
 			// ignore any power output below 2, so we ignore those
