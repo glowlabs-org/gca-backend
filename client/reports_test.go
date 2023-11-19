@@ -112,7 +112,6 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(2 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	httpPort, _, _ = gcas.Ports()
 	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
 	if err != nil {
 		t.Fatal(err)
@@ -134,13 +133,11 @@ func TestPeriodicMonitoring(t *testing.T) {
 		}
 	}
 
-	// Give the server enough time to execute a sync. We only need to sleep
-	// 20 cycles because the first sync check happens 20 ticks after
-	// startup, and we haven't spent 20 ticks yet testing things.
+	// Give the server enough time to execute a sync. The server needs
+	// about 20 cycles to execute a sync.
 	time.Sleep(25 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	httpPort, _, _ = gcas.Ports()
 	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
 	if err != nil {
 		t.Fatal(err)

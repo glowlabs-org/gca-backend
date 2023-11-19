@@ -9,6 +9,7 @@ import (
 // This function initializes the API routes and starts the HTTP server.
 func (gcas *GCAServer) launchAPI() {
 	// Attach all of the handlers to the mux.
+	gcas.mux.HandleFunc("/api/v1/authorized-servers", gcas.AuthorizedServersHandler)
 	gcas.mux.HandleFunc("/api/v1/authorize-equipment", gcas.AuthorizeEquipmentHandler)
 	gcas.mux.HandleFunc("/api/v1/register-gca", gcas.RegisterGCAHandler)
 	gcas.mux.HandleFunc("/api/v1/recent-reports", gcas.RecentReportsHandler)

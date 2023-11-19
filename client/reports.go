@@ -33,14 +33,17 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
+	"github.com/glowlabs-org/gca-backend/server"
 )
 
 // Represents one row of data from the energy file.
@@ -121,16 +124,28 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 	return records, nil
 }
 
-// c.staticServerReadings is a wrapper for the networking call that happens in
+// staticServerSync is a wrapper for the networking call that happens in
 // threadedSyncServer, it allows us to isolate failures which indicate that a
 // failover needs to happen.
-func (c *Client) staticServerReadings(gcas GCAServer, gcasKey glow.PublicKey) (timeslotOffset uint32, bitfield [504]byte, err error) {
+//
+// The server sync grabs a bitfield indicating what reports are missing, a
+// public key that states which GCA owns the device, and a list of gcaServers
+// (including banned servers) associated with the GCA. In most cases, the GCA
+// will be the same as the current GCA owner of the device. In the event that a
+// GCA retires or otherwise needs to shuffle a device away, the GCA may be
+// updated.
+//
+// TODO: When reading the newGCA field, we need to make sure that this new GCA
+// is authorized by the current GCA. The message as a whole is authorized by
+// the GCA server, but that's not the same as the GCA, and any GCA transitions
+// (and also any GCA server lists) need to be authorized by the GCA.
+func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey glow.PublicKey) (timeslotOffset uint32, bitfield [504]byte, newGCA glow.PublicKey, newShortID uint32, gcaServers []server.AuthorizedServer, err error) {
 	// The first step is to make a connection to the server and download
 	// the list of reports that it current has.
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
 	conn, err := net.Dial("tcp", location)
 	if err != nil {
-		return 0, [504]byte{}, fmt.Errorf("unable to dial the gca server")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to dial the gca server: %v", err)
 	}
 	defer conn.Close()
 
@@ -139,32 +154,75 @@ func (c *Client) staticServerReadings(gcas GCAServer, gcasKey glow.PublicKey) (t
 	binary.BigEndian.PutUint32(buf[:], c.shortID)
 	_, err = conn.Write(buf[:])
 	if err != nil {
-		return 0, [504]byte{}, fmt.Errorf("unable to send reqeust to gca server")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to send reqeust to gca server: %v", err)
 	}
 
-	// Receive the response.
-	var respBuf [32 + 4 + 504 + 8 + 64]byte
-	_, err = io.ReadFull(conn, respBuf[:])
+	// Receive the response length
+	var respLenBuf [2]byte
+	_, err = io.ReadFull(conn, respLenBuf[:])
 	if err != nil {
-		return 0, [504]byte{}, fmt.Errorf("unable to read response from gca server")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read the response length: %v", err)
+	}
+	respLen := binary.BigEndian.Uint16(respLenBuf[:])
+
+	// Receive the response.
+	respBuf := make([]byte, respLen)
+	_, err = io.ReadFull(conn, respBuf)
+	if err != nil {
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read response from gca server: %v", err)
 	}
 
 	// Verify the signature.
-	signingTime := binary.BigEndian.Uint64(respBuf[32+4+504:])
+	signingTime := binary.BigEndian.Uint64(respBuf[respLen-68:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
-		return 0, [504]byte{}, fmt.Errorf("received response from server that is out of bounds temporally")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v", err)
 	}
 	var sig glow.Signature
-	copy(sig[:], respBuf[32+4+504+8:])
-	if !glow.Verify(gcasKey, respBuf[:32+4+504+8], sig) {
-		return 0, [504]byte{}, fmt.Errorf("received response from server with invalid signature")
+	copy(sig[:], respBuf[respLen-64:])
+	if !glow.Verify(gcasKey, respBuf[:respLen-64], sig) {
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
 	}
 
-	// Extract the timeslot offset and bitfield.
-	copy(bitfield[:], respBuf[36:540])
+	// Extract the constant length fields.
 	timeslotOffset = binary.BigEndian.Uint32(respBuf[32:36])
-	return timeslotOffset, bitfield, nil
+	copy(bitfield[:], respBuf[36:540])
+	copy(newGCA[:], respBuf[540:572])
+	var newGCASignature glow.Signature
+	copy(newGCASignature[:], respBuf[572:636])
+	newShortID = binary.BigEndian.Uint32(respBuf[636:640])
+
+	// Ensure that the new GCA signature is valid.
+	var blank glow.PublicKey
+	newGCASigningBytes := append([]byte("gca_migration_key"), newGCA[:]...)
+	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
+	}
+
+	// Extract the variable length fields.
+	i := 640
+	for i < int(respLen)-68 {
+		var as server.AuthorizedServer
+		copy(as.PublicKey[:], respBuf[i:i+32])
+		i += 32
+		as.Banned = respBuf[i] != 0
+		i += 1
+		locationLen := int(respBuf[i])
+		i += 1
+		as.Location = string(respBuf[i : i+locationLen])
+		i += locationLen
+		as.HttpPort = binary.BigEndian.Uint16(respBuf[i : i+2])
+		i += 2
+		as.TcpPort = binary.BigEndian.Uint16(respBuf[i : i+2])
+		i += 2
+		as.UdpPort = binary.BigEndian.Uint16(respBuf[i : i+2])
+		i += 2
+		copy(as.GCAAuthorization[:], respBuf[i:])
+		i += 64
+		gcaServers = append(gcaServers, as)
+	}
+
+	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
 // syncWithServer will make a request to the server to figure out which reports
@@ -178,16 +236,16 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	c.serverMu.Lock()
 	gcas := c.gcaServers[c.primaryServer]
 	gcasKey := c.primaryServer
+	gcaKey := c.gcaPubkey
 	c.serverMu.Unlock()
 
 	// Perform the network call
-	timeslotOffset, bitfield, err := c.staticServerReadings(gcas, gcasKey)
+	timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err := c.staticServerSync(gcas, gcasKey, gcaKey)
 	if err != nil {
-		// Try up to 5 times to get a successful interaction with a
-		// server. Wait 10 ticks between each attempt.
+		// Try again up to 5 times to grab a new server.
 		for i := 0; i < 6; i++ {
 			if i == 5 {
-				// Give up entirely after 3 attempts. We use
+				// Give up entirely after 5 attempts. We use
 				// this control structure to exit the loop so
 				// that we can have relevant bits of logic
 				// after the loop which assume that a
@@ -195,11 +253,11 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 				return
 			}
 
-			// Sleep for 2 ticks.
+			// Sleep for a tick.
 			select {
 			case <-c.closeChan:
 				return
-			case <-time.After(2 * sendReportTime):
+			case <-time.After(sendReportTime):
 			}
 
 			// Pick a new random primary server. The steps are:
@@ -230,15 +288,93 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 			c.serverMu.Unlock()
 
 			// Retry grabbing the bitfield.
-			timeslotOffset, bitfield, err = c.staticServerReadings(gcas, gcasKey)
+			timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err = c.staticServerSync(gcas, gcasKey, gcaKey)
 			if err == nil {
 				break
 			}
 		}
 	}
 
-	// Scan through the bitfield
-	// productive.
+	// Check whether the GCA has changed. If the GCA has changed, the
+	// device will need to update its servers and gcaPubkey and shortId.
+	// This will include updating all of the relevant persist files. The
+	// history does not need to be wiped.
+	c.serverMu.Lock()
+	blank := glow.PublicKey{}
+	if newGCA != c.gcaPubkey && newGCA != blank {
+		// Before updating the internal state, the on-disk files need
+		// to be updated. A new GCA is a big deal, and a failure here
+		// could render the device useless. We don't have any ACID
+		// frameworks in place, so we have to take a risk with all of
+		// the files and hope that they all update atomically.
+		// Practical experience tells me that this is a very small
+		// risk, because the action happens infrequently, and it
+		// happens after the device has been running for a while, and
+		// it should complete in under 100ms. The device would have to
+		// fail within that 100ms window.
+		//
+		// If failure does happen, the consequence will be a bricked
+		// device that needs its SD card replaced. This isn't a
+		// terrible consequence. In the event of an error we panic and
+		// hope it doesn't happen again.
+		err := ioutil.WriteFile(filepath.Join(c.baseDir, GCAPubfile), newGCA[:], 0644)
+		if err != nil {
+			panic(err)
+		}
+		var shortIDBytes [4]byte
+		binary.LittleEndian.PutUint32(shortIDBytes[:], newShortID)
+		err = ioutil.WriteFile(filepath.Join(c.baseDir, ShortIDFile), shortIDBytes[:], 0644)
+		if err != nil {
+			panic(err)
+		}
+		newServers := make(map[glow.PublicKey]GCAServer)
+		for _, s := range gcaServers {
+			newServers[s.PublicKey] = GCAServer{
+				Banned:   s.Banned,
+				Location: s.Location,
+				HttpPort: s.HttpPort,
+				TcpPort:  s.TcpPort,
+				UdpPort:  s.UdpPort,
+			}
+		}
+		raw, err := SerializeGCAServerMap(newServers)
+		if err != nil {
+			panic(err)
+		}
+		err = ioutil.WriteFile(filepath.Join(c.baseDir, GCAServerMapFile), raw[:], 0644)
+		if err != nil {
+			panic(err)
+		}
+
+		// Need to update the gca pubkey + file, the shortID + file,
+		// and the list of GCA servers needs to be wiped clean.
+		c.gcaPubkey = newGCA
+		c.shortID = newShortID
+		c.gcaServers = newServers
+	}
+	// Update the server map based on the new list of gca servers.
+	// Specifcially we want to look for new servers, as well as servers
+	// that are now banned.
+	//
+	// This code runs whether or not there's a new GCA, and it needs to run
+	// even if there's a new GCA because the update in the newGCA code does
+	// not properly handle server bans.
+	for _, s := range gcaServers {
+		_, exists := c.gcaServers[s.PublicKey]
+		if !exists && s.Banned {
+			c.gcaServers[s.PublicKey] = GCAServer{
+				Banned:   s.Banned,
+				Location: s.Location,
+				HttpPort: s.HttpPort,
+				TcpPort:  s.TcpPort,
+				UdpPort:  s.UdpPort,
+			}
+		}
+	}
+	c.serverMu.Unlock()
+
+	// Scan through the bitfield and submit any reports that the device has
+	// but the GCA server does not.
 	lastIndex := latestReading - timeslotOffset
 	for i := uint32(0); i < lastIndex && int(i)/8 < len(bitfield); i++ {
 		if bitfield[i/8]&(1<<(i%8)) == 0 {
@@ -290,12 +426,12 @@ func (c *Client) threadedSendReports() {
 		}
 	}
 
-	// Infinite loop to send reports. We start ticks at 270 so that the
-	// catchup function will run about 20 minutes after boot. We don't want
+	// Infinite loop to send reports. We start ticks at 30 so that the
+	// catchup function will run about 2.5 hours after boot. We don't want
 	// to run it immediately after boot because if we get stuck in a short
 	// boot loop scenario, we don't want to blow all of our bandwidth doing
 	// sync operations.
-	ticks := 270
+	ticks := 30
 	close(c.syncThread)
 	for {
 		// Quit if the closeChan was closed.
@@ -345,11 +481,11 @@ func (c *Client) threadedSendReports() {
 		select {
 		case <-c.closeChan:
 			return
-		case <-time.After(sendReportTime):
+		case <-time.After(sendReportTime + randomTimeExtension()):
 		}
 
 		ticks++
-		if ticks >= 300 {
+		if ticks >= 60 {
 			ticks = 0
 			go c.threadedSyncWithServer(latestRecord)
 		}
