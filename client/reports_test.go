@@ -13,15 +13,6 @@ import (
 	"github.com/glowlabs-org/gca-backend/server"
 )
 
-// TODO: Need to make sure sending multiple reports at once is working.
-
-// TODO: Need to make sure we are correctly handling cases where multiple
-// monitoring reports are in the same bin. The strategy there is that the bin
-// will always get the first report that appears in that bin. If 2 reports
-// appear (or more), the extra report(s) will go into the next bin. We will
-// bother with this code after we confirm that the monitoring equipment isn't
-// already ensuring that we get exactly one reading per 300 seconds.
-
 // updateMonitorFile is an apparatus that allows the monitor file to be changed
 // during testing, simulating a new reading being taken.
 func updateMonitorFile(dir string, newTimeslots []uint32, newReadings []uint64) error {
@@ -32,9 +23,11 @@ func updateMonitorFile(dir string, newTimeslots []uint32, newReadings []uint64) 
 	// Craft the new file.
 	newFileDataStr := "timestamp,energy (mWh)"
 	for i := 0; i < len(newTimeslots); i++ {
-		newFileDataStr += "\n"
-		newFileDataStr += fmt.Sprintf("%v", int64(newTimeslots[i]*300)+glow.GenesisTime)
-		newFileDataStr += fmt.Sprintf(",%v", newReadings[i])
+		if newReadings[i] != 34404 {
+			newFileDataStr += fmt.Sprintf("\n%v,%v", int64(newTimeslots[i]*300)+glow.GenesisTime, newReadings[i])
+		} else {
+			newFileDataStr += fmt.Sprintf("\n%v,random error here", int64(newTimeslots[i]*300)+glow.GenesisTime)
+		}
 	}
 
 	// Write the new file.
@@ -99,7 +92,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	// test the sync function, as the only way those readings will get to
 	// the server is if the sync function identifies that they are missing
 	// and sends them.
-	err = updateMonitorFile(client.baseDir, []uint32{1, 2, 5}, []uint64{500, 100, 3000})
+	err = updateMonitorFile(client.baseDir, []uint32{1, 2, 5, 6}, []uint64{500, 100, 3000, 34404})
 	if err != nil {
 		t.Fatal(err)
 	}
