@@ -8,11 +8,8 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-// The object used to store GCA servers on disk.
-//
-// TODO: Need to add some sort of data here which indicates the success rate of
-// the server, so that we skip the server or at least de-prioritize the server
-// if recent attempts to send it data have failed.
+// The object used to store GCA servers on disk. Once a GCAServer is banned, it
+// can never become un-banned.
 type GCAServer struct {
 	Banned   bool
 	Location string

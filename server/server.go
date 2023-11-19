@@ -68,6 +68,10 @@ type GCAServer struct {
 	gcaPubkeyAvailable bool
 	gcaTempKey         glow.PublicKey
 
+	// We need to track other servers so that clients who ping us for a
+	// list of backup servers have something they can retrieve.
+	gcaServers AuthorizedServers
+
 	// These are the signing keys for the GCA server. The GCA server will
 	// sign all GET requests so that the caller knows the data is
 	// authentic.
