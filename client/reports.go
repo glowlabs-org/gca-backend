@@ -1,9 +1,6 @@
 package client
 
 // reports.go contains all of the code for sending reports to the server.
-//
-// TODO: We will have to create a simlink between the client directory's
-// 'energy_data.csv' and the '/opt/halki/energy_data.csv' file.
 
 // TODO: Add concurrency testing. Since the client doesn't have APIs, the
 // concurrency testing can be a bit less intensive than for when there's an API
@@ -11,21 +8,9 @@ package client
 
 // TODO: Need to add testing around how banned servers get handled.
 
-// TODO: Need to pick a random offset that is preferred for sending new reports
-// to the server, to avoid overwhelming the server DoS style.
-
 // TODO: The test suite needs to have some optional randomization on the
 // reports sending so that we can sometimes control the report not to send,
 // simulating a UDP failure.
-
-// Remaining for tomorrow:
-//
-// 1. Get multiple servers so the hardware can have them
-// 2. Configure the first hardware files (probably by hand)
-// 3. Contemplate writing code to grab new GCA servers from the existing one
-// 4. Contemplate writing code to complete GCA migration
-//
-// TODO TODO TODO
 
 import (
 	"crypto/rand"
@@ -102,11 +87,11 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 		energy, err := strconv.ParseUint(record[1], 10, 32)
 		if err != nil {
 			energy = 0
+		} else {
+			// Round the energy down so that we never over-estiamte the amount of
+			// power that has been produced.
+			energy = energy - 1
 		}
-
-		// Round the energy down so that we never over-estiamte the amount of
-		// power that has been produced.
-		energy = energy - 1
 
 		// 0, 1, and 2 are reserved sentinel values, so we just skip this
 		// reading if we are in that range.
@@ -135,10 +120,10 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 // GCA retires or otherwise needs to shuffle a device away, the GCA may be
 // updated.
 //
-// TODO: When reading the newGCA field, we need to make sure that this new GCA
-// is authorized by the current GCA. The message as a whole is authorized by
-// the GCA server, but that's not the same as the GCA, and any GCA transitions
-// (and also any GCA server lists) need to be authorized by the GCA.
+// When reading the newGCA field, we need to make sure that this new GCA is
+// authorized by the current GCA. The message as a whole is authorized by the
+// GCA server, but that's not the same as the GCA, and any GCA transitions (and
+// also any GCA server lists) need to be authorized by the GCA.
 func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey glow.PublicKey) (timeslotOffset uint32, bitfield [504]byte, newGCA glow.PublicKey, newShortID uint32, gcaServers []server.AuthorizedServer, err error) {
 	// The first step is to make a connection to the server and download
 	// the list of reports that it current has.
@@ -398,9 +383,6 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 // threadedSendReports will wake up every minute, check whether there's a new
 // report available, and if so it'll send a report for the corresponding
 // timeslot.
-//
-// TODO: Need to pick an arbitrary point within the 5 minute period to send
-// data to the server so that the devices are spread out nicely.
 func (c *Client) threadedSendReports() {
 	// Right at startup, we save all of the existing records. We don't
 	// bother sending them because we assume we already sent them, and if
