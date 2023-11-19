@@ -36,27 +36,33 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	}
 
 	// Prepare a buffer to store the incoming response
-	var resp [32 + 4 + 504 + 8 + 64]byte
+	var respLenBytes [2]byte
+	_, err = io.ReadFull(conn, respLenBytes[:])
+	if err != nil {
+		return 0, [504]byte{}, fmt.Errorf("unable to read response length: %v", err)
+	}
+	respLen := binary.BigEndian.Uint16(respLenBytes[:])
+	resp := make([]byte, respLen)
 
 	// Read the full response
-	_, err = io.ReadFull(conn, resp[:])
+	_, err = io.ReadFull(conn, resp)
 	if err != nil {
 		return 0, [504]byte{}, fmt.Errorf("unable to read full response: %v", err)
 	}
 
 	// Separate the signature from the data
 	var sig glow.Signature
-	copy(sig[:], resp[32+4+504+8:])
+	copy(sig[:], resp[respLen-64:])
 
 	// Extract the signing time.
-	signingTime := binary.BigEndian.Uint64(resp[32+4+504:])
+	signingTime := binary.BigEndian.Uint64(resp[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
 		return 0, [504]byte{}, fmt.Errorf("signature comes from an out of bounds time: %v", signingTime)
 	}
 
 	// Verify the signature
-	if !glow.Verify(gcas.staticPublicKey, resp[:32+4+504+8], sig) {
+	if !glow.Verify(gcas.staticPublicKey, resp[:respLen-64], sig) {
 		return 0, [504]byte{}, fmt.Errorf("Signature verification failed")
 	}
 
