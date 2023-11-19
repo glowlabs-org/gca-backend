@@ -152,16 +152,19 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 
 	// Receive the response.
 	respBuf := make([]byte, respLen)
-	_, err = io.ReadFull(conn, respBuf)
+	n, err := io.ReadFull(conn, respBuf)
 	if err != nil {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read response from gca server: %v", err)
 	}
+	if n != int(respLen) {
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("server did not send enough data: %v", err)
+	}
 
 	// Verify the signature.
-	signingTime := binary.BigEndian.Uint64(respBuf[respLen-68:])
+	signingTime := binary.BigEndian.Uint64(respBuf[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
-		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v", err)
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v vs %v", now, signingTime)
 	}
 	var sig glow.Signature
 	copy(sig[:], respBuf[respLen-64:])
@@ -170,23 +173,32 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	}
 
 	// Extract the constant length fields.
+	var equipmentKey glow.PublicKey
+	copy(equipmentKey[:], respBuf[:32])
 	timeslotOffset = binary.BigEndian.Uint32(respBuf[32:36])
 	copy(bitfield[:], respBuf[36:540])
 	copy(newGCA[:], respBuf[540:572])
+	newShortID = binary.BigEndian.Uint32(respBuf[572:576])
 	var newGCASignature glow.Signature
-	copy(newGCASignature[:], respBuf[572:636])
-	newShortID = binary.BigEndian.Uint32(respBuf[636:640])
+	copy(newGCASignature[:], respBuf[576:640])
 
-	// Ensure that the new GCA signature is valid.
+	// Ensure that if there's a new GCA, that the signature authorizing the
+	// GCA migration for the device is valid and comes from the current
+	// GCA.
 	var blank glow.PublicKey
-	newGCASigningBytes := append([]byte("gca_migration_key"), newGCA[:]...)
+	newGCASigningBytes := append([]byte("gca_migration_key"), respBuf[540:576]...) // Add the new GCA and the new shortID to the verification
 	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
-		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature: %v", err)
+	}
+
+	// Ensure that the equipment key matches the client's public key.
+	if equipmentKey != c.pubkey {
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
 	}
 
 	// Extract the variable length fields.
 	i := 640
-	for i < int(respLen)-68 {
+	for i < int(respLen)-72 {
 		var as server.AuthorizedServer
 		copy(as.PublicKey[:], respBuf[i:i+32])
 		i += 32
@@ -206,6 +218,8 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		i += 64
 		gcaServers = append(gcaServers, as)
 	}
+
+	// TODO: Need to verify the signature on all of the gca servers.
 
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
@@ -227,6 +241,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Perform the network call
 	timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err := c.staticServerSync(gcas, gcasKey, gcaKey)
 	if err != nil {
+		fmt.Println(err)
 		// Try again up to 5 times to grab a new server.
 		for i := 0; i < 6; i++ {
 			if i == 5 {

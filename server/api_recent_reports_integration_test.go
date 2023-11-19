@@ -54,7 +54,7 @@ func TestRecentReportsIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(len(rj))
+	t.Log("RecentReportsResponse size:", len(rj), "bytes")
 
 	// Validate the response
 	if len(response.Reports) != 4032 {

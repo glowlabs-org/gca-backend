@@ -114,21 +114,47 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 		return
 	}
 
-	// Prepare the response.
-	var resp [32 + 4 + 504 + 8 + 64]byte
+	// Prepare the response. The first two bytes will be used as a length
+	// prefix.
+	resp := make([]byte, 640)
 	// Copy in the public key.
-	copy(resp[:32], equipment.PublicKey[:])
+	copy(resp[2:34], equipment.PublicKey[:])
 	// Copy in the reports offset
-	binary.BigEndian.PutUint32(resp[32:36], reportsOffset)
+	binary.BigEndian.PutUint32(resp[34:38], reportsOffset)
 	// Copy in the bitfield.
-	copy(resp[36:540], bitfield[:])
+	copy(resp[38:542], bitfield[:])
+	// TODO: Copy in the new GCA message if there's a new GCA. This will
+	// also include a new shortID and a signature.
+	//
+	// Add the list of gcaServers.
+	gcas.gcaServers.mu.Lock()
+	for _, s := range gcas.gcaServers.servers {
+		locationLen := len(s.Location)
+		sBytes := make([]byte, 104+locationLen)
+		copy(sBytes[:32], s.PublicKey[:])
+		if s.Banned {
+			sBytes[32] = 1
+		}
+		sBytes[33] = byte(locationLen)
+		copy(sBytes[34:], []byte(s.Location))
+		binary.BigEndian.PutUint16(sBytes[35+locationLen:], s.HttpPort)
+		binary.BigEndian.PutUint16(sBytes[37+locationLen:], s.TcpPort)
+		binary.BigEndian.PutUint16(sBytes[39+locationLen:], s.UdpPort)
+		copy(sBytes[41+locationLen:], s.GCAAuthorization[:])
+		resp = append(resp, sBytes...)
+	}
+	gcas.gcaServers.mu.Unlock()
 	// Copy in the unix timestamp
+	var timeBytes [8]byte
 	timestamp := time.Now().Unix()
-	binary.BigEndian.PutUint64(resp[540:548], uint64(timestamp))
+	binary.BigEndian.PutUint64(timeBytes[:], uint64(timestamp))
+	resp = append(resp, timeBytes[:]...)
 	// Create the signature
-	sig := glow.Sign(resp[:548], gcas.staticPrivateKey)
-	copy(resp[548:], sig[:])
-	_, err = conn.Write(resp[:])
+	sig := glow.Sign(resp[2:], gcas.staticPrivateKey)
+	resp = append(resp, sig[:]...)
+	respLen := len(resp) - 2 // subtract 2 because the length prefix doesn't count
+	binary.BigEndian.PutUint16(resp[:2], uint16(respLen))
+	_, err = conn.Write(resp)
 	if err != nil {
 		gcas.logger.Errorf("Failed to write response: %v", err)
 		return
