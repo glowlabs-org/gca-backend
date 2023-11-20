@@ -154,3 +154,37 @@ func TestPeriodicMonitoring(t *testing.T) {
 		}
 	}
 }
+
+// TestAddingServers has a goal of spinning up multiple servers for a hardware
+// device, and then adding them one at a time and ensuring that the hardware
+// device is able to gracefully transition from one to another.
+func TestAddingServers(t *testing.T) {
+	// Set up the first server.
+	gcas1, _, gcaPubKey, gcaPrivKey, err := server.SetupTestEnvironment(t.Name() + "_server1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Set up the second server.
+	gcas2, _, err := server.SetupTestEnvironmentKnownGCA(t.Name()+"_server2", gcaPubKey, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a client that can submit reports to either server.
+	clientDir := glow.GenerateTestDir(t.Name() + "_client1")
+	err = SetupTestEnvironment(clientDir, gcaPubKey, gcaPrivKey, []*server.GCAServer{gcas1, gcas2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the client and immediately close it, which will ensure that
+	// even having 2 servers at all is useful.
+	c, err := NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -15,7 +15,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	}
 
 	// Create the server.
-	server, _, _, err := SetupTestEnvironment(t.Name())
+	server, _, _, _, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

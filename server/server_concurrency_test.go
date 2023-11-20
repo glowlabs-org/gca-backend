@@ -56,7 +56,7 @@ func TestConcurrency(t *testing.T) {
 			i := 0
 			for {
 				// Try submitting the key.
-				_, err := gcas.submitGCAKey(key)
+				_, _, err := gcas.submitGCAKey(key)
 				if err == nil {
 					t.Fatal("should not be able to submit a GCA key with a bad private key")
 				}
@@ -199,7 +199,7 @@ func TestConcurrency(t *testing.T) {
 	// Send a GCA key to the server. All of the above threads should be
 	// able to continue running successfully after that, as they were
 	// designed not care whether the GCA key was active or not.
-	gcaPrivKey, err := gcas.submitGCAKey(tempPrivKey)
+	_, gcaPrivKey, err := gcas.submitGCAKey(tempPrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestConcurrency(t *testing.T) {
 			i := 0
 			for {
 				// Try submitting the key.
-				_, err := gcas.submitGCAKey(key)
+				_, _, err := gcas.submitGCAKey(key)
 				if err == nil {
 					t.Fatal("should not be able to submit a GCA key after it's been set")
 				}

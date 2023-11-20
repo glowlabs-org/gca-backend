@@ -81,7 +81,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 // TestAuthorizeEquipmentIntegration checks that the full flow for
 // authorizing new equipment works as intended.
 func TestAuthorizeEquipmentIntegration(t *testing.T) {
-	server, dir, gcaPrivKey, err := SetupTestEnvironment(t.Name())
+	server, dir, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,7 +13,7 @@ import (
 
 // TestRecentReportsIntegration checks that the full flow for fetching recent equipment reports works as intended.
 func TestRecentReportsIntegration(t *testing.T) {
-	server, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
+	server, _, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
