@@ -183,12 +183,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		err = c.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
 	// Ensure that the client is running properly.
 	<-c.syncThread
 
@@ -293,9 +287,9 @@ func TestAddingServers(t *testing.T) {
 			continue
 		}
 		if i == 1 && report.PowerOutput != 499 {
-			// t.Fatal("expected power report")
+			t.Fatal("expected power report")
 		} else if i == 5 && report.PowerOutput != 2999 {
-			// t.Fatal("expected power report")
+			t.Fatal("expected power report")
 		} else if i == 6 && report.PowerOutput != 3499 {
 			t.Fatal("expected power report")
 		} else if i != 1 && i != 5 && i != 2 && i != 6 && report.PowerOutput != 0 {
@@ -303,4 +297,56 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 
+	// Try restarting the client, make sure it can still submit reports to
+	// gcas2. It will need to potentially go through a sync to find gcas2
+	// as a viable option for submitting reports.
+	err = c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-c.syncThread
+
+	// Sleep long enough to let a sync happen.
+	time.Sleep(35 * sendReportTime)
+
+	// Update the monitor file so that the client has data to send to gcas2.
+	err = updateMonitorFile(c.baseDir, []uint32{7}, []uint64{1200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * sendReportTime)
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			t.Fatal("expected power report")
+		} else if i == 2 && report.PowerOutput != 549 {
+			t.Fatal("expected power report")
+		} else if i == 5 && report.PowerOutput != 2999 {
+			t.Fatal("expected power report")
+		} else if i == 6 && report.PowerOutput != 3499 {
+			t.Fatal("expected power report")
+		} else if i == 7 && report.PowerOutput != 1199 {
+			t.Fatal("expected power report")
+		} else if i != 1 && i != 2 && i != 5 && i != 6 && i != 7 && report.PowerOutput != 0 {
+			t.Fatal("expected no power report")
+		}
+	}
+
+	// TODO: Bring up gcas3, submit it as a new server to gcas2, give the
+	// client time to sync and see that gcas3 exists, then shut down gcas2
+	// and see if the client is able to properly failover to gcas3.
 }
