@@ -9,7 +9,7 @@ import (
 
 // TestThreadedMigrateReports tests the migration of equipment reports.
 func TestThreadedMigrateReports(t *testing.T) {
-	server, _, _, err := SetupTestEnvironment(t.Name())
+	server, _, _, _, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

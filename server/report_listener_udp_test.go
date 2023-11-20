@@ -18,7 +18,7 @@ import (
 func TestParseReport(t *testing.T) {
 
 	// Setup the GCAServer with the test keys.
-	server, _, _, err := SetupTestEnvironment(t.Name())
+	server, _, _, _, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -219,7 +219,13 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		gcaServers = append(gcaServers, as)
 	}
 
-	// TODO: Need to verify the signature on all of the gca servers.
+	// Verify all of the signatures on the authorized servers.
+	for _, as := range gcaServers {
+		sb := as.SigningBytes()
+		if !glow.Verify(gcaKey, sb, as.GCAAuthorization) {
+			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received authorized server which has invalid authorization")
+		}
+	}
 
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }

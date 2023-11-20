@@ -56,7 +56,7 @@ func TestToAuthorization(t *testing.T) {
 // TestAuthorizeEquipmentEndpoint is a test function that verifies the functionality
 // of the Authorize Equipment Endpoint in the GCA Server.
 func TestAuthorizeEquipmentEndpoint(t *testing.T) {
-	server, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
+	server, _, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func (gcas *GCAServer) loadEquipmentAuth(ea glow.EquipmentAuthorization) {
 
 // Perform an integration test for the equipment authorizations.
 func TestVerifyEquipmentAuthorization(t *testing.T) {
-	server, _, gcaPrivateKey, err := SetupTestEnvironment(t.Name())
+	server, _, _, gcaPrivateKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}

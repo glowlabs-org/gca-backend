@@ -48,7 +48,7 @@ func TestGCAKeyLifecycle(t *testing.T) {
 	// Try submitting a public key to the server using the wrong priv key.
 	badTempKey := tempPrivKey
 	badTempKey[0]++
-	_, err = gcas.submitGCAKey(badTempKey)
+	_, _, err = gcas.submitGCAKey(badTempKey)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -57,7 +57,7 @@ func TestGCAKeyLifecycle(t *testing.T) {
 	}
 
 	// Try submitting a public key to the server using the temp priv key.
-	_, err = gcas.submitGCAKey(tempPrivKey)
+	_, _, err = gcas.submitGCAKey(tempPrivKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestGCAKeyLifecycle(t *testing.T) {
 	}
 
 	// Check that we get an error when trying to submit another gca key.
-	_, err = gcas.submitGCAKey(tempPrivKey)
+	_, _, err = gcas.submitGCAKey(tempPrivKey)
 	if err == nil {
 		t.Fatal("expecting an error")
 	}
