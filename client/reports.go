@@ -244,69 +244,82 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	gcaKey := c.gcaPubkey
 	c.serverMu.Unlock()
 
-	// Perform the network call
-	timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err := c.staticServerSync(gcas, gcasKey, gcaKey)
-	if err != nil {
-		// Create a map to track servers that have already failed, so
-		// that we don't try the same server twice in the same sync
-		// attempt. We don't persist this because the server may come
-		// back later.
-		failedServers := make(map[glow.PublicKey]struct{})
-		failedServers[gcasKey] = struct{}{}
+	// The sync loop starts out by randomly selecting a new server. We do
+	// this rather than stick with the current server because we want to
+	// know if the current server has gone rogue and gotten banned. A rogue
+	// server doesn't have to report itself as banned, and if the client
+	// isn't shuffling between available servers, it'll never see news from
+	// the GCA that the rogue server doesn't want to expose. Therefore we
+	// ensure that the client is always bouncing between servers so that it
+	// has good exposure to news from the GCA.
+	//
+	// The relevant news items are server bannings, new servers, and GCA
+	// migrations.
 
-		// Try again up to 5 times to grab a new server.
-		for i := 0; i < 6; i++ {
-			if i == 5 {
-				// Give up entirely after 5 attempts. We use
-				// this control structure to exit the loop so
-				// that we can have relevant bits of logic
-				// after the loop which assume that a
-				// connection was made successfully.
-				return
-			}
-
-			// Sleep for a tick.
-			select {
-			case <-c.closeChan:
-				return
-			case <-time.After(sendReportTime):
-			}
-
-			// Pick a new random primary server. The steps are:
-			//
-			// 1. Pull all the servers into an array.
-			// 2. Randomly shuffle the array.
-			// 3. Select the first non-banned server.
-			c.serverMu.Lock()
-			servers := make([]glow.PublicKey, 0, len(c.gcaServers))
-			for server, _ := range c.gcaServers {
-				servers = append(servers, server)
-			}
-			for i := range servers {
-				j, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
-				if err != nil {
-					continue
-				}
-				servers[i], servers[j.Int64()] = servers[j.Int64()], servers[i]
-			}
-			for _, server := range servers {
-				_, exists := failedServers[server]
-				if exists || c.gcaServers[server].Banned {
-					continue
-				}
-				c.primaryServer = server
-				break
-			}
-			gcas = c.gcaServers[c.primaryServer]
-			gcasKey = c.primaryServer
-			c.serverMu.Unlock()
-
-			// Retry grabbing the bitfield.
-			timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err = c.staticServerSync(gcas, gcasKey, gcaKey)
-			if err == nil {
-				break
-			}
+	// Create a map to track servers that have already failed, so
+	// that we don't try the same server twice in the same sync
+	// attempt. We don't persist this because the server may come
+	// back later.
+	failedServers := make(map[glow.PublicKey]struct{})
+	// Try up to 5 times to grab a random server.
+	var timeslotOffset uint32
+	var bitfield [504]byte
+	var newGCA glow.PublicKey
+	var newShortID uint32
+	var gcaServers []server.AuthorizedServer
+	for i := 0; i < 6; i++ {
+		if i == 5 {
+			// Give up entirely after 5 attempts. We use
+			// this control structure to exit the loop so
+			// that we can have relevant bits of logic
+			// after the loop which assume that a
+			// connection was made successfully.
+			return
 		}
+
+		// Sleep for a tick.
+		select {
+		case <-c.closeChan:
+			return
+		case <-time.After(sendReportTime):
+		}
+
+		// Pick a new random primary server. The steps are:
+		//
+		// 1. Pull all the servers into an array.
+		// 2. Randomly shuffle the array.
+		// 3. Select the first non-banned server.
+		c.serverMu.Lock()
+		servers := make([]glow.PublicKey, 0, len(c.gcaServers))
+		for server, _ := range c.gcaServers {
+			servers = append(servers, server)
+		}
+		for i := range servers {
+			j, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+			if err != nil {
+				continue
+			}
+			servers[i], servers[j.Int64()] = servers[j.Int64()], servers[i]
+		}
+		for _, server := range servers {
+			_, exists := failedServers[server]
+			if exists || c.gcaServers[server].Banned {
+				continue
+			}
+			c.primaryServer = server
+			break
+		}
+		gcas = c.gcaServers[c.primaryServer]
+		gcasKey = c.primaryServer
+		c.serverMu.Unlock()
+
+		// Retry grabbing the bitfield.
+		var err error
+		timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err = c.staticServerSync(gcas, gcasKey, gcaKey)
+		if err == nil {
+			break
+		}
+		failedServers[gcasKey] = struct{}{}
 	}
 
 	// Check whether the GCA has changed. If the GCA has changed, the

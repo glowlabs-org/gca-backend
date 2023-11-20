@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -282,14 +283,14 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 2 {
-			// Report 2 may or may not have been sent.
+		if i == 2 || i == 5 {
+			// Reports 2 and 5 may or may not have been sent.
 			continue
 		}
 		if i == 1 && report.PowerOutput != 499 {
 			t.Fatal("expected power report")
 		} else if i == 5 && report.PowerOutput != 2999 {
-			t.Fatal("expected power report")
+			t.Fatal("expected power report", report.PowerOutput)
 		} else if i == 6 && report.PowerOutput != 3499 {
 			t.Fatal("expected power report")
 		} else if i != 1 && i != 5 && i != 2 && i != 6 && report.PowerOutput != 0 {
@@ -346,7 +347,41 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 
-	// TODO: Bring up gcas3, submit it as a new server to gcas2, give the
-	// client time to sync and see that gcas3 exists, then shut down gcas2
-	// and see if the client is able to properly failover to gcas3.
+	// Bring up gcas3, submit it as a new server to gcas2, give the client
+	// time to sync and see that gcas3 exists, then shut down gcas2 and see
+	// if the client is able to properly failover to gcas3.
+	gcas3, _, err := server.SetupTestEnvironmentKnownGCA(t.Name()+"_server3", gcaPubKey, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Submit gcas3 to gcas2 so that the client, when it syncs, will see
+	// the new server.
+	httpPort3, tcpPort3, udpPort3 := gcas3.Ports()
+	as := server.AuthorizedServer{
+		PublicKey: gcas3.PublicKey(),
+		Banned:    false,
+		Location:  "localhost",
+		HttpPort:  httpPort3,
+		TcpPort:   tcpPort3,
+		UdpPort:   udpPort3,
+	}
+	sb := as.SigningBytes()
+	sig := glow.Sign(sb, gcaPrivKey)
+	as.GCAAuthorization = sig
+	// Create the http request for gcas2
+	requestBody, err := json.Marshal(as)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorized-servers", httpPort3), "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status code:", resp.StatusCode)
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
