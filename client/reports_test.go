@@ -183,8 +183,124 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = c.Close()
+	defer func() {
+		err = c.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	// Ensure that the client is running properly.
+	<-c.syncThread
+
+	// Update the monitoring file for the client so that the client has
+	// stuff to report.
+	err = updateMonitorFile(c.baseDir, []uint32{1, 5}, []uint64{500, 3000})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Give the client some time to tick.
+	time.Sleep(2 * sendReportTime)
+
+	// Ensure that at least one of the servers got a report.
+	httpPort1, _, _ := gcas1.Ports()
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	var response server.RecentReportsResponse
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcas1HasReports := true
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			gcas1HasReports = false
+		} else if i == 5 && report.PowerOutput != 2999 {
+			gcas1HasReports = false
+		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
+			gcas1HasReports = false
+		}
+	}
+	httpPort2, _, _ := gcas2.Ports()
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcas2HasReports := true
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			gcas2HasReports = false
+		} else if i == 5 && report.PowerOutput != 2999 {
+			gcas2HasReports = false
+		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
+			gcas2HasReports = false
+		}
+	}
+	if !gcas1HasReports && !gcas2HasReports {
+		t.Fatal("The client does not seem to be correctly submitting reports to one of the servers")
+	}
+
+	// Shut down gcas1, then update the monitoring file. The client should
+	// failover to gcas2 and continue submitting reports. Half the time,
+	// the client will actually already be on client2, so this test may
+	// occasionally have a false positive pass if things are broken. To be
+	// certain, the test should be run at least 3 times, and to be really
+	// certain 20 times is a better number.
+	//
+	// We have to sleep for a large number of ticks because the failover
+	// code only runs once every 60 ticks, but the client starts with the
+	// tick counter at 30.
+	err = gcas1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(35 * sendReportTime)
+
+	// The client should have successfully failed over at this point, even
+	// though it has nothing to report. Let's give it something to report,
+	// and then see if the report lands on gcas2.
+	err = updateMonitorFile(c.baseDir, []uint32{2, 6}, []uint64{550, 3500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * sendReportTime)
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 2 {
+			// Report 2 may or may not have been sent.
+			continue
+		}
+		if i == 1 && report.PowerOutput != 499 {
+			// t.Fatal("expected power report")
+		} else if i == 5 && report.PowerOutput != 2999 {
+			// t.Fatal("expected power report")
+		} else if i == 6 && report.PowerOutput != 3499 {
+			t.Fatal("expected power report")
+		} else if i != 1 && i != 5 && i != 2 && i != 6 && report.PowerOutput != 0 {
+			t.Fatal("expected no power report")
+		}
+	}
+
 }

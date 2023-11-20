@@ -37,6 +37,7 @@ func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 	if err != nil {
 		gcas.logger.Fatalf("Failed to start server: %s", err)
 	}
+	gcas.tcpListener = listener
 	defer listener.Close()
 	gcas.tcpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
 	close(tcpReady)
