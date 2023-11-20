@@ -247,7 +247,13 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Perform the network call
 	timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err := c.staticServerSync(gcas, gcasKey, gcaKey)
 	if err != nil {
-		fmt.Println("error sending, trying again")
+		// Create a map to track servers that have already failed, so
+		// that we don't try the same server twice in the same sync
+		// attempt. We don't persist this because the server may come
+		// back later.
+		failedServers := make(map[glow.PublicKey]struct{})
+		failedServers[gcasKey] = struct{}{}
+
 		// Try again up to 5 times to grab a new server.
 		for i := 0; i < 6; i++ {
 			if i == 5 {
@@ -256,7 +262,6 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 				// that we can have relevant bits of logic
 				// after the loop which assume that a
 				// connection was made successfully.
-				fmt.Println("BABORO")
 				return
 			}
 
@@ -285,10 +290,12 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 				servers[i], servers[j.Int64()] = servers[j.Int64()], servers[i]
 			}
 			for _, server := range servers {
-				if !c.gcaServers[server].Banned {
-					c.primaryServer = server
-					break
+				_, exists := failedServers[server]
+				if exists || c.gcaServers[server].Banned {
+					continue
 				}
+				c.primaryServer = server
+				break
 			}
 			gcas = c.gcaServers[c.primaryServer]
 			gcasKey = c.primaryServer
