@@ -78,16 +78,17 @@ type GCAServer struct {
 	staticPrivateKey glow.PrivateKey
 	staticPublicKey  glow.PublicKey
 
-	baseDir    string         // Base directory for server files
-	logger     *Logger        // Custom logger for the server
-	httpServer *http.Server   // Web server for handling API requests
-	httpPort   uint16         // Records the port that is being used to serve the api
-	mux        *http.ServeMux // Routing for HTTP requests
-	udpConn    *net.UDPConn   // UDP connection for listening to equipment reports
-	udpPort    uint16         // The port that the UDP conn is listening on
-	tcpPort    uint16         // The port that the TCP listener is using
-	quit       chan bool      // A channel to initiate server shutdown
-	mu         sync.Mutex
+	baseDir     string         // Base directory for server files
+	logger      *Logger        // Custom logger for the server
+	httpServer  *http.Server   // Web server for handling API requests
+	httpPort    uint16         // Records the port that is being used to serve the api
+	mux         *http.ServeMux // Routing for HTTP requests
+	tcpListener net.Listener   // handles incoming sync requests over tcp
+	udpConn     *net.UDPConn   // UDP connection for listening to equipment reports
+	udpPort     uint16         // The port that the UDP conn is listening on
+	tcpPort     uint16         // The port that the TCP listener is using
+	quit        chan bool      // A channel to initiate server shutdown
+	mu          sync.Mutex
 }
 
 // NewGCAServer initializes a new instance of GCAServer and returns either
@@ -178,7 +179,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 }
 
 // Close cleanly shuts down the GCAServer instance.
-func (server *GCAServer) Close() {
+func (server *GCAServer) Close() error {
 	// Signal to terminate the server
 	close(server.quit)
 
@@ -191,17 +192,32 @@ func (server *GCAServer) Close() {
 	if err != nil {
 		// Log the error if the shutdown fails.
 		server.logger.Errorf("HTTP server shutdown error: %v", err)
+		return err
 	}
 
-	// Close the UDP connection
+	// Close the TCP and UDP connection
 	server.mu.Lock()
+	var err1, err2 error
 	if server.udpConn != nil {
-		server.udpConn.Close()
+		err1 = server.udpConn.Close()
+	}
+	if server.tcpListener != nil {
+		err2 = server.tcpListener.Close()
 	}
 	server.mu.Unlock()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
 
 	// Close the logger
-	server.logger.Close()
+	err = server.logger.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // loadGCAServerKeys will load the keys for the GCA server from disk, creating

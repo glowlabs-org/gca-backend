@@ -247,7 +247,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Perform the network call
 	timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err := c.staticServerSync(gcas, gcasKey, gcaKey)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("error sending, trying again")
 		// Try again up to 5 times to grab a new server.
 		for i := 0; i < 6; i++ {
 			if i == 5 {
@@ -256,6 +256,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 				// that we can have relevant bits of logic
 				// after the loop which assume that a
 				// connection was made successfully.
+				fmt.Println("BABORO")
 				return
 			}
 

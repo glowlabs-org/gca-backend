@@ -40,8 +40,8 @@ func NewLogger(logLevel LogLevel, logFile string) (*Logger, error) {
 }
 
 // Close closes the log file.
-func (l *Logger) Close() {
-	l.file.Close()
+func (l *Logger) Close() error {
+	return l.file.Close()
 }
 
 // Internal logging function. Handles actual file writes.
