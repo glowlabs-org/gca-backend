@@ -2,56 +2,14 @@ package server
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
-
-// TestToAuthorization verifies that an EquipmentAuthorizationRequest
-// correctly converts into an EquipmentAuthorization.
-func TestToAuthorization(t *testing.T) {
-	// Generate a real ECDSA public-private key pair using the secp256k1 curve.
-	pubKey, privKey := glow.GenerateKeyPair()
-
-	// Generate a real signature using the ECDSA private key.
-	message := []byte("test message")
-	signature := glow.Sign(message, privKey)
-
-	// Hex-encode the real public key and signature.
-	hexPublicKey := hex.EncodeToString(pubKey[:])
-	hexSignature := hex.EncodeToString(signature[:])
-
-	// Create a new EquipmentAuthorizationRequest.
-	request := EquipmentAuthorizationRequest{
-		ShortID:    1,
-		PublicKey:  hexPublicKey,
-		Capacity:   100,
-		Debt:       50,
-		Expiration: 50000,
-		Signature:  hexSignature,
-	}
-	ea, err := request.ToAuthorization()
-	if err != nil {
-		t.Errorf("ToAuthorization returned error: %v", err)
-		return
-	}
-
-	// Compare the converted EquipmentAuthorization to the original request.
-	if ea.ShortID != request.ShortID ||
-		!reflect.DeepEqual(pubKey, ea.PublicKey) ||
-		ea.Capacity != request.Capacity ||
-		ea.Debt != request.Debt ||
-		ea.Expiration != request.Expiration ||
-		!reflect.DeepEqual(signature, ea.Signature) {
-		// t.Errorf("Conversion failed: got %v, want %v", ea, request)
-	}
-}
 
 // TestAuthorizeEquipmentEndpoint is a test function that verifies the functionality
 // of the Authorize Equipment Endpoint in the GCA Server.
@@ -63,26 +21,19 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	defer server.Close()
 
 	// Create a mock request for equipment authorization.
-	body := EquipmentAuthorizationRequest{
+	ea := glow.EquipmentAuthorization{
 		ShortID:    12345,
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Capacity:   1000000,
 		Debt:       2000000,
 		Expiration: 2000,
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	}
-	ea, err := body.ToAuthorization()
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature := glow.Sign(sb, gcaPrivKey)
-	body.Signature = hex.EncodeToString(signature[:])
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
 
 	// Convert the request body to JSON.
-	jsonBody, _ := json.Marshal(body)
+	jsonBody, _ := json.Marshal(ea)
 
 	// Perform an HTTP POST request.
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))

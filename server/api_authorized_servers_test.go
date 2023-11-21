@@ -1,14 +1,11 @@
 package server
 
-/* - might be testing a deprecated endpoint, plus this test was never finished
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -17,33 +14,26 @@ import (
 // TestAuthorizedServers writes an integration test to make sure the authorized
 // servers endpoints are working.
 func TestAuthorizeServers(t *testing.T) {
-	server, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
+	server, _, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer server.Close()
 
 	// Create a mock request for equipment authorization.
-	body := EquipmentAuthorizationRequest{
+	ea := glow.EquipmentAuthorization{
 		ShortID:    12345,
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Capacity:   1000000,
 		Debt:       2000000,
 		Expiration: 2000,
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	}
-	ea, err := body.ToAuthorization()
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature := glow.Sign(sb, gcaPrivKey)
-	body.Signature = hex.EncodeToString(signature[:])
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
 
 	// Convert the request body to JSON.
-	jsonBody, _ := json.Marshal(body)
+	jsonBody, _ := json.Marshal(ea)
 
 	// Perform an HTTP POST request.
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
@@ -69,57 +59,3 @@ func TestAuthorizeServers(t *testing.T) {
 		t.Fatalf("Unexpected response: %v", response)
 	}
 }
-
-// loadEquipmentAuths is responsible for populating the equipment map
-// using the provided array of EquipmentAuths.
-func (gcas *GCAServer) loadEquipmentAuth(ea glow.EquipmentAuthorization) {
-	// Add the equipment's public key to the equipment map using its ShortID as the key
-	gcas.equipment[ea.ShortID] = ea
-	gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
-	gcas.addRecentEquipmentAuth(ea)
-}
-
-// Perform an integration test for the equipment authorizations.
-func TestVerifyEquipmentAuthorization(t *testing.T) {
-	server, _, gcaPrivateKey, err := SetupTestEnvironment(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.Close()
-
-	// Create and sign a valid EquipmentAuthorization
-	ea := glow.EquipmentAuthorization{
-		ShortID:    1,
-		PublicKey:  [32]byte{1},
-		Capacity:   100,
-		Debt:       0,
-		Expiration: 1000,
-	}
-	signingBytes := ea.SigningBytes()
-	ea.Signature = glow.Sign(signingBytes, gcaPrivateKey)
-
-	// Test case 1: Valid EquipmentAuthorization should pass verification
-	if err := server.verifyEquipmentAuthorization(ea); err != nil {
-		t.Errorf("Failed to verify a valid EquipmentAuthorization: %v", err)
-	}
-
-	// Create and sign an invalid EquipmentAuthorization
-	eaInvalid := glow.EquipmentAuthorization{
-		ShortID:    2,
-		PublicKey:  [32]byte{2},
-		Capacity:   200,
-		Debt:       50,
-		Expiration: 2000,
-	}
-	eaInvalidBytes := eaInvalid.SigningBytes()
-	ea.Signature = glow.Sign(eaInvalidBytes, gcaPrivateKey)
-
-	// Tamper with the EquipmentAuthorization to make it invalid
-	eaInvalid.Debt = 100
-
-	// Test case 2: Invalid EquipmentAuthorization should fail verification
-	if err := server.verifyEquipmentAuthorization(eaInvalid); err == nil {
-		t.Errorf("Verified an invalid EquipmentAuthorization without error")
-	}
-}
-*/

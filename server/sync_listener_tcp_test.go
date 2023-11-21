@@ -95,7 +95,7 @@ func TestTCPListener(t *testing.T) {
 	sig := glow.Sign(sb, gcaPrivKey)
 	auth.Signature = sig
 	gcas.mu.Lock()
-	err = gcas.saveEquipment(auth)
+	_, err = gcas.saveEquipment(auth)
 	gcas.mu.Unlock()
 	if err != nil {
 		t.Fatal(err)

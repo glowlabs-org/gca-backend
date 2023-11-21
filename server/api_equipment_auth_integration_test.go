@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -25,26 +24,18 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 	// Create a keypair for the equipment, then create the equipment
 	// request body.
 	pubkey, equipmentKey := glow.GenerateKeyPair()
-	body := EquipmentAuthorizationRequest{
+	ea = glow.EquipmentAuthorization{
 		ShortID:    shortID,
-		PublicKey:  hex.EncodeToString(pubkey[:]),
+		PublicKey:  pubkey,
 		Capacity:   15400300,
 		Debt:       11223344,
-		Expiration: 100e6 + glow.CurrentTimeslot(),                                                                                                     // ensure the hardware won't be invalid for a while, but leave enough room for tests to intentionally expire the hardware
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // need a dummy signature
-	}
-
-	// Serialize and sign the request.
-	ea, err = body.ToAuthorization()
-	if err != nil {
-		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to serialize contemplated equipment: %v", err)
+		Expiration: 100e6 + glow.CurrentTimeslot(), // ensure the hardware won't be invalid for a while, but leave enough room for tests to intentionally expire the hardware
 	}
 	sb := ea.SigningBytes()
-	sig := glow.Sign(sb, gcaPrivKey)
-	body.Signature = hex.EncodeToString(sig[:])
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
 
 	// Convert the request to json and post it.
-	jsonBody, _ := json.Marshal(body)
+	jsonBody, _ := json.Marshal(ea)
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
@@ -87,26 +78,19 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 
 	// Create the http request that will authorize new equipment.
-	body := EquipmentAuthorizationRequest{
-		ShortID:    12345,                                                              // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                            // Storage capacity
-		Debt:       2000000,                                                            // Current debt value
-		Expiration: 2000,                                                               // Expiry time for the equipment
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	}
-	ea, err := body.ToAuthorization()
-	if err != nil {
-		t.Fatal(err)
+	ea := glow.EquipmentAuthorization{
+		ShortID:    12345,   // A unique identifier for the equipment
+		Capacity:   1000000, // Storage capacity
+		Debt:       2000000, // Current debt value
+		Expiration: 2000,    // Expiry time for the equipment
 	}
 
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
-	signature := glow.Sign(sb, gcaPrivKey)
-	body.Signature = hex.EncodeToString(signature[:])
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
 
 	// Convert the request body to JSON format.
-	jsonBody, _ := json.Marshal(body)
+	jsonBody, _ := json.Marshal(ea)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -161,24 +145,17 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	resp.Body.Close()
 
 	// Send a new request, this time with the same ShortID. The server should add the ShortID to the banlist.
-	body = EquipmentAuthorizationRequest{
-		ShortID:    12345,                                                              // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                            // Storage capacity
-		Debt:       2400000,                                                            // Current debt value
-		Expiration: 2000,                                                               // Expiry time for the equipment
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	}
-	ea, err = body.ToAuthorization()
-	if err != nil {
-		t.Fatal(err)
+	ea = glow.EquipmentAuthorization{
+		ShortID:    12345,   // A unique identifier for the equipment
+		Capacity:   1000000, // Storage capacity
+		Debt:       2400000, // Current debt value
+		Expiration: 2000,    // Expiry time for the equipment
 	}
 	// Sign the authorization request with GCA's private key.
 	sb = ea.SigningBytes()
-	signature = glow.Sign(sb, gcaPrivKey)
-	body.Signature = hex.EncodeToString(signature[:])
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
 	// Convert the request body to JSON format.
-	jsonBody, _ = json.Marshal(body)
+	jsonBody, _ = json.Marshal(ea)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
 	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -209,24 +186,17 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 
 	// Send a new request, this time with a new ShortID.
-	body = EquipmentAuthorizationRequest{
-		ShortID:    12346,                                                              // A unique identifier for the equipment
-		PublicKey:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // Public key of the equipment for secure communication
-		Capacity:   1000000,                                                            // Storage capacity
-		Debt:       2400000,                                                            // Current debt value
-		Expiration: 2000,                                                               // Expiry time for the equipment
-		Signature:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	}
-	ea, err = body.ToAuthorization()
-	if err != nil {
-		t.Fatal(err)
+	ea = glow.EquipmentAuthorization{
+		ShortID:    12346,   // A unique identifier for the equipment
+		Capacity:   1000000, // Storage capacity
+		Debt:       2400000, // Current debt value
+		Expiration: 2000,    // Expiry time for the equipment
 	}
 	// Sign the authorization request with GCA's private key.
 	sb = ea.SigningBytes()
-	signature = glow.Sign(sb, gcaPrivKey)
-	body.Signature = hex.EncodeToString(signature[:])
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
 	// Convert the request body to JSON format.
-	jsonBody, _ = json.Marshal(body)
+	jsonBody, _ = json.Marshal(ea)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
 	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {

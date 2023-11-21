@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -123,21 +122,14 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 	}
 	sb := ea.SigningBytes()
 	sig := glow.Sign(sb, gcaPrivKey)
-	ear := server.EquipmentAuthorizationRequest{
-		ShortID:    shortID,
-		PublicKey:  hex.EncodeToString(pub[:]),
-		Capacity:   12341234,
-		Debt:       11223344,
-		Expiration: 100e6 + glow.CurrentTimeslot(),
-		Signature:  hex.EncodeToString(sig[:]),
-	}
-	jsonEAR, err := json.Marshal(ear)
+	ea.Signature = sig
+	jsonEA, err := json.Marshal(ea)
 	if err != nil {
 		return fmt.Errorf("unable to marshal the auth request")
 	}
 	for _, server := range gcaServers {
 		httpX, _, _ := server.Ports()
-		resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpX), "application/json", bytes.NewBuffer(jsonEAR))
+		resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpX), "application/json", bytes.NewBuffer(jsonEA))
 		if err != nil {
 			return fmt.Errorf("unable to authorize device on GCA server: %v", err)
 		}

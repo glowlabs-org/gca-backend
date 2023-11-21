@@ -65,7 +65,7 @@ func TestParseReportIntegration(t *testing.T) {
 		sb := devices[i].SigningBytes()
 		sig := glow.Sign(sb, gcaPrivKey)
 		devices[i].Signature = sig
-		err := server.saveEquipment(devices[i])
+		_, err := server.saveEquipment(devices[i])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +314,7 @@ func TestCapacityEnforcement(t *testing.T) {
 	sb := device.SigningBytes()
 	sig := glow.Sign(sb, gcaPrivKey)
 	device.Signature = sig
-	err = server.saveEquipment(device)
+	_, err = server.saveEquipment(device)
 	if err != nil {
 		t.Fatal(err)
 	}
