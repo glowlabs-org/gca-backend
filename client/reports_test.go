@@ -463,8 +463,11 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 
-	// TODO: We have to test banning servers. That one is going to take a
-	// while. Maybe 30 seconds even.
+	// TODO: We have to test GCA migrations. Perhaps after launch. We are
+	// going to have to re-install all of the equipment anyway probably.
+	// And instructing people to put on a new sim card is not so bad
+	// either.
 
-	// TODO: We have to test GCA migrations.
+	// TODO: We have to test banning servers. That one is going to take a
+	// while. Maybe 30 seconds even. Perhaps after launch.
 }
