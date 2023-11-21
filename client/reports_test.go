@@ -49,6 +49,12 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-client.syncThread
+	defer func() {
+		err := client.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// Update the monitoring file so that there is data to read.
 	err = updateMonitorFile(client.baseDir, []uint32{1, 5}, []uint64{500, 3000})
@@ -315,7 +321,7 @@ func TestAddingServers(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file so that the client has data to send to gcas2.
-	err = updateMonitorFile(c.baseDir, []uint32{7}, []uint64{1200})
+	err = updateMonitorFile(c.baseDir, []uint32{3, 4, 7}, []uint64{55, 59, 1200})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +348,7 @@ func TestAddingServers(t *testing.T) {
 			t.Fatal("expected power report")
 		} else if i == 7 && report.PowerOutput != 1199 {
 			t.Fatal("expected power report")
-		} else if i != 1 && i != 2 && i != 5 && i != 6 && i != 7 && report.PowerOutput != 0 {
+		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
 		}
 	}
@@ -373,7 +379,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorized-servers", httpPort3), "application/json", bytes.NewBuffer(requestBody))
+	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorized-servers", httpPort2), "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,4 +390,81 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Close the client, re-open the client, then wait for a sync
+	// operation. Client will have to sync with gcas2 because that's the
+	// only server it knows that is online.
+	err = c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-c.syncThread
+	time.Sleep(35 * sendReportTime)
+
+	// Client should now have gcas3 as a failover server. Close both the
+	// client and gcas2. Then bring the client back up, the only server it
+	// will know is gcas3. Add some new data, and see if that new data
+	// makes it to gcas3.
+	err = gcas2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-c.syncThread
+	time.Sleep(35 * sendReportTime)
+
+	// Add some new data that can be reported.
+	err = updateMonitorFile(c.baseDir, []uint32{8}, []uint64{1800})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * sendReportTime)
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			t.Error("expected power report")
+		} else if i == 2 && report.PowerOutput != 549 {
+			t.Error("expected power report")
+		} else if i == 3 && report.PowerOutput != 54 {
+			t.Error("expected power report")
+		} else if i == 4 && report.PowerOutput != 58 {
+			t.Error("expected power report")
+		} else if i == 5 && report.PowerOutput != 2999 {
+			t.Error("expected power report")
+		} else if i == 6 && report.PowerOutput != 3499 {
+			t.Error("expected power report")
+		} else if i == 7 && report.PowerOutput != 1199 {
+			t.Error("expected power report")
+		} else if i == 8 && report.PowerOutput != 1799 {
+			t.Error("expected power report")
+		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
+			t.Error("expected no power report")
+		}
+	}
+
+	// TODO: We have to test banning servers. That one is going to take a
+	// while. Maybe 30 seconds even.
+
+	// TODO: We have to test GCA migrations.
 }

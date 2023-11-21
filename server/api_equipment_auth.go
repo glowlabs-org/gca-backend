@@ -5,7 +5,7 @@ package server
 // requests to the server.
 
 import (
-	"encoding/hex"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,47 +13,6 @@ import (
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
-
-// EquipmentAuthorizationRequest is a struct that maps the JSON request payload.
-type EquipmentAuthorizationRequest struct {
-	ShortID    uint32 `json:"ShortID"`
-	PublicKey  string `json:"Public Key"`
-	Capacity   uint64 `json:"Capacity"` // Milliwatt hours that can be generated in 5 minutes
-	Debt       uint64 `json:"Debt"`     // milligrams of CO2
-	Expiration uint32 `json:"Expiration"`
-	Signature  string `json:"Signature"`
-}
-
-// ToAuthorization converts an EquipmentAuthorizationRequest to an EquipmentAuthorization.
-// It decodes the hex-encoded PublicKey and Signature.
-func (req *EquipmentAuthorizationRequest) ToAuthorization() (glow.EquipmentAuthorization, error) {
-	if len(req.PublicKey) != 64 {
-		return glow.EquipmentAuthorization{}, errors.New("public key is wrong length")
-	}
-	decodedPublicKey, err := hex.DecodeString(req.PublicKey)
-	if err != nil {
-		return glow.EquipmentAuthorization{}, err
-	}
-
-	if len(req.Signature) != 128 {
-		return glow.EquipmentAuthorization{}, fmt.Errorf("signature is wrong length: %v", len(req.Signature))
-	}
-	decodedSignature, err := hex.DecodeString(req.Signature)
-	if err != nil {
-		return glow.EquipmentAuthorization{}, err
-	}
-
-	ea := glow.EquipmentAuthorization{
-		ShortID:    req.ShortID,
-		Capacity:   req.Capacity,
-		Debt:       req.Debt,
-		Expiration: req.Expiration,
-	}
-	copy(ea.PublicKey[:], decodedPublicKey)
-	copy(ea.Signature[:], decodedSignature)
-
-	return ea, nil
-}
 
 // AuthorizeEquipmentHandler handles the authorization requests for equipment.
 // This function serves as the HTTP handler for equipment authorization.
@@ -65,8 +24,8 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Decode the JSON request body into EquipmentAuthorizationRequest struct
-	var request EquipmentAuthorizationRequest
+	// Decode the JSON request body into the authorization.
+	var request glow.EquipmentAuthorization
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		gca.logger.Error("Failed to decode request body: ", err)
@@ -74,10 +33,39 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 	}
 
 	// Validate and process the request
-	if err := gca.managedAuthorizeEquipment(request); err != nil {
+	isNew, err := gca.managedAuthorizeEquipment(request)
+	if err != nil {
 		http.Error(w, fmt.Sprint("Failed to authorize equipment:", err), http.StatusInternalServerError)
 		gca.logger.Error("Failed to authorize equipment: ", err)
 		return
+	}
+
+	// Now that the equipment has been verified, send the authorization to
+	// all other known servers. This code running on every GCA server will
+	// result in a total of n^2 messages being sent, but that's okay
+	// because new equipment is a pretty big deal and we want to be sure
+	// that every GCA server recognizes every piece of equipment.
+	//
+	// If a particular GCA server is offline at the time that a device is
+	// authorized, that GCA server is going to miss the device, so standard
+	// sychronization calls still need to be in place. But this is a good
+	// starting point.
+	if !isNew {
+		// Don't send equipment to the other servers unless this
+		// equipment is new to us.
+		return
+	}
+	gca.gcaServers.mu.Lock()
+	ass := make([]AuthorizedServer, len(gca.gcaServers.servers))
+	copy(ass, gca.gcaServers.servers)
+	gca.gcaServers.mu.Unlock()
+	for _, as := range ass {
+		jsonBody, _ := json.Marshal(request)
+		resp, err := http.Post(fmt.Sprintf("http://%v:%v/api/v1/authorize-equipment", as.Location, as.HttpPort), "application/json", bytes.NewBuffer(jsonBody))
+		if err != nil {
+			gca.logger.Infof("unable to send http request to submit new hardware: %v", err)
+		}
+		resp.Body.Close()
 	}
 
 	// Send a success response
@@ -88,30 +76,24 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 
 // managedAuthorizeEquipment performs the actual authorization based on the client request.
 // This function is responsible for the actual logic of authorizing the equipment.
-func (gcas *GCAServer) managedAuthorizeEquipment(req EquipmentAuthorizationRequest) error {
+func (gcas *GCAServer) managedAuthorizeEquipment(auth glow.EquipmentAuthorization) (bool, error) {
 	gcas.mu.Lock()
 	defer gcas.mu.Unlock()
 	if !gcas.gcaPubkeyAvailable {
-		return fmt.Errorf("this gca server has not yet been initialized by the GCA")
+		return false, fmt.Errorf("this gca server has not yet been initialized by the GCA")
 	}
 
-	// Parse and verify the authorization
-	auth, err := req.ToAuthorization()
+	err := gcas.verifyEquipmentAuthorization(auth)
 	if err != nil {
-		gcas.logger.Warn("Received bad equipment authorization", req)
-		return fmt.Errorf("unable to convert to normal authorization: %v", err)
+		gcas.logger.Warn("Received bad equipment authorization signature", auth)
+		return false, fmt.Errorf("unable to verify authorization: %v", err)
 	}
-	err = gcas.verifyEquipmentAuthorization(auth)
-	if err != nil {
-		gcas.logger.Warn("Received bad equipment authorization signature", req)
-		return fmt.Errorf("unable to verify authorization: %v", err)
-	}
-	err = gcas.saveEquipment(auth)
+	isNew, err := gcas.saveEquipment(auth)
 	if err != nil {
 		gcas.logger.Warn("Unable to save equipment:", auth)
-		return fmt.Errorf("unable to save equipment: %v", err)
+		return false, fmt.Errorf("unable to save equipment: %v", err)
 	}
-	return nil
+	return isNew, nil
 }
 
 // verifyEquipmentAuthorization checks the validity of the signature on an EquipmentAuthorization.

@@ -8,7 +8,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,7 +16,6 @@ import (
 	"os"
 
 	"github.com/glowlabs-org/gca-backend/glow"
-	"github.com/glowlabs-org/gca-backend/server"
 )
 
 type GCAServer struct {
@@ -230,23 +228,17 @@ func main() {
 	}
 
 	// Create an authorization for the equipment
-	body := server.EquipmentAuthorizationRequest{
+	ea := glow.EquipmentAuthorization{
 		ShortID:   10,
-		PublicKey: hex.EncodeToString(devPub[:]),
+		PublicKey: devPub,
 		Capacity:  2520e3,   // milliwatt hours
 		Debt:      165680e6, // milligrams
-		Signature: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 	}
 	// Submit the authorization to the gca server.
-	ea, err := body.ToAuthorization()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 	sb := ea.SigningBytes()
 	sig := glow.Sign(sb, gcaPriv)
-	body.Signature = hex.EncodeToString(sig[:])
-	j, err := json.Marshal(body)
+	ea.Signature = sig
+	j, err := json.Marshal(ea)
 	if err != nil {
 		fmt.Println(err)
 		return

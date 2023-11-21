@@ -110,11 +110,13 @@ func (gcas *GCAServer) loadEquipment() error {
 //
 // The method returns an error if it fails to open the file, write to it,
 // or close it after writing.
-func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
+//
+// The bool indicates whether the equipment is new or not.
+func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, error) {
 	// Before saving, check if the equipment is already on the banlist.
 	_, exists := gcas.equipmentBans[ea.ShortID]
 	if exists {
-		return fmt.Errorf("equipment with this ShortID is banned")
+		return false, fmt.Errorf("equipment with this ShortID is banned")
 	}
 
 	// Now check if there's already equipment with the same ShortID
@@ -123,7 +125,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 		if current == ea {
 			// This exact authorization is already known and saved.
 			// Exit without complaining.
-			return nil
+			return false, nil
 		}
 	}
 
@@ -136,7 +138,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 	// Open the file in append mode.
 	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer file.Close()
 	// Serialize the EquipmentAuthorization to a byte slice
@@ -144,7 +146,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 	// Write the serialized data to the file
 	_, err = file.Write(serializedData)
 	if err != nil {
-		return err
+		return false, err
 	}
 	// Also add this to the recent equipment list so that the evidence will propagate
 	// to other servers that are trying to sync.
@@ -155,7 +157,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 		gcas.equipmentShortID[ea.PublicKey] = ea.ShortID
 		gcas.equipment[ea.ShortID] = ea
 		gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
-		return nil
+		return true, nil
 	}
 
 	// There is a conflict, so we need to delete the equipment from the list of
@@ -164,7 +166,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) error {
 	delete(gcas.equipment, ea.ShortID)
 	delete(gcas.equipmentReports, ea.ShortID)
 	gcas.equipmentBans[ea.ShortID] = struct{}{}
-	return fmt.Errorf("duplicate authorization received, banning equipment")
+	return false, fmt.Errorf("duplicate authorization received, banning equipment")
 }
 
 // threadedMigrateReports will infrequently update the equipment reports so

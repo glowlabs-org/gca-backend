@@ -388,7 +388,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// not properly handle server bans.
 	for _, s := range gcaServers {
 		_, exists := c.gcaServers[s.PublicKey]
-		if !exists && s.Banned {
+		if !exists || s.Banned {
 			c.gcaServers[s.PublicKey] = GCAServer{
 				Banned:   s.Banned,
 				Location: s.Location,
@@ -398,12 +398,20 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 			}
 		}
 	}
+	raw, err := SerializeGCAServerMap(c.gcaServers)
+	if err != nil {
+		panic(err)
+	}
+	err = ioutil.WriteFile(filepath.Join(c.baseDir, GCAServerMapFile), raw[:], 0644)
+	if err != nil {
+		panic(err)
+	}
 	c.serverMu.Unlock()
 
 	// Scan through the bitfield and submit any reports that the device has
 	// but the GCA server does not.
 	lastIndex := latestReading - timeslotOffset
-	for i := uint32(0); i < lastIndex && int(i)/8 < len(bitfield); i++ {
+	for i := uint32(0); i <= lastIndex && int(i)/8 < len(bitfield); i++ {
 		if bitfield[i/8]&(1<<(i%8)) == 0 {
 			// Server is missing this index, check locally to see
 			// if we have it, and send it if we do. The server will

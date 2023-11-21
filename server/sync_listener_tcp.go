@@ -117,7 +117,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 
 	// Prepare the response. The first two bytes will be used as a length
 	// prefix.
-	resp := make([]byte, 640)
+	resp := make([]byte, 642)
 	// Copy in the public key.
 	copy(resp[2:34], equipment.PublicKey[:])
 	// Copy in the reports offset
@@ -138,10 +138,10 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 		}
 		sBytes[33] = byte(locationLen)
 		copy(sBytes[34:], []byte(s.Location))
-		binary.BigEndian.PutUint16(sBytes[35+locationLen:], s.HttpPort)
-		binary.BigEndian.PutUint16(sBytes[37+locationLen:], s.TcpPort)
-		binary.BigEndian.PutUint16(sBytes[39+locationLen:], s.UdpPort)
-		copy(sBytes[41+locationLen:], s.GCAAuthorization[:])
+		binary.BigEndian.PutUint16(sBytes[34+locationLen:], s.HttpPort)
+		binary.BigEndian.PutUint16(sBytes[36+locationLen:], s.TcpPort)
+		binary.BigEndian.PutUint16(sBytes[38+locationLen:], s.UdpPort)
+		copy(sBytes[40+locationLen:], s.GCAAuthorization[:])
 		resp = append(resp, sBytes...)
 	}
 	gcas.gcaServers.mu.Unlock()
