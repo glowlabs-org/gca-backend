@@ -117,7 +117,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 
 	// Prepare the response. The first two bytes will be used as a length
 	// prefix.
-	resp := make([]byte, 642)
+	resp := make([]byte, 578)
 	// Copy in the public key.
 	copy(resp[2:34], equipment.PublicKey[:])
 	// Copy in the reports offset
@@ -125,7 +125,8 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	// Copy in the bitfield.
 	copy(resp[38:542], bitfield[:])
 	// TODO: Copy in the new GCA message if there's a new GCA. This will
-	// also include a new shortID and a signature.
+	// also include a new shortID and a signature. Also the dynamic list of
+	// servers will be different.
 	//
 	// Add the list of gcaServers.
 	gcas.gcaServers.mu.Lock()
@@ -144,6 +145,10 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 		copy(sBytes[40+locationLen:], s.GCAAuthorization[:])
 		resp = append(resp, sBytes...)
 	}
+	// Copy in a blank GCA signature. TODO: Don't have it be blank if
+	// there's a migration.
+	var newGCASig glow.Signature
+	resp = append(resp, newGCASig[:]...)
 	gcas.gcaServers.mu.Unlock()
 	// Copy in the unix timestamp
 	var timeBytes [8]byte

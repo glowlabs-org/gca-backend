@@ -131,7 +131,7 @@ func (s *GCAServer) AuthorizedServersHandlerPOST(w http.ResponseWriter, r *http.
 	// check runs, otherwise you can get infinite loops of servers sending
 	// authorizations to each other.
 	for _, as := range ass {
-		// Don't tell banend servers anything.
+		// Don't tell banned servers anything.
 		if as.Banned {
 			continue
 		}

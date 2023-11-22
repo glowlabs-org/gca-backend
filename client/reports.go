@@ -180,25 +180,25 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	copy(newGCA[:], respBuf[540:572])
 	newShortID = binary.BigEndian.Uint32(respBuf[572:576])
 	var newGCASignature glow.Signature
-	copy(newGCASignature[:], respBuf[576:640])
-
-	// Ensure that if there's a new GCA, that the signature authorizing the
-	// GCA migration for the device is valid and comes from the current
-	// GCA.
-	var blank glow.PublicKey
-	newGCASigningBytes := append([]byte("gca_migration_key"), respBuf[540:576]...) // Add the new GCA and the new shortID to the verification
-	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
-		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature: %v", err)
-	}
+	copy(newGCASignature[:], respBuf[respLen-(64+72):respLen-72])
 
 	// Ensure that the equipment key matches the client's public key.
 	if equipmentKey != c.pubkey {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
 	}
 
+	// Ensure that if there's a new GCA, that the signature authorizing the
+	// GCA migration for the device is valid and comes from the current
+	// GCA.
+	var blank glow.PublicKey
+	newGCASigningBytes := append([]byte("gca_migration_key"), respBuf[540:respLen-(64+72)]...) // Add the new GCA and the new shortID to the verification
+	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature: %v", err)
+	}
+
 	// Extract the variable length fields.
-	i := 640
-	for i < int(respLen)-72 {
+	i := 576
+	for i < int(respLen)-(72+64) {
 		var as server.AuthorizedServer
 		copy(as.PublicKey[:], respBuf[i:i+32])
 		i += 32
@@ -219,10 +219,18 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		gcaServers = append(gcaServers, as)
 	}
 
-	// Verify all of the signatures on the authorized servers.
+	// Verify all of the signatures on the authorized servers. If there's a
+	// new GCA, it's assumed that all of the new servers being presented
+	// are related to the migration.
 	for _, as := range gcaServers {
 		sb := as.SigningBytes()
-		if !glow.Verify(gcaKey, sb, as.GCAAuthorization) {
+		var verify bool
+		if newGCA != blank {
+			verify = glow.Verify(newGCA, sb, as.GCAAuthorization)
+		} else {
+			verify = glow.Verify(gcaKey, sb, as.GCAAuthorization)
+		}
+		if !verify {
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received authorized server which has invalid authorization")
 		}
 	}

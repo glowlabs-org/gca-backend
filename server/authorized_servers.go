@@ -37,11 +37,11 @@ func (gcas *GCAServer) AuthorizedServers() []AuthorizedServer {
 	return as
 }
 
-// SigningBytes generates the byte slice for signing an AuthorizedServer.
-func (as *AuthorizedServer) SigningBytes() []byte {
-	// Calculate the lengths, excluding the signature.
+// Create the serialization for the AuthorizedServer.
+func (as *AuthorizedServer) Serialize() []byte {
+	// Calculate the length.
 	locationLength := len(as.Location)
-	totalLength := 32 + 1 + 2 + locationLength + 2 + 2 + 2
+	totalLength := 32 + 1 + 2 + locationLength + 2 + 2 + 2 + 64
 	data := make([]byte, totalLength)
 
 	// Serialize the fields, except the signature.
@@ -56,5 +56,12 @@ func (as *AuthorizedServer) SigningBytes() []byte {
 	binary.LittleEndian.PutUint16(data[35+locationLength:], as.HttpPort)
 	binary.LittleEndian.PutUint16(data[37+locationLength:], as.TcpPort)
 	binary.LittleEndian.PutUint16(data[39+locationLength:], as.UdpPort)
-	return append([]byte("AuthorizedServer"), data...)
+	copy(data[41+locationLength:], as.GCAAuthorization[:])
+	return data
+}
+
+// SigningBytes generates the byte slice for signing an AuthorizedServer.
+func (as *AuthorizedServer) SigningBytes() []byte {
+	data := as.Serialize()
+	return append([]byte("AuthorizedServer"), data[:len(data)-64]...)
 }
