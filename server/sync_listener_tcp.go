@@ -105,6 +105,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	}
 	equipment, exists2 := gcas.equipment[id]
 	reportsOffset := gcas.equipmentReportsOffset
+	migration, migrationExists := gcas.equipmentMigrations[equipment.PublicKey]
 	gcas.mu.Unlock()
 
 	// If there is no hardware for the provided short id, write a zero byte
@@ -124,32 +125,36 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	binary.BigEndian.PutUint32(resp[34:38], reportsOffset)
 	// Copy in the bitfield.
 	copy(resp[38:542], bitfield[:])
-	// TODO: Copy in the new GCA message if there's a new GCA. This will
-	// also include a new shortID and a signature. Also the dynamic list of
-	// servers will be different.
-	//
-	// Add the list of gcaServers.
-	gcas.gcaServers.mu.Lock()
-	for _, s := range gcas.gcaServers.servers {
-		locationLen := len(s.Location)
-		sBytes := make([]byte, 104+locationLen)
-		copy(sBytes[:32], s.PublicKey[:])
-		if s.Banned {
-			sBytes[32] = 1
+	if migrationExists {
+		// When copying in the migration, we can skip the first 32
+		// bytes because it contains the equipment public key, which
+		// already appears before the bitfield.
+		mBytes := migration.Serialize()
+		resp = resp[:542]
+		resp = append(resp, mBytes[32:]...)
+	} else {
+		// Add the list of gcaServers.
+		gcas.gcaServers.mu.Lock()
+		for _, s := range gcas.gcaServers.servers {
+			locationLen := len(s.Location)
+			sBytes := make([]byte, 104+locationLen)
+			copy(sBytes[:32], s.PublicKey[:])
+			if s.Banned {
+				sBytes[32] = 1
+			}
+			sBytes[33] = byte(locationLen)
+			copy(sBytes[34:], []byte(s.Location))
+			binary.BigEndian.PutUint16(sBytes[34+locationLen:], s.HttpPort)
+			binary.BigEndian.PutUint16(sBytes[36+locationLen:], s.TcpPort)
+			binary.BigEndian.PutUint16(sBytes[38+locationLen:], s.UdpPort)
+			copy(sBytes[40+locationLen:], s.GCAAuthorization[:])
+			resp = append(resp, sBytes...)
 		}
-		sBytes[33] = byte(locationLen)
-		copy(sBytes[34:], []byte(s.Location))
-		binary.BigEndian.PutUint16(sBytes[34+locationLen:], s.HttpPort)
-		binary.BigEndian.PutUint16(sBytes[36+locationLen:], s.TcpPort)
-		binary.BigEndian.PutUint16(sBytes[38+locationLen:], s.UdpPort)
-		copy(sBytes[40+locationLen:], s.GCAAuthorization[:])
-		resp = append(resp, sBytes...)
+		// Copy in a blank GCA signature.
+		var newGCASig glow.Signature
+		resp = append(resp, newGCASig[:]...)
+		gcas.gcaServers.mu.Unlock()
 	}
-	// Copy in a blank GCA signature. TODO: Don't have it be blank if
-	// there's a migration.
-	var newGCASig glow.Signature
-	resp = append(resp, newGCASig[:]...)
-	gcas.gcaServers.mu.Unlock()
 	// Copy in the unix timestamp
 	var timeBytes [8]byte
 	timestamp := time.Now().Unix()

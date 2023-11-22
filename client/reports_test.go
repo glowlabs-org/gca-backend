@@ -534,6 +534,107 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Get the client to perform a sync and see if it picks up the
+	// migration.
+	err = c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-c.syncThread
+	time.Sleep(35 * sendReportTime)
+
+	// At this point, the client should have picked up the migration, but
+	// we now need to trigger an actual sync with the new GCA server.
+	err = c.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = NewClient(clientDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-c.syncThread
+	time.Sleep(35 * sendReportTime)
+
+	// Update the monitor file as well for good measure.
+	err = updateMonitorFile(c.baseDir, []uint32{9}, []uint64{800})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * sendReportTime)
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			t.Error("expected power report")
+		} else if i == 2 && report.PowerOutput != 549 {
+			t.Error("expected power report")
+		} else if i == 3 && report.PowerOutput != 54 {
+			t.Error("expected power report")
+		} else if i == 4 && report.PowerOutput != 58 {
+			t.Error("expected power report")
+		} else if i == 5 && report.PowerOutput != 2999 {
+			t.Error("expected power report")
+		} else if i == 6 && report.PowerOutput != 3499 {
+			t.Error("expected power report")
+		} else if i == 7 && report.PowerOutput != 1199 {
+			t.Error("expected power report")
+		} else if i == 8 && report.PowerOutput != 1799 {
+			t.Error("expected power report")
+		} else if i == 9 && report.PowerOutput != 799 {
+			t.Error("expected power report")
+		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
+			t.Error("expected no power report")
+		}
+	}
+
+	// Check the old GCA, which should not be receiving reports anymore.
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1 && report.PowerOutput != 499 {
+			t.Error("expected power report")
+		} else if i == 2 && report.PowerOutput != 549 {
+			t.Error("expected power report")
+		} else if i == 3 && report.PowerOutput != 54 {
+			t.Error("expected power report")
+		} else if i == 4 && report.PowerOutput != 58 {
+			t.Error("expected power report")
+		} else if i == 5 && report.PowerOutput != 2999 {
+			t.Error("expected power report")
+		} else if i == 6 && report.PowerOutput != 3499 {
+			t.Error("expected power report")
+		} else if i == 7 && report.PowerOutput != 1199 {
+			t.Error("expected power report")
+		} else if i == 8 && report.PowerOutput != 1799 {
+			t.Error("expected power report")
+		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
+			t.Error("expected no power report")
+		}
+	}
+
 	// TODO: We have to test banning servers. That one is going to take a
 	// while. Maybe 30 seconds even. Perhaps after launch.
 }

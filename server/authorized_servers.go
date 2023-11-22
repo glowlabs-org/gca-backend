@@ -41,7 +41,7 @@ func (gcas *GCAServer) AuthorizedServers() []AuthorizedServer {
 func (as *AuthorizedServer) Serialize() []byte {
 	// Calculate the length.
 	locationLength := len(as.Location)
-	totalLength := 32 + 1 + 2 + locationLength + 2 + 2 + 2 + 64
+	totalLength := 104 + locationLength
 	data := make([]byte, totalLength)
 
 	// Serialize the fields, except the signature.
@@ -51,12 +51,12 @@ func (as *AuthorizedServer) Serialize() []byte {
 	} else {
 		data[32] = 0
 	}
-	binary.LittleEndian.PutUint16(data[33:35], uint16(locationLength))
-	copy(data[35:35+locationLength], []byte(as.Location))
-	binary.LittleEndian.PutUint16(data[35+locationLength:], as.HttpPort)
-	binary.LittleEndian.PutUint16(data[37+locationLength:], as.TcpPort)
-	binary.LittleEndian.PutUint16(data[39+locationLength:], as.UdpPort)
-	copy(data[41+locationLength:], as.GCAAuthorization[:])
+	data[33] = byte(locationLength)
+	copy(data[34:], []byte(as.Location))
+	binary.BigEndian.PutUint16(data[34+locationLength:], as.HttpPort)
+	binary.BigEndian.PutUint16(data[36+locationLength:], as.TcpPort)
+	binary.BigEndian.PutUint16(data[38+locationLength:], as.UdpPort)
+	copy(data[40+locationLength:], as.GCAAuthorization[:])
 	return data
 }
 

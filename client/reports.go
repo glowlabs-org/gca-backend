@@ -191,7 +191,8 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	// GCA migration for the device is valid and comes from the current
 	// GCA.
 	var blank glow.PublicKey
-	newGCASigningBytes := append([]byte("gca_migration_key"), respBuf[540:respLen-(64+72)]...) // Add the new GCA and the new shortID to the verification
+	emb := append(equipmentKey[:], respBuf[540:respLen-(64+72)]...)
+	newGCASigningBytes := append([]byte("EquipmentMigration"), emb...)
 	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature: %v", err)
 	}
