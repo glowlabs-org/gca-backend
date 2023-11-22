@@ -463,10 +463,76 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 
-	// TODO: We have to test GCA migrations. Perhaps after launch. We are
-	// going to have to re-install all of the equipment anyway probably.
-	// And instructing people to put on a new sim card is not so bad
-	// either.
+	// Create a new GCA with a new GCA server, and execute a migration of
+	// the client from the old GCA to the new GCA.
+	gcasA, _, ngcaPubKey, ngcaPrivKey, err := server.SetupTestEnvironment(t.Name() + "_serverA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpPortA, tcpPortA, udpPortA := gcasA.Ports()
+
+	// Create an authorization for the client on the new GCA.
+	shortID := uint32(135) // Use a different short id for the new GCA to make sure the migration is correct.
+	ea := glow.EquipmentAuthorization{
+		ShortID:    shortID,
+		PublicKey:  c.pubkey,
+		Capacity:   12341234,
+		Debt:       11223344,
+		Expiration: 100e6 + glow.CurrentTimeslot(),
+	}
+	sb = ea.SigningBytes()
+	sig = glow.Sign(sb, ngcaPrivKey)
+	ea.Signature = sig
+	jsonEA, err := json.Marshal(ea)
+	if err != nil {
+		t.Fatal("unable to marshal the auth request")
+	}
+	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpPortA), "application/json", bytes.NewBuffer(jsonEA))
+	if err != nil {
+		t.Fatal("unable to authorize device on GCA server:", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("got non-OK status code when authorizing gca client")
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create and submit the migration object.
+	as = server.AuthorizedServer{
+		PublicKey: gcasA.PublicKey(),
+		Banned:    false,
+		Location:  "localhost",
+		HttpPort:  httpPortA,
+		TcpPort:   tcpPortA,
+		UdpPort:   udpPortA,
+	}
+	sb = as.SigningBytes()
+	as.GCAAuthorization = glow.Sign(sb, ngcaPrivKey)
+	em := server.EquipmentMigration{
+		Equipment:  c.pubkey,
+		NewGCA:     ngcaPubKey,
+		NewShortID: 135,
+		NewServers: []server.AuthorizedServer{as},
+	}
+	sb = em.SigningBytes()
+	em.Signature = glow.Sign(sb, gcaPrivKey)
+	jsonEM, err := json.Marshal(em)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/equipment-migrate", httpPort3), "application/json", bytes.NewBuffer(jsonEM))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("got bad code")
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// TODO: We have to test banning servers. That one is going to take a
 	// while. Maybe 30 seconds even. Perhaps after launch.
