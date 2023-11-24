@@ -1,26 +1,20 @@
 package server
 
 import (
+	"archive/zip"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 )
-
-// Define a struct to receive the information from the call to
-// get historical sunlight information for a region.
-type NASAResponse struct {
-	Properties struct {
-		Parameter map[string]map[string]float64 `json:"ALLSKY_SFC_SW_DWN"`
-	} `json:"properties"`
-}
 
 // Define a struct to receive the information from the call to get
 // a token from WattTime.
@@ -57,10 +51,12 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
 		return
 	}
+	fmt.Println("lat:", latitude)
+	fmt.Println("long:", longitude)
 
 	// Load WattTime credentials and then get the auth token.
 	wtUsernamePath := filepath.Join("watttime_data", "username")
-	wtPasswordPath := filepath.Join("watttime_data", "password"
+	wtPasswordPath := filepath.Join("watttime_data", "password")
 	username := loadWattTimeCredentials(wtUsernamePath)
 	password := loadWattTimeCredentials(wtPasswordPath)
 	token, err := getWattTimeToken(username, password)
@@ -68,6 +64,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching watttime token", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("got watttime token")
 
 	// Fetch NASA data for this coordinate.
 	nasaData, err := fetchNASAData(latitude, longitude)
@@ -75,6 +72,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching nasa data", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("got nasa data")
 
 	// Fetch the balancing authority for this coordinate.
 	ba, err := getBalancingAuthority(token, latitude, longitude)
@@ -82,6 +80,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("got BA:", ba)
 
 	// Get all of the historical data for this BA. It's a very expensive operation,
 	// but only if the historical data is not cached locally already. Luckily, most
@@ -91,7 +90,8 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
 	}
-	
+	fmt.Println("finished saving historical data")
+
 	// Load the historical data from disk. The previous call to fetch the data saves
 	// it to disk if the data is not already saved.
 	baData, err := loadMOERData(ba)
@@ -99,26 +99,34 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error loading balancing authority historical data", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("finished loading MOER data")
 
 	// Calculate results
-	averageSunlight, averageCarbonCredits, err := calculateCarbonCredits(nasaData)
+	averageSunlight, averageCarbonCredits, err := calculateGeoStats(nasaData, baData)
 	if err != nil {
 		log.Println("Error in calculation:", err)
 		http.Error(w, "Error in calculation", http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("got average sunlight:", averageSunlight)
+	fmt.Println("got average carbon credits:", averageCarbonCredits)
 
 	// Create response
-	responseData := ResponseData{
-		AverageSunlightPerDay: averageSunlight,
-		AverageCarbonCredits:  averageCarbonCredits,
+	responseData := GeoStatsResponse{
+		AverageSunlight:           averageSunlight,
+		AverageCarbonCertificates: averageCarbonCredits,
 	}
 
-	responseJSON, _ := json.Marshal(responseData)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJSON)
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(responseData); err != nil {
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println("response sent")
 }
 
+// loadWattTimeCredentials is a helper function to load one of
+// the watttime credential files from disk.
 func loadWattTimeCredentials(filename string) string {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -127,32 +135,75 @@ func loadWattTimeCredentials(filename string) string {
 	return strings.TrimSpace(string(data))
 }
 
+// getWattTimeToken makes an API call to WattTime to authenticate and retrieve an access token.
 func getWattTimeToken(username, password string) (string, error) {
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "https://api2.watttime.org/v2/login", nil)
+	req, err := http.NewRequest("GET", "https://api2.watttime.org/v2/login", nil)
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(username, password)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	var tokenResponse TokenResponse
-	json.NewDecoder(resp.Body).Decode(&tokenResponse)
+
+	// Check for non-200 status code and handle specific errors
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == 403 {
+			return "", fmt.Errorf("authentication failed: invalid credentials")
+		}
+		return "", fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+	}
+
+	var tokenResponse WattTimeTokenResponse
+	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+	if err != nil {
+		return "", err
+	}
+
 	return tokenResponse.Token, nil
 }
 
-func fetchNASAData(latitude, longitude float64) (NASAData, error) {
-	var data NASAData
-	url := "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&longitude=" +
-		strconv.FormatFloat(longitude, 'f', -1, 64) + "&latitude=" +
-		strconv.FormatFloat(latitude, 'f', -1, 64) + "&start=20220101&end=20221231&format=json"
-	resp, err := http.Get(url)
+// fetchNASAData is a helper function to download the historical sunlight data
+// for a given geographical coordinate from NASA.
+func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
+	type Parameter struct {
+		AllSkySfcSwDwn map[string]float64 `json:"ALLSKY_SFC_SW_DWN"`
+	}
+	type Properties struct {
+		Parameter Parameter `json:"parameter"`
+	}
+	type Response struct {
+		Type       string     `json:"type"`
+		Properties Properties `json:"properties"`
+	}
+
+	baseURL := "https://power.larc.nasa.gov/api/temporal/hourly/point"
+	// Create a map for the query parameters
+	params := url.Values{}
+	params.Add("parameters", "ALLSKY_SFC_SW_DWN")
+	params.Add("community", "RE")
+	params.Add("longitude", strconv.FormatFloat(longitude, 'f', -1, 64))
+	params.Add("latitude", strconv.FormatFloat(latitude, 'f', -1, 64))
+	params.Add("start", "20220101")
+	params.Add("end", "20221231")
+	params.Add("format", "json")
+	// Construct the final URL with encoded query parameters
+	finalURL := baseURL + "?" + params.Encode()
+	fmt.Println(finalURL)
+
+	// Now make the request
+	resp, err := http.Get(finalURL)
 	if err != nil {
-		return data, err
+		return nil, err
 	}
 	defer resp.Body.Close()
+	var data Response
 	err = json.NewDecoder(resp.Body).Decode(&data)
-	return data, err
+	return data.Properties.Parameter.AllSkySfcSwDwn, err
 }
 
 // getBalancingAuthority makes an API call to watttime to get the ba that's associated
@@ -185,7 +236,7 @@ func getBalancingAuthority(token string, latitude, longitude float64) (string, e
 	}
 
 	// Parse the JSON response
-	var baResponse BAResponse
+	var baResponse BalancingAuthorityResponse
 	if err := json.NewDecoder(resp.Body).Decode(&baResponse); err != nil {
 		return "", err
 	}
@@ -193,8 +244,9 @@ func getBalancingAuthority(token string, latitude, longitude float64) (string, e
 	return baResponse.Abbrev, nil
 }
 
-// fetchAndSaveHistoricalBAData fetches historical data for the given balancing authority and saves it locally.
-func fetchAndSaveHistoricaBAlData(token, ba string) error {
+// fetchAndSaveHistoricalBAData fetches historical data for the given balancing
+// authority and saves it locally.
+func fetchAndSaveHistoricalBAData(token, ba string) error {
 	dataPath := filepath.Join("watttime_data", ba)
 	if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
 		// Data already exists
@@ -356,8 +408,12 @@ func readMOERCSV(filePath string) (map[string]map[string][]float64, error) {
 
 		// Assuming the timestamp format is YYYY-MM-DDTHH
 		parts := strings.Split(timestamp, "T")
-		day := parts[0][5:] // Extract MM-DD
-		hour := parts[1][:2]
+		year := parts[0][:4] // Extract YYYY
+		day := parts[0][5:]  // Extract MM-DD
+		hour := parts[1][:2] // Extract TT
+		if year != "2022" {
+			continue
+		}
 
 		if _, ok := moerValues[day]; !ok {
 			moerValues[day] = make(map[string][]float64)
@@ -368,28 +424,20 @@ func readMOERCSV(filePath string) (map[string]map[string][]float64, error) {
 	return moerValues, nil
 }
 
-// calculateGeoStats takes in the nasa data and ba data as input, and provides a
-// computed average sunlight hours and average carbon impact.
-func calculateCarbonCredits(nasaData NASAData, moerData map[string]map[string][]float64) (float64, float64, error) {
+// calculateGeoStats takes in the nasa data and ba data as input, and provides
+// a computed average sunlight hours and average carbon impact.
+func calculateGeoStats(nasaData map[string]float64, moerData map[string]map[string][]float64) (float64, float64, error) {
 	totalKWh := 0.0
 	totalHours := 0
 	totalMOER := 0.0
 
-	for dayData, sunIntensity := range nasaData.Properties.Parameter["ALLSKY_SFC_SW_DWN"] {
-		if sunIntensity == 0 {
-			continue
-		}
-
-		date, err := time.Parse("20060102", dayData)
-		if err != nil {
-			return 0, 0, err
-		}
-
-		day := fmt.Sprintf("%02d-%02d", date.Month(), date.Day())
-		hour := strconv.Itoa(date.Hour())
+	for dayData, sunIntensity := range nasaData {
+		day := fmt.Sprintf("%s-%s", dayData[4:6], dayData[6:8])
+		hour := dayData[8:10]
 
 		moerValues, exists := moerData[day][hour]
 		if !exists || len(moerValues) == 0 {
+			fmt.Println("skipping:", day, hour)
 			continue
 		}
 
@@ -402,10 +450,10 @@ func calculateCarbonCredits(nasaData NASAData, moerData map[string]map[string][]
 		totalHours++
 	}
 
-	averageSunlightPerDay := totalKWh / float64(totalHours)
-	averageMOERPerMWh := (totalMOER / totalKWh) * 1000
+	avgSun := 24 * totalKWh / float64(totalHours)
+	averageMOER := (totalMOER / totalKWh)
 
-	return averageSunlightPerDay, averageMOERPerMWh, nil
+	return avgSun, averageMOER, nil
 }
 
 // calculateAverage computes the average of a slice of float64.
