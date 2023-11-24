@@ -51,8 +51,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
 		return
 	}
-	fmt.Println("lat:", latitude)
-	fmt.Println("long:", longitude)
 
 	// Load WattTime credentials and then get the auth token.
 	wtUsernamePath := filepath.Join("watttime_data", "username")
@@ -64,7 +62,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching watttime token", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("got watttime token")
 
 	// Fetch NASA data for this coordinate.
 	nasaData, err := fetchNASAData(latitude, longitude)
@@ -72,7 +69,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching nasa data", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("got nasa data")
 
 	// Fetch the balancing authority for this coordinate.
 	ba, err := getBalancingAuthority(token, latitude, longitude)
@@ -80,7 +76,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("got BA:", ba)
 
 	// Get all of the historical data for this BA. It's a very expensive operation,
 	// but only if the historical data is not cached locally already. Luckily, most
@@ -90,7 +85,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("finished saving historical data")
 
 	// Load the historical data from disk. The previous call to fetch the data saves
 	// it to disk if the data is not already saved.
@@ -99,7 +93,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error loading balancing authority historical data", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("finished loading MOER data")
 
 	// Calculate results
 	averageSunlight, averageCarbonCredits, err := calculateGeoStats(nasaData, baData)
@@ -108,8 +101,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in calculation", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("got average sunlight:", averageSunlight)
-	fmt.Println("got average carbon credits:", averageCarbonCredits)
 
 	// Create response
 	responseData := GeoStatsResponse{
@@ -122,7 +113,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("response sent")
 }
 
 // loadWattTimeCredentials is a helper function to load one of
@@ -193,7 +183,6 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 	params.Add("format", "json")
 	// Construct the final URL with encoded query parameters
 	finalURL := baseURL + "?" + params.Encode()
-	fmt.Println(finalURL)
 
 	// Now make the request
 	resp, err := http.Get(finalURL)
@@ -437,7 +426,6 @@ func calculateGeoStats(nasaData map[string]float64, moerData map[string]map[stri
 
 		moerValues, exists := moerData[day][hour]
 		if !exists || len(moerValues) == 0 {
-			fmt.Println("skipping:", day, hour)
 			continue
 		}
 
