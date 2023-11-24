@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// Create a new client, using the current directory as the basedir.
-	c, err := client.NewClient(".")
+	c, err := client.NewClient("/opt/glow-monitor/")
 	if err != nil {
 		fmt.Println("unable to create client: ", err)
 		return

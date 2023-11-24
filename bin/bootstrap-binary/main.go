@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 
@@ -228,8 +229,9 @@ func main() {
 	}
 
 	// Create an authorization for the equipment
+	sid := rand.Intn(400) + 15
 	ea := glow.EquipmentAuthorization{
-		ShortID:   10,
+		ShortID:   uint32(sid),
 		PublicKey: devPub,
 		Capacity:  2520e3,   // milliwatt hours
 		Debt:      165680e6, // milligrams
@@ -262,7 +264,7 @@ func main() {
 	}
 	// Save the ShortID for the device.
 	var idBytes [4]byte
-	binary.LittleEndian.PutUint32(idBytes[:], 10)
+	binary.LittleEndian.PutUint32(idBytes[:], uint32(sid))
 	err = ioutil.WriteFile("short-id.dat", idBytes[:], 0644)
 	if err != nil {
 		fmt.Println(err)
