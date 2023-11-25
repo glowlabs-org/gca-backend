@@ -109,7 +109,7 @@ func main() {
 	}
 }
 
-// fristEquipmentCmd creates the shortID file and submits the first equipment
+// firstEquipmentCmd creates the shortID file and submits the first equipment
 // to the servers.
 func firstEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serversMap map[glow.PublicKey]client.GCAServer) error {
 	// Check whether the shortID file already exists, return an error if
