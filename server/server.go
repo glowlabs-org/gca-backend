@@ -170,11 +170,17 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	udpReady := make(chan struct{})
 	tcpReady := make(chan struct{})
 
+	// Load the watttime credentials.
+	wtUsernamePath := filepath.Join(server.baseDir, "watttime_data", "username")
+	wtPasswordPath := filepath.Join(server.baseDir, "watttime_data", "password")
+	username := loadWattTimeCredentials(wtUsernamePath)
+	password := loadWattTimeCredentials(wtPasswordPath)
+
 	// Start the background threads for various server functionalities
 	go server.threadedLaunchUDPServer(udpReady)
 	go server.threadedMigrateReports()
 	go server.threadedListenForSyncRequests(tcpReady)
-	go server.threadedCollectImpactData()
+	go server.threadedCollectImpactData(username, password)
 	server.launchAPI()
 
 	<-udpReady

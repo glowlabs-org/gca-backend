@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -71,6 +70,12 @@ func getBalancingAuthority(token string, latitude, longitude float64) (string, e
 // getWattTimeIndex returns the MOER value for the provided lat+long at the
 // curernt time.
 func getWattTimeIndex(token string, latitude float64, longitude float64) (float64, int64, error) {
+	// Since this code depends on external APIs, we return an arbitrary
+	// value.
+	if testMode {
+		return latitude + longitude + 1.5, time.Now().Unix(), nil
+	}
+
 	// Create the base url
 	client := &http.Client{}
 	url := "https://api2.watttime.org/v2/index"
@@ -120,26 +125,7 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 // for the latest impact data for each device being tracked by the server. The
 // WattTime period is 5 minutes, so we'll be grabbing the same datapoint pretty
 // regularly.
-func (gcas *GCAServer) threadedCollectImpactData() {
-	// Since this code depends on external APIs, we don't actually want to
-	// run it during testing. At some point we may want to write tests to
-	// mock out the external API, but for now we'll just test this in prod.
-	//
-	// Testing in prod is not so bad because the logic is pretty simple
-	// overall, and the consequences of mistakes are a few missed readings,
-	// which can be manually recovered using the historical APIs.
-	if testMode {
-		return
-	}
-
-	// Load the WattTime credentials.
-	//
-	// TODO: Move to NewServer() and pass as input.
-	wtUsernamePath := filepath.Join("watttime_data", "username")
-	wtPasswordPath := filepath.Join("watttime_data", "password")
-	username := loadWattTimeCredentials(wtUsernamePath)
-	password := loadWattTimeCredentials(wtPasswordPath)
-
+func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 	// Infinite loop to keep fetching data from WattTime.
 	for {
 		// Soft sleep before collecting data. We sleep before instead
