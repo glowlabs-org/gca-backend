@@ -144,6 +144,19 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey glow.Private
 		return nil, glow.PrivateKey{}, fmt.Errorf("failed to write public key to file: %v", err)
 	}
 
+	// Create empty username and password files for watttime.
+	if err := os.MkdirAll(filepath.Join(dir, "watttime_data"), 0755); err != nil {
+		return nil, glow.PrivateKey{}, fmt.Errorf("failed to create server basedir: %v", err)
+	}
+	err = ioutil.WriteFile(filepath.Join(dir, "watttime_data", "username"), []byte("hi"), 0644)
+	if err != nil {
+		return nil, glow.PrivateKey{}, fmt.Errorf("failed to write watttime username: %v", err)
+	}
+	err = ioutil.WriteFile(filepath.Join(dir, "watttime_data", "password"), []byte("ih"), 0644)
+	if err != nil {
+		return nil, glow.PrivateKey{}, fmt.Errorf("failed to write watttime password: %v", err)
+	}
+
 	// Initialize and launch the GCAServer.
 	gcas, err = NewGCAServer(dir)
 	if err != nil {
