@@ -304,6 +304,25 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 
+	// Check that the all-device-stats endpoint is listing out the client
+	// and the corresponding reports.
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		t.Fatal("bad status:", string(body), err)
+	}
+	var statsResp server.AllDeviceStats
+	err = json.NewDecoder(resp.Body).Decode(&statsResp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statsResp.Devices) != 1 {
+		t.Fatal("expecting 1 device in the stats:", len(statsResp.Devices))
+	}
+
 	// Try restarting the client, make sure it can still submit reports to
 	// gcas2. It will need to potentially go through a sync to find gcas2
 	// as a viable option for submitting reports.
