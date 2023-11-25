@@ -175,13 +175,18 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 
 // threadedMigrateReports will infrequently update the equipment reports so
 // that the reports are always for the current week and the previous.
-//
-// TODO: Need to add code to make previous week's reports available.
 func (gcas *GCAServer) threadedMigrateReports() {
 	for {
 		// This loop is pretty lightweight so every 3 seconds seems
 		// fine, even though action is only taken once a week.
 		time.Sleep(reportMigrationFrequency)
+
+		// TODO: Grab the historical impact rates from WattTime (just
+		// the recent week's of data) so that any gaps / downtime from
+		// earlier in the week can be repaired. I suppose if there are
+		// errors, we can try to sleep through them, we do have at
+		// least 1000 minutes to get this done right. Retrying a bunch
+		// is probably okay.
 
 		// We only update if we are progressed most of the way through
 		// the second week.
@@ -193,6 +198,12 @@ func (gcas *GCAServer) threadedMigrateReports() {
 			panic("migration got out of sync")
 		}
 		if int64(now)-int64(gcas.equipmentReportsOffset) > 3200 {
+			// Save the device stats.
+			stats, err := gcas.buildDeviceStats(gcas.equipmentReportsOffset)
+			if err != nil {
+				panic("unable to build device stats: " + err.Error())
+			}
+			gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, stats)
 			// Copy the last half of every report into the first
 			// half, then blank out the last half.
 			for _, report := range gcas.equipmentReports {
@@ -200,10 +211,26 @@ func (gcas *GCAServer) threadedMigrateReports() {
 				copy(report[:2016], report[2016:])
 				copy(report[2016:], blankReports[:])
 			}
+			// Repeat for the impact values.
+			for _, rates := range gcas.equipmentImpactRate {
+				var blankRates [2016]float64
+				copy(rates[:2016], rates[2016:])
+				copy(rates[2016:], blankRates[:])
+			}
 			// Update the reports offset.
 			gcas.equipmentReportsOffset += 2016
 			gcas.logger.Info("completed an equipment reports migration")
+			gcas.mu.Unlock()
+
+			// TODO: after dropping the lock, save the latest set
+			// of stats to disk. We'll need some way to be sure
+			// it's not being saved redundantly, I guess that's
+			// what the timeslot offset inside the struct is for -
+			// even if we get a few copies of it, we'll be able to
+			// tell that it happened.
+		} else {
+			gcas.mu.Unlock()
 		}
-		gcas.mu.Unlock()
+
 	}
 }
