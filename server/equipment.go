@@ -175,6 +175,8 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 
 // threadedMigrateReports will infrequently update the equipment reports so
 // that the reports are always for the current week and the previous.
+//
+// TODO: Need to add code to make previous week's reports available.
 func (gcas *GCAServer) threadedMigrateReports() {
 	for {
 		// This loop is pretty lightweight so every 3 seconds seems

@@ -50,6 +50,8 @@ type GCAServer struct {
 	equipmentMigrations    map[glow.PublicKey]EquipmentMigration  // Keeps track of migration orders that have been given to equipment
 	equipmentReports       map[uint32]*[4032]glow.EquipmentReport // Keeps all recent reports in memory
 	equipmentReportsOffset uint32                                 // What timeslot the equipmentReports arrays start at
+	equipmentStatsHistory  []AllDeviceStats                       // A history of all the stats that were collected for each device
+	equipmentHistoryOffset uint32                                 // Establishes the first timeslot where history is available
 
 	recentEquipmentAuths []glow.EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []glow.EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
