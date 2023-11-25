@@ -116,6 +116,8 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 	ea := glow.EquipmentAuthorization{
 		ShortID:    shortID,
 		PublicKey:  pub,
+		Latitude:   38,
+		Longitude:  -100,
 		Capacity:   12341234,
 		Debt:       11223344,
 		Expiration: 100e6 + glow.CurrentTimeslot(),

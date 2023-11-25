@@ -17,4 +17,5 @@ const (
 	udpPort                  = 0
 	defaultLogLevel          = DEBUG
 	reportMigrationFrequency = 100 * time.Millisecond
+	testMode                 = true
 )

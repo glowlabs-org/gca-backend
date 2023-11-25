@@ -476,6 +476,8 @@ func TestAddingServers(t *testing.T) {
 	ea := glow.EquipmentAuthorization{
 		ShortID:    shortID,
 		PublicKey:  c.pubkey,
+		Latitude:   38,
+		Longitude:  -100,
 		Capacity:   12341234,
 		Debt:       11223344,
 		Expiration: 100e6 + glow.CurrentTimeslot(),

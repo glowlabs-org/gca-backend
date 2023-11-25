@@ -46,12 +46,16 @@ type GCAServer struct {
 	equipment              map[uint32]glow.EquipmentAuthorization // Map from a ShortID to the full equipment authorization
 	equipmentShortID       map[glow.PublicKey]uint32              // Map from a public key to a ShortID
 	equipmentBans          map[uint32]struct{}                    // Tracks which equipment is banned
-	equipmentMigrations    map[glow.PublicKey]EquipmentMigration  // Keeps track of any migration orders that have been given to equipment based on ShortID
+	equipmentImpactRate    map[uint32]*[4032]uint32               // Tracks the number of micrograms of CO2 offset per WattHour of energy
+	equipmentMigrations    map[glow.PublicKey]EquipmentMigration  // Keeps track of migration orders that have been given to equipment
 	equipmentReports       map[uint32]*[4032]glow.EquipmentReport // Keeps all recent reports in memory
 	equipmentReportsOffset uint32                                 // What timeslot the equipmentReports arrays start at
 
 	recentEquipmentAuths []glow.EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []glow.EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
+
+	// TODO: We need some software to track the carbon impact of each piece
+	// of equipment. I guess we don't actually need it to be sorted by BA.
 
 	// The GCA interacts with the server in two stages. The first stage
 	// uses a temporary key which is created by the technicians before the
@@ -168,6 +172,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	go server.threadedLaunchUDPServer(udpReady)
 	go server.threadedMigrateReports()
 	go server.threadedListenForSyncRequests(tcpReady)
+	go server.threadedCollectImpactData()
 	server.launchAPI()
 
 	<-udpReady
