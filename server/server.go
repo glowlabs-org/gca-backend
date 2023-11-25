@@ -80,17 +80,18 @@ type GCAServer struct {
 	staticPrivateKey glow.PrivateKey
 	staticPublicKey  glow.PublicKey
 
-	baseDir     string         // Base directory for server files
-	logger      *Logger        // Custom logger for the server
-	httpServer  *http.Server   // Web server for handling API requests
-	httpPort    uint16         // Records the port that is being used to serve the api
-	mux         *http.ServeMux // Routing for HTTP requests
-	tcpListener net.Listener   // handles incoming sync requests over tcp
-	udpConn     *net.UDPConn   // UDP connection for listening to equipment reports
-	udpPort     uint16         // The port that the UDP conn is listening on
-	tcpPort     uint16         // The port that the TCP listener is using
-	quit        chan bool      // A channel to initiate server shutdown
-	mu          sync.Mutex
+	baseDir        string         // Base directory for server files
+	logger         *Logger        // Custom logger for the server
+	httpServer     *http.Server   // Web server for handling API requests
+	httpPort       uint16         // Records the port that is being used to serve the api
+	mux            *http.ServeMux // Routing for HTTP requests
+	skipInvariants bool           // If set to true, 'CheckInvariants()' will not run on Close()
+	tcpListener    net.Listener   // handles incoming sync requests over tcp
+	udpConn        *net.UDPConn   // UDP connection for listening to equipment reports
+	udpPort        uint16         // The port that the UDP conn is listening on
+	tcpPort        uint16         // The port that the TCP listener is using
+	quit           chan bool      // A channel to initiate server shutdown
+	mu             sync.Mutex
 }
 
 // NewGCAServer initializes a new instance of GCAServer and returns either
@@ -128,6 +129,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		equipment:              make(map[uint32]glow.EquipmentAuthorization),
 		equipmentShortID:       make(map[glow.PublicKey]uint32),
 		equipmentBans:          make(map[uint32]struct{}),
+		equipmentImpactRate:    make(map[uint32]*[4032]float64),
 		equipmentMigrations:    make(map[glow.PublicKey]EquipmentMigration),
 		equipmentReports:       make(map[uint32]*[4032]glow.EquipmentReport),
 		equipmentReportsOffset: closestWeek,
@@ -184,6 +186,13 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 
 // Close cleanly shuts down the GCAServer instance.
 func (server *GCAServer) Close() error {
+	// By placing this here, we know that every time a server is closed
+	// during testing, we are reviewing the state to make sure it's all in
+	// order.
+	if !server.skipInvariants {
+		server.CheckInvariants()
+	}
+
 	// Signal to terminate the server
 	close(server.quit)
 

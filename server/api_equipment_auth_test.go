@@ -31,11 +31,7 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	// Sign the authorization request with GCA's private key.
 	sb := ea.SigningBytes()
 	ea.Signature = glow.Sign(sb, gcaPrivKey)
-
-	// Convert the request body to JSON.
 	jsonBody, _ := json.Marshal(ea)
-
-	// Perform an HTTP POST request.
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
@@ -58,15 +54,6 @@ func TestAuthorizeEquipmentEndpoint(t *testing.T) {
 	if status, exists := response["status"]; !exists || status != "success" {
 		t.Fatalf("Unexpected response: %v", response)
 	}
-}
-
-// loadEquipmentAuths is responsible for populating the equipment map
-// using the provided array of EquipmentAuths.
-func (gcas *GCAServer) loadEquipmentAuth(ea glow.EquipmentAuthorization) {
-	// Add the equipment's public key to the equipment map using its ShortID as the key
-	gcas.equipment[ea.ShortID] = ea
-	gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
-	gcas.addRecentEquipmentAuth(ea)
 }
 
 // Perform an integration test for the equipment authorizations.

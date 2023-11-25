@@ -16,9 +16,8 @@ import (
 //   - Reports signed by the wrong equipment are rejected.
 //   - The values within the report are correctly parsed and verified.
 func TestParseReport(t *testing.T) {
-
 	// Setup the GCAServer with the test keys.
-	server, _, _, _, err := SetupTestEnvironment(t.Name())
+	server, _, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +36,10 @@ func TestParseReport(t *testing.T) {
 
 	// Load the equipment
 	for _, e := range equipment {
-		server.loadEquipmentAuth(e)
+		err := server.AuthorizeEquipment(e, gcaPrivKey)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Run some reports on each piece of equipment.
