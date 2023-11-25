@@ -11,3 +11,8 @@ func UnixToTimeslot(time int64) (uint32, error) {
 	}
 	return uint32(time-GenesisTime) / 300, nil
 }
+
+// TimeslotToUnix converts a timeslot to the unix timestamp that it began.
+func TimeslotToUnix(timeslot uint32) int64 {
+	return GenesisTime + int64(timeslot*300)
+}

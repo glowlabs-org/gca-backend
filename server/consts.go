@@ -18,4 +18,5 @@ const (
 	defaultLogLevel          = WARN
 	reportMigrationFrequency = 1 * time.Hour
 	testMode                 = false
+	wattTimeFrequency        = 2 * time.Minute
 )
