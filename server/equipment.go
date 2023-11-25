@@ -91,11 +91,13 @@ func (gcas *GCAServer) loadEquipment() error {
 		if !exists {
 			gcas.equipmentShortID[ea.PublicKey] = ea.ShortID
 			gcas.equipment[ea.ShortID] = ea
+			gcas.equipmentImpactRate[ea.ShortID] = new([4032]float64)
 			gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
 			continue
 		}
 		// If a conflict exists, ban the equipment.
 		delete(gcas.equipment, ea.ShortID)
+		delete(gcas.equipmentImpactRate, ea.ShortID)
 		delete(gcas.equipmentReports, ea.ShortID)
 		delete(gcas.equipmentShortID, ea.PublicKey)
 		gcas.equipmentBans[ea.ShortID] = struct{}{}
@@ -156,6 +158,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 	if !exists {
 		gcas.equipmentShortID[ea.PublicKey] = ea.ShortID
 		gcas.equipment[ea.ShortID] = ea
+		gcas.equipmentImpactRate[ea.ShortID] = new([4032]float64)
 		gcas.equipmentReports[ea.ShortID] = new([4032]glow.EquipmentReport)
 		return true, nil
 	}
@@ -164,6 +167,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 	// equipment and also add a ban.
 	delete(gcas.equipmentShortID, ea.PublicKey)
 	delete(gcas.equipment, ea.ShortID)
+	delete(gcas.equipmentImpactRate, ea.ShortID)
 	delete(gcas.equipmentReports, ea.ShortID)
 	gcas.equipmentBans[ea.ShortID] = struct{}{}
 	return false, fmt.Errorf("duplicate authorization received, banning equipment")

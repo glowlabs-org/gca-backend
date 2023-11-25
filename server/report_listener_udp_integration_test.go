@@ -70,11 +70,12 @@ func TestParseReportIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	server.mu.Lock()
 	for _, d := range devices {
-		server.loadEquipmentAuth(d)
+		err := server.AuthorizeEquipment(d, gcaPrivKey)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	server.mu.Unlock()
 
 	now := glow.CurrentTimeslot()
 	expectedReports := 0
@@ -318,9 +319,10 @@ func TestCapacityEnforcement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server.mu.Lock()
-	server.loadEquipmentAuth(device)
-	server.mu.Unlock()
+	err = server.AuthorizeEquipment(device, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create an equipment report that we expect to get banned for having
 	// too high of a capacity.

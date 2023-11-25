@@ -32,31 +32,65 @@ func (gcas *GCAServer) PublicKey() glow.PublicKey {
 //
 // This function is primarily used during testing, but doesn't hurt to run
 // occasionally in prod.
-func (server *GCAServer) CheckInvariants() {
-	// Lock the server for concurrency safety if needed
-	server.mu.Lock()
-	defer server.mu.Unlock()
+func (gcas *GCAServer) CheckInvariants() {
+	// Lock the gcas for concurrency safety if needed
+	gcas.mu.Lock()
 
 	// Check if equipmentShortID has the same number of elements as equipment
-	if len(server.equipment) != len(server.equipmentShortID) {
+	if len(gcas.equipment) != len(gcas.equipmentShortID) {
+		gcas.mu.Unlock()
 		panic("equipment and equipmentShortID maps have different sizes")
 	}
 
 	// Create a map to track unique PublicKeys
 	pubKeys := make(map[glow.PublicKey]struct{})
 
-	for shortID, auth := range server.equipment {
+	for shortID, auth := range gcas.equipment {
 		// Check for unique PublicKey
 		if _, exists := pubKeys[auth.PublicKey]; exists {
+			gcas.mu.Unlock()
 			panic("duplicate PublicKey found in equipment map")
 		}
 		pubKeys[auth.PublicKey] = struct{}{}
 
 		// Check if equipmentShortID correctly maps to equipment
-		if mappedShortID, exists := server.equipmentShortID[auth.PublicKey]; !exists || mappedShortID != shortID {
+		if mappedShortID, exists := gcas.equipmentShortID[auth.PublicKey]; !exists || mappedShortID != shortID {
+			gcas.mu.Unlock()
 			panic("mismatch between equipment and equipmentShortID maps")
 		}
+
+		// Check that an impact rate element exists for this equipment.
+		_, exists := gcas.equipmentImpactRate[shortID]
+		if !exists {
+			gcas.mu.Unlock()
+			panic("the equipment impact rate was not established for this equipment")
+		}
 	}
+	gcas.mu.Unlock()
+}
+
+// AuthorizeEquipment will submit an equipment authorization to the GCA server
+// for the provided equipment.
+func (gcas *GCAServer) AuthorizeEquipment(ea glow.EquipmentAuthorization, gcaPrivKey glow.PrivateKey) error {
+	sb := ea.SigningBytes()
+	ea.Signature = glow.Sign(sb, gcaPrivKey)
+	j, err := json.Marshal(ea)
+	if err != nil {
+		return fmt.Errorf("unable to marshal equipment authorization: %v", err)
+	}
+	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(j))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("Expected status 200, but got %d. Response: %s", resp.StatusCode, string(bodyBytes))
+	}
+	err = resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close response: %v", err)
+	}
+	return nil
 }
 
 // SetupTestEnvironment will return a fully initialized gca server that is

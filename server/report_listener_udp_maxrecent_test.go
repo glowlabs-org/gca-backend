@@ -15,7 +15,7 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 	}
 
 	// Create the server.
-	server, _, _, _, err := SetupTestEnvironment(t.Name())
+	server, _, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,10 @@ func TestHandleEquipmentReport_MaxRecentReports(t *testing.T) {
 		privKeys = append(privKeys, privKey)
 	}
 	for _, d := range devices {
-		server.loadEquipmentAuth(d)
+		err := server.AuthorizeEquipment(d, gcaPrivKey)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Submit enough reports to saturate the maxRecentReports field.

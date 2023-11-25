@@ -9,14 +9,11 @@ import (
 
 // TestThreadedMigrateReports tests the migration of equipment reports.
 func TestThreadedMigrateReports(t *testing.T) {
-	server, _, _, _, err := SetupTestEnvironment(t.Name())
+	gcas, _, _, gcaPrivKey, err := SetupTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer server.Close()
-
-	// Because we mess with the global time during this test, we need to
-	// make sure it gets reset to 0 when the test ends.
+	defer gcas.Close()
 	defer func() {
 		glow.SetCurrentTimeslot(0)
 	}()
@@ -24,7 +21,10 @@ func TestThreadedMigrateReports(t *testing.T) {
 	// Generate a dummy EquipmentAuthorization
 	ePubKey, _ := glow.GenerateKeyPair()
 	dummyEquipment := glow.EquipmentAuthorization{ShortID: 1, PublicKey: ePubKey}
-	server.loadEquipmentAuth(dummyEquipment)
+	err = gcas.AuthorizeEquipment(dummyEquipment, gcaPrivKey)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Generate reports that will fill out the first 2 migrations.
 	dummyReport := [4032]glow.EquipmentReport{}
@@ -35,27 +35,27 @@ func TestThreadedMigrateReports(t *testing.T) {
 			PowerOutput: uint64(1000 + i),
 		}
 	}
-	// Just load the dummy reports right into the server.
-	server.equipmentReports[dummyEquipment.ShortID] = &dummyReport
+	// Just load the dummy reports right into the gcas.
+	gcas.equipmentReports[dummyEquipment.ShortID] = &dummyReport
 
 	// Verify that nothing got pruned.
 	for i := 0; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 	// Wait 150 milliseconds, which should trigger a prune. Except that no
 	// prune should be triggered because we aren't inside the prune window.
 	time.Sleep(150 * time.Millisecond)
 	// Verify that nothing got pruned.
 	for i := 0; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 
 	// Update the timeslot just enough that we shouldn't be getting pruned still.
@@ -65,11 +65,11 @@ func TestThreadedMigrateReports(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	// Verify that nothing got pruned.
 	for i := 0; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 
 	// Update the timeslot just enough that things should be getting pruned now.
@@ -79,52 +79,52 @@ func TestThreadedMigrateReports(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	// Verify that things got pruned
 	for i := 0; i < 2016; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 	for i := 2016; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 
 	// Wait for another prune cycle, verify nothing happens.
 	time.Sleep(150 * time.Millisecond)
 	for i := 0; i < 2016; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 	for i := 2016; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 
 	// Update the time to 5000, which should still not cause a prune.
 	time.Sleep(150 * time.Millisecond)
 	for i := 0; i < 2016; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 	for i := 2016; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 
 	// Update the current timeslot to trigger another migration, now all of
@@ -132,10 +132,10 @@ func TestThreadedMigrateReports(t *testing.T) {
 	glow.SetCurrentTimeslot(5300)
 	time.Sleep(150 * time.Millisecond)
 	for i := 0; i < 4032; i++ {
-		server.mu.Lock()
-		if server.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+		gcas.mu.Lock()
+		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
 			t.Fatal("equipment should still exist")
 		}
-		server.mu.Unlock()
+		gcas.mu.Unlock()
 	}
 }
