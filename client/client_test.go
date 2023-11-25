@@ -28,7 +28,7 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 	pub, priv := glow.GenerateKeyPair()
 
 	// Save the keys for the client.
-	path := filepath.Join(baseDir, ClientKeyfile)
+	path := filepath.Join(baseDir, ClientKeyFile)
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("unable to create the client keyfile: %v", err)
@@ -46,7 +46,7 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 	}
 
 	// Save the public key for the GCA.
-	path = filepath.Join(baseDir, GCAPubfile)
+	path = filepath.Join(baseDir, GCAPubKeyFile)
 	f, err = os.Create(path)
 	if err != nil {
 		return fmt.Errorf("unable to create the gca pubkey file: %v", err)

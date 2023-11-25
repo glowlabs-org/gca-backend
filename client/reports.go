@@ -353,7 +353,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		// device that needs its SD card replaced. This isn't a
 		// terrible consequence. In the event of an error we panic and
 		// hope it doesn't happen again.
-		err := ioutil.WriteFile(filepath.Join(c.baseDir, GCAPubfile), newGCA[:], 0644)
+		err := ioutil.WriteFile(filepath.Join(c.baseDir, GCAPubKeyFile), newGCA[:], 0644)
 		if err != nil {
 			panic(err)
 		}

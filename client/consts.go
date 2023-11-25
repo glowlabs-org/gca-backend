@@ -2,14 +2,14 @@ package client
 
 const (
 	// The file that contains the keypair for the client, authorized by the GCA.
-	ClientKeyfile = "client.keys"
+	ClientKeyFile = "clientKeys.dat"
 
 	// The file that contains the public key of the GCA.
-	GCAPubfile = "gca.pubkey"
+	GCAPubKeyFile = "gcaPubKey.dat"
 
 	// GCAServerMapFile contains the list of servers that the GCA has online. It
 	// will also contain banned servers.
-	GCAServerMapFile = "gca-servers.dat"
+	GCAServerMapFile = "gcaServers.dat"
 
 	// HistoryFile contains all of the historic power readings for this solar
 	// installation.
@@ -17,5 +17,5 @@ const (
 
 	// ShortIDFile contains the ShortID of the device, which is useful for
 	// compressing communications with the GCA servers.
-	ShortIDFile = "short-id.dat"
+	ShortIDFile = "shortID.dat"
 )

@@ -141,7 +141,7 @@ func (c *Client) Close() error {
 // the other hand the GCA is pretty much the unilaterally trusted authority in
 // this case anyway.
 func (c *Client) loadKeypair() error {
-	path := filepath.Join(c.baseDir, ClientKeyfile)
+	path := filepath.Join(c.baseDir, ClientKeyFile)
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
@@ -158,7 +158,7 @@ func (c *Client) loadKeypair() error {
 // to verify that the servers it is reporting to are in good standing according
 // to the GCA.
 func (c *Client) loadGCAPub() error {
-	path := filepath.Join(c.baseDir, GCAPubfile)
+	path := filepath.Join(c.baseDir, GCAPubKeyFile)
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")

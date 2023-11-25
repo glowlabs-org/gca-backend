@@ -1,0 +1,26 @@
+# GCA Backend
+
+This repository contains all of the code related to running the GCA servers,
+and the clients that report to the servers,
+
+## Standards and Conventions
+
+Within the code, "PublicKey" can be abbreviated to "PubKey" or "pubKey", but
+not "pubkey". Same convention goes for "PrivateKey" - "PrivKey" and "privKey"
+are okay but "privkey" is not.
+
+Filenames use camelCase and any non-standard filetype ends with the extention
+'.dat'. For example, filenames can be 'gcaPubKey.dat' or 'history.dat'
+
+Units:
+	+ 3 decimals of precision for latitude and longitude
+	+ MilliWatt hours is the base unit of precision for energy
+	+ Milliwatts is the base unit of precision for power
+	+ Grams is the base unit of precision for emissions
+	+ Timeslots (5 minutes) is the base unit of precision for protocol time
+	+ Seconds is the base unit of precision for clock time
+
+Always use LittleEndian when encoding numbers to binary.
+
+Anything that needs to be signed should have an explicit 'SigningBytes()'
+function.
