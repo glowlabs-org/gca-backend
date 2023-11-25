@@ -18,4 +18,5 @@ const (
 	defaultLogLevel          = DEBUG
 	reportMigrationFrequency = 100 * time.Millisecond
 	testMode                 = true
+	wattTimeFrequency        = 20 * time.Millisecond
 )

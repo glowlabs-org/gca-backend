@@ -73,7 +73,7 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// Since this code depends on external APIs, we return an arbitrary
 	// value.
 	if testMode {
-		return latitude + longitude + 1.5, time.Now().Unix(), nil
+		return latitude + longitude + 200 + float64(time.Now().UnixNano()%250), glow.TimeslotToUnix(glow.CurrentTimeslot()), nil
 	}
 
 	// Create the base url
@@ -134,8 +134,7 @@ func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 		select {
 		case <-gcas.quit:
 			return
-		case <-time.After(2 * time.Minute):
-			// TODO: Need to swap this to a const
+		case <-time.After(wattTimeFrequency):
 		}
 
 		// Get a new auth token. They expire relatively quickly so we
