@@ -153,6 +153,7 @@ func (s *GCAServer) buildDeviceStats(timeslotOffset uint32) (ads AllDeviceStats,
 			ds.PowerOutputs[i] = report.PowerOutput
 		}
 		copy(ds.ImpactRates[:], s.equipmentImpactRate[shortID][:])
+		ads.Devices = append(ads.Devices, ds)
 	}
 
 	// Set the timeslot offset and add a signature.
