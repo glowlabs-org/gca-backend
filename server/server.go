@@ -146,12 +146,10 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	}
 
 	// Load the GCA Server keys.
-	pub, priv, err := server.loadGCAServerKeys()
+	server.staticPublicKey, server.staticPrivateKey, err = server.loadGCAServerKeys()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load gca server keys: %v", err)
 	}
-	server.staticPublicKey = pub
-	server.staticPrivateKey = priv
 	// Load the temporary Glow Certification Agent public key.
 	if err := server.loadGCATempKey(); err != nil {
 		return nil, fmt.Errorf("failed to load GCA public key: %v", err)
@@ -168,6 +166,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	if err := server.loadEquipmentReports(); err != nil {
 		return nil, fmt.Errorf("failed to load equipment reports: %v", err)
 	}
+	// TODO: Load the persisted list of authorized servers.
 
 	udpReady := make(chan struct{})
 	tcpReady := make(chan struct{})
