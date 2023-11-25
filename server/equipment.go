@@ -57,7 +57,7 @@ func (gcas *GCAServer) loadEquipment() error {
 	buffer := bytes.NewBuffer(rawData)
 	for buffer.Len() > 0 {
 		// Deserialize the EquipmentAuthorization
-		ea, err := glow.DeserializeEquipmentAuthorization(buffer.Next(120)) // 120 bytes = 4 (ShortID) + 32 (PublicKey) + 8 (Capacity) + 8 (Debt) + 4 (Expiration) + 64 (Signature)
+		ea, err := glow.DeserializeEquipmentAuthorization(buffer.Next(136))
 		if err != nil {
 			return err
 		}

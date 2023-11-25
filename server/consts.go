@@ -17,4 +17,5 @@ const (
 	udpPort                  = 35045
 	defaultLogLevel          = WARN
 	reportMigrationFrequency = 1 * time.Hour
+	testMode                 = false
 )

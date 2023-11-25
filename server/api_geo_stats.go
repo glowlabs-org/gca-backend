@@ -115,16 +115,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// loadWattTimeCredentials is a helper function to load one of
-// the watttime credential files from disk.
-func loadWattTimeCredentials(filename string) string {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Fatal("Error reading credentials file:", err)
-	}
-	return strings.TrimSpace(string(data))
-}
-
 // getWattTimeToken makes an API call to WattTime to authenticate and retrieve an access token.
 func getWattTimeToken(username, password string) (string, error) {
 	client := &http.Client{}
@@ -193,44 +183,6 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 	var data Response
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	return data.Properties.Parameter.AllSkySfcSwDwn, err
-}
-
-// getBalancingAuthority makes an API call to watttime to get the ba that's associated
-// with a specific location
-func getBalancingAuthority(token string, latitude, longitude float64) (string, error) {
-	client := &http.Client{}
-	regionURL := "https://api2.watttime.org/v2/ba-from-loc"
-	req, err := http.NewRequest("GET", regionURL, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Set the authorization header and query parameters
-	req.Header.Set("Authorization", "Bearer "+token)
-	q := req.URL.Query()
-	q.Add("latitude", strconv.FormatFloat(latitude, 'f', 6, 64))
-	q.Add("longitude", strconv.FormatFloat(longitude, 'f', 6, 64))
-	req.URL.RawQuery = q.Encode()
-
-	// Make the API request
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	// Check for non-200 status code
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
-	}
-
-	// Parse the JSON response
-	var baResponse BalancingAuthorityResponse
-	if err := json.NewDecoder(resp.Body).Decode(&baResponse); err != nil {
-		return "", err
-	}
-
-	return baResponse.Abbrev, nil
 }
 
 // fetchAndSaveHistoricalBAData fetches historical data for the given balancing
