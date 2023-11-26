@@ -204,6 +204,7 @@ func (gcas *GCAServer) threadedMigrateReports() {
 				panic("unable to build device stats: " + err.Error())
 			}
 			gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, stats)
+			// TODO: write to file
 			// Copy the last half of every report into the first
 			// half, then blank out the last half.
 			for _, report := range gcas.equipmentReports {

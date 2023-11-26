@@ -332,6 +332,11 @@ func TestAddingServers(t *testing.T) {
 	if !isData {
 		t.Fatal("Expecting at least some IR values to have accrued, but there is nothing")
 	}
+	// Verify the signature.
+	sb := statsResp.SigningBytes()
+	if !glow.Verify(gcas2.PublicKey(), sb, statsResp.Signature) {
+		t.Fatal("signature mismatch on the AllDeviceStats object")
+	}
 
 	// Try restarting the client, make sure it can still submit reports to
 	// gcas2. It will need to potentially go through a sync to find gcas2
@@ -400,7 +405,7 @@ func TestAddingServers(t *testing.T) {
 		TcpPort:   tcpPort3,
 		UdpPort:   udpPort3,
 	}
-	sb := as.SigningBytes()
+	sb = as.SigningBytes()
 	sig := glow.Sign(sb, gcaPrivKey)
 	as.GCAAuthorization = sig
 	// Create the http request for gcas2
