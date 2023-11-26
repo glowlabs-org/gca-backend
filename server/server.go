@@ -183,6 +183,16 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		return nil, fmt.Errorf("failed to load password: %v", err)
 	}
 
+	// Immediately grab all of the data for the most recent week to catch
+	// up on anything that was missed.
+	err = server.managedGetWattTimeWeekData(username, password)
+	if err != nil {
+		// This is unfortunate, but this is not cause to abort startup,
+		// so we'll just log an error.
+		fmt.Println("Unable to get WattTime data for the most recent week:", err)
+		server.logger.Errorf("Unable to get WattTime data for the most recent week: %v", err)
+	}
+
 	// Start the background threads for various server functionalities
 	go server.threadedLaunchUDPServer(udpReady)
 	go server.threadedMigrateReports(username, password)
