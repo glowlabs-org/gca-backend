@@ -3,6 +3,8 @@ package server
 // This file contains helper functions related to the creation and tracking of
 // equipement.
 
+// TODO: Need to test the persistence of the saveAllDeviceStats.
+
 import (
 	"bytes"
 	"fmt"
@@ -192,30 +194,33 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 
 // threadedMigrateReports will infrequently update the equipment reports so
 // that the reports are always for the current week and the previous.
-func (gcas *GCAServer) threadedMigrateReports() {
+func (gcas *GCAServer) threadedMigrateReports(username, password string) {
 	for {
 		// This loop is pretty lightweight so every 3 seconds seems
 		// fine, even though action is only taken once a week.
 		time.Sleep(reportMigrationFrequency)
 
-		// TODO: Grab the historical impact rates from WattTime (just
-		// the recent week's of data) so that any gaps / downtime from
-		// earlier in the week can be repaired. I suppose if there are
-		// errors, we can try to sleep through them, we do have at
-		// least 1000 minutes to get this done right. Retrying a bunch
-		// is probably okay.
-
 		// We only update if we are progressed most of the way through
 		// the second week.
 		gcas.mu.Lock()
+		ero := gcas.equipmentReportsOffset
+		gcas.mu.Unlock()
 		now := glow.CurrentTimeslot()
-		if int64(now)-int64(gcas.equipmentReportsOffset) > 4000 {
+		if int64(now)-int64(ero) > 4000 {
 			// panic, because the system has entered incoherency.
-			gcas.mu.Unlock()
-			panic("migration got out of sync")
+			panic("migration is late")
 		}
-		if int64(now)-int64(gcas.equipmentReportsOffset) > 3200 {
+		if int64(now)-int64(ero) > 3200 {
+			// Fetch all of the moer values for the week.
+			err := gcas.managedGetWattTimeWeekData(username, password)
+			if err != nil {
+				gcas.logger.Errorf("unable to fetch WattTime week data: %v", err)
+				// All we can do is log the error, we still
+				// need to rotate the time and save the data.
+				// No control flow is used here.
+			}
 			// Save the device stats.
+			gcas.mu.Lock()
 			stats, err := gcas.buildDeviceStats(gcas.equipmentReportsOffset)
 			if err != nil {
 				panic("unable to build device stats: " + err.Error())
@@ -242,16 +247,6 @@ func (gcas *GCAServer) threadedMigrateReports() {
 			gcas.equipmentReportsOffset += 2016
 			gcas.logger.Info("completed an equipment reports migration")
 			gcas.mu.Unlock()
-
-			// TODO: after dropping the lock, save the latest set
-			// of stats to disk. We'll need some way to be sure
-			// it's not being saved redundantly, I guess that's
-			// what the timeslot offset inside the struct is for -
-			// even if we get a few copies of it, we'll be able to
-			// tell that it happened.
-		} else {
-			gcas.mu.Unlock()
 		}
-
 	}
 }
