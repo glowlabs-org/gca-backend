@@ -196,7 +196,6 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 	if err != nil {
 		return nil, nil, fmt.Errorf("Unable to parse api response: %v", err)
 	}
-	fmt.Println(irs)
 
 	// Build the return values.
 	var moers []float64
