@@ -185,7 +185,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 
 	// Start the background threads for various server functionalities
 	go server.threadedLaunchUDPServer(udpReady)
-	go server.threadedMigrateReports()
+	go server.threadedMigrateReports(username, password)
 	go server.threadedListenForSyncRequests(tcpReady)
 	go server.threadedCollectImpactData(username, password)
 	server.launchAPI()
