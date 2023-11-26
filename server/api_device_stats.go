@@ -78,6 +78,94 @@ func (ads AllDeviceStats) SigningBytes() []byte {
 	return b
 }
 
+// Serialize will convert an AllDeviceStats to a byte slice.
+func (ads AllDeviceStats) Serialize() []byte {
+	// Calculate the byte slice size
+	size := 4 + len(ads.Devices)*(32+8*2*4032) + 4 + 64 // Additional 64 for Signature
+	b := make([]byte, size)
+	i := 0
+
+	// Number of devices
+	binary.BigEndian.PutUint32(b[i:], uint32(len(ads.Devices)))
+	i += 4
+
+	// Device data
+	for _, device := range ads.Devices {
+		copy(b[i:], device.PublicKey[:])
+		i += 32
+		for _, po := range device.PowerOutputs {
+			binary.BigEndian.PutUint64(b[i:], po)
+			i += 8
+		}
+		for _, ir := range device.ImpactRates {
+			binary.BigEndian.PutUint64(b[i:], math.Float64bits(ir))
+			i += 8
+		}
+	}
+
+	// Timeslot offset
+	binary.BigEndian.PutUint32(b[i:], ads.TimeslotOffset)
+	i += 4
+
+	// Signature
+	copy(b[i:], ads.Signature[:])
+
+	return b
+}
+
+// DeserializeAllDeviceStats will reverse a call to AllDeviceStats.Serialize()
+func DeserializeAllDeviceStats(b []byte) (AllDeviceStats, error) {
+	if len(b) < 4 {
+		return AllDeviceStats{}, fmt.Errorf("byte slice too short")
+	}
+
+	// Number of devices
+	numDevices := binary.BigEndian.Uint32(b[:4])
+	i := 4
+
+	devices := make([]DeviceStats, numDevices)
+	for x := 0; x < int(numDevices); x++ {
+		if i+32 > len(b) {
+			return AllDeviceStats{}, fmt.Errorf("byte slice too short for public key")
+		}
+		copy(devices[x].PublicKey[:], b[i:i+32])
+		i += 32
+
+		for j := 0; j < 4032; j++ {
+			if i+8 > len(b) {
+				return AllDeviceStats{}, fmt.Errorf("byte slice too short for power output")
+			}
+			devices[x].PowerOutputs[j] = binary.BigEndian.Uint64(b[i : i+8])
+			i += 8
+		}
+		for j := 0; j < 4032; j++ {
+			if i+8 > len(b) {
+				return AllDeviceStats{}, fmt.Errorf("byte slice too short for impact rate")
+			}
+			devices[x].ImpactRates[j] = math.Float64frombits(binary.BigEndian.Uint64(b[i : i+8]))
+			i += 8
+		}
+	}
+
+	if i+4 > len(b) {
+		return AllDeviceStats{}, fmt.Errorf("byte slice too short for timeslot offset")
+	}
+	timeslotOffset := binary.BigEndian.Uint32(b[i : i+4])
+	i += 4
+
+	if i+64 > len(b) {
+		return AllDeviceStats{}, fmt.Errorf("byte slice too short for signature")
+	}
+	var signature glow.Signature
+	copy(signature[:], b[i:i+64])
+
+	return AllDeviceStats{
+		Devices:        devices,
+		TimeslotOffset: timeslotOffset,
+		Signature:      signature,
+	}, nil
+}
+
 // AllDeviceStatsHandler will return the statistics on all of the devices for
 // the requested week.
 func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request) {

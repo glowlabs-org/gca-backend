@@ -199,31 +199,10 @@ func (gcas *GCAServer) managedGetWattTimeData(username, password string) error {
 		// Update the struct which tracks the moer times. If the clock
 		// goes backwards in time for some reason, this can panic, so
 		// we have to double check.
-		save := true
 		gcas.mu.Lock()
 		impactIndex := timeslot - gcas.equipmentReportsOffset
-		if moer == 0 || (timeslot > gcas.equipmentReportsOffset && gcas.equipmentImpactRate[shortID][impactIndex] == moer) {
-			save = false
-		}
 		gcas.equipmentImpactRate[shortID][impactIndex] = moer
 		gcas.mu.Unlock()
-
-		if save {
-			// TODO: persist this reading to disk. Thinking about
-			// this a little more, we should save the readings to
-			// disk one-by-one so that there's a logged history of
-			// readings that have been made. Which device, what
-			// time, what reading.
-			//
-			// When we load the readings later, I don't think the
-			// offset will have updated so we can fill out the
-			// things and still get the correct historical values.
-			//
-			// We should probably just have the server refuse to
-			// start if it has been offline for more than 7 days.
-			// You have to hard-reset it and let it resync with
-			// it's peers.
-		}
 	}
 	return nil
 }
