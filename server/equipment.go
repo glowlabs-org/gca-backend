@@ -125,6 +125,47 @@ func (gcas *GCAServer) loadEquipment() error {
 	return nil
 }
 
+// loadEquipmentHistory will open the history file that contains all of the
+// DeviceStatsHistory entries, and load it into the server one element at a
+// time. This loading process will also inform the equipmentReportsOffset value
+// that gets set before all of the recentReports are loaded.
+func (gcas *GCAServer) loadEquipmentHistory() error {
+	// Read the full file into memory. We keep all of the structs in memory
+	// already anyway, if it starts to get too big we can optimize later.
+	path := filepath.Join(gcas.baseDir, AllDeviceStatsHistoryFile)
+	data, err := ioutil.ReadFile(path)
+	// Create the file if it doesn't exist.
+	if os.IsNotExist(err) {
+		f, err := os.Create(path)
+		if err != nil {
+			return fmt.Errorf("unable to create device stats history file: %v", err)
+		}
+		err = f.Close()
+		if err != nil {
+			return fmt.Errorf("unable to close device stats histroy file: %v", err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("unable to load the device stats history file: %v", err)
+	}
+
+	// Deserialize the device stats one week at at time.
+	for {
+		// Once we've parsed all the data, we can return.
+		if len(data) == 0 {
+			return nil
+		}
+
+		ads, i, err := DeserializeStreamAllDeviceStats(data)
+		if err != nil {
+			return fmt.Errorf("unable to decode all device stats: %v", err)
+		}
+		gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, ads)
+		data = data[i:]
+	}
+}
+
 // saveEquipment serializes a given EquipmentAuthorization and appends it to
 // the 'equipment-authorizations.dat' file. The function opens the file in append
 // mode, or creates it if it does not exist.
@@ -207,7 +248,14 @@ func (gcas *GCAServer) threadedMigrateReports(username, password string) {
 		gcas.mu.Unlock()
 		now := glow.CurrentTimeslot()
 		if int64(now)-int64(ero) > 4000 {
-			// panic, because the system has entered incoherency.
+			// TODO: Actually, the code has been adjusted so that
+			// this should not be a problem. We should proceed,
+			// business as usual, if this happens. But also, if
+			// this happens we need to do it a bunch more times
+			// so... we need to skip the reportMigrationFrequency
+			// sleep on the next round. We probably need to
+			// refactor this code a decent amount to make that
+			// clean.
 			panic("migration is late")
 		}
 		if int64(now)-int64(ero) > 3200 {
