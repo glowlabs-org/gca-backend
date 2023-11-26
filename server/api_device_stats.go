@@ -234,6 +234,10 @@ func (s *GCAServer) buildDeviceStats(timeslotOffset uint32) (ads AllDeviceStats,
 	if timeslotOffset < s.equipmentReportsOffset {
 		return ads, fmt.Errorf("timeslotOffset must not predate the current equipment offset")
 	}
+	var x int
+	if timeslotOffset == s.equipmentReportsOffset+2016 {
+		x = 2016
+	}
 	if timeslotOffset > s.equipmentReportsOffset+2016 {
 		return ads, fmt.Errorf("timeslotOffset must not be in the future")
 	}
@@ -242,13 +246,10 @@ func (s *GCAServer) buildDeviceStats(timeslotOffset uint32) (ads AllDeviceStats,
 	for shortID, reports := range s.equipmentReports {
 		var ds DeviceStats
 		ds.PublicKey = s.equipment[shortID].PublicKey
-		for i, report := range reports {
-			if i >= 2016 {
-				break
-			}
-			ds.PowerOutputs[i] = report.PowerOutput
+		for i := 0; i < 2016; i++ {
+			ds.PowerOutputs[i] = reports[x+i].PowerOutput
 		}
-		copy(ds.ImpactRates[:], s.equipmentImpactRate[shortID][:])
+		copy(ds.ImpactRates[:], s.equipmentImpactRate[shortID][x:])
 		ads.Devices = append(ads.Devices, ds)
 	}
 
