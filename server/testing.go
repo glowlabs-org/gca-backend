@@ -26,6 +26,11 @@ func (gcas *GCAServer) PublicKey() glow.PublicKey {
 	return gcas.staticPublicKey
 }
 
+// BaseDir returns the base dir of the GCA server.
+func (gcas *GCAServer) BaseDir() string {
+	return gcas.baseDir
+}
+
 // CheckInvariants is a function which will ensure that the data on the server
 // is self-consistent. If something is broken, it means the struct has corrupted
 // and a panic is necessary to prevent grey goo from infecting the system.
