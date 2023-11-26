@@ -288,10 +288,12 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 
 		// Update the struct which tracks the moer times. If the clock
 		// goes backwards in time for some reason, this can panic, so
-		// we have to double check.
+		// we have to double check the bounds.
 		gcas.mu.Lock()
 		impactIndex := timeslot - gcas.equipmentReportsOffset
-		gcas.equipmentImpactRate[shortID][impactIndex] = moer
+		if timeslot >= gcas.equipmentReportsOffset {
+			gcas.equipmentImpactRate[shortID][impactIndex] = moer
+		}
 		gcas.mu.Unlock()
 	}
 	return nil
@@ -351,7 +353,9 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 			// goes backwards in time for some reason, this can panic, so
 			// we have to double check.
 			impactIndex := timeslot - gcas.equipmentReportsOffset
-			gcas.equipmentImpactRate[shortID][impactIndex] = moers[i]
+			if timeslot >= gcas.equipmentReportsOffset {
+				gcas.equipmentImpactRate[shortID][impactIndex] = moers[i]
+			}
 		}
 		gcas.mu.Unlock()
 

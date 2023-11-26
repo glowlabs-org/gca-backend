@@ -202,17 +202,16 @@ func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request
 	// Check whether we need to return all of the current values, or if we
 	// need to return
 	var stats AllDeviceStats
-	if tso+4032 < glow.CurrentTimeslot() {
-		s.mu.Lock()
+	s.mu.Lock()
+	if tso < s.equipmentReportsOffset {
 		relativeTSO := tso - s.equipmentHistoryOffset
 		stats = s.equipmentStatsHistory[relativeTSO/2016]
 		s.mu.Unlock()
 	} else {
-		s.mu.Lock()
 		stats, err = s.buildDeviceStats(tso)
 		s.mu.Unlock()
 		if err != nil {
-			http.Error(w, "unable to build stats for the provided timeslot", http.StatusInternalServerError)
+			http.Error(w, "unable to build stats for the provided timeslot: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -233,7 +232,7 @@ func (s *GCAServer) buildDeviceStats(timeslotOffset uint32) (ads AllDeviceStats,
 		return ads, fmt.Errorf("timeslotOffset must be a multiple of 2016")
 	}
 	if timeslotOffset < s.equipmentReportsOffset {
-		return ads, fmt.Errorf("timeslotOffset must not be in the future")
+		return ads, fmt.Errorf("timeslotOffset must not predate the current equipment offset")
 	}
 	if timeslotOffset > s.equipmentReportsOffset+2016 {
 		return ads, fmt.Errorf("timeslotOffset must not be in the future")

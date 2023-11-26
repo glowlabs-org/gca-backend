@@ -239,7 +239,7 @@ func (gcas *GCAServer) threadedMigrateReports(username, password string) {
 	for {
 		// This loop is pretty lightweight so every 3 seconds seems
 		// fine, even though action is only taken once a week.
-		time.Sleep(reportMigrationFrequency)
+		time.Sleep(ReportMigrationFrequency)
 
 		// We only update if we are progressed most of the way through
 		// the second week.

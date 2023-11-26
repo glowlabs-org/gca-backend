@@ -15,7 +15,8 @@ const (
 	tcpPort                  = ":0"
 	udpPort                  = 0
 	defaultLogLevel          = DEBUG
-	reportMigrationFrequency = 100 * time.Millisecond
 	testMode                 = true
 	wattTimeFrequency        = 20 * time.Millisecond
+
+	ReportMigrationFrequency = 100 * time.Millisecond
 )

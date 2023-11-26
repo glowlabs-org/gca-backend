@@ -10,6 +10,9 @@ import (
 )
 
 // RecentReportsResponse defines the output containing the equipment reports and a signature.
+//
+// TODO: Need to add the equipmentReportsOffset to this struct so the caller
+// knows which batch of reports they are reading from.
 type RecentReportsResponse struct {
 	Reports   [4032]glow.EquipmentReport `json:"Reports"`   // Array of equipment reports
 	Signature string                     `json:"Signature"` // Signature of the GCA server
