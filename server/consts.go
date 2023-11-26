@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	equipmentReportSize      = 80
 	maxRecentReports         = 100e3
 	maxRecentEquipmentAuths  = 1e3
 	serverIP                 = "0.0.0.0"

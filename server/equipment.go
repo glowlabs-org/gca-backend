@@ -28,6 +28,23 @@ func (gcas *GCAServer) addRecentEquipmentAuth(ea glow.EquipmentAuthorization) {
 	}
 }
 
+// saveAllDeviceStats will save the provided AllDeviceStats object to disk,
+// adding it to the file that contains the history of all device stats.
+func (gcas *GCAServer) saveAllDeviceStats(ads AllDeviceStats) error {
+	file, err := os.OpenFile(filepath.Join(gcas.baseDir, AllDeviceStatsHistoryFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open all device stats file: %v", err)
+	}
+	defer file.Close()
+
+	b := ads.Serialize()
+	_, err = file.Write(b)
+	if err != nil {
+		return fmt.Errorf("unable to write data to disk: %v", err)
+	}
+	return nil
+}
+
 // loadEquipment reads the serialized EquipmentAuthorizations from disk,
 // deserializes them, and then verifies each of them.
 //
@@ -204,7 +221,10 @@ func (gcas *GCAServer) threadedMigrateReports() {
 				panic("unable to build device stats: " + err.Error())
 			}
 			gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, stats)
-			// TODO: write to file
+			err = gcas.saveAllDeviceStats(stats)
+			if err != nil {
+				panic("failed to save all device stats: " + err.Error())
+			}
 			// Copy the last half of every report into the first
 			// half, then blank out the last half.
 			for _, report := range gcas.equipmentReports {
