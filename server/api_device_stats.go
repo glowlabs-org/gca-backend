@@ -34,8 +34,8 @@ import (
 // DeviceStats contains the statistics for one device.
 type DeviceStats struct {
 	PublicKey    glow.PublicKey
-	PowerOutputs [4032]uint64
-	ImpactRates  [4032]float64
+	PowerOutputs [2016]uint64
+	ImpactRates  [2016]float64
 }
 
 // AllDeviceStats contains aggregate weekly statistics
@@ -49,7 +49,7 @@ type AllDeviceStats struct {
 // server to authenticate the response.
 func (ads AllDeviceStats) SigningBytes() []byte {
 	// Add the length prefix
-	b := make([]byte, 4+len(ads.Devices)*(32+8*2*4032)+4)
+	b := make([]byte, 4+len(ads.Devices)*(32+8*2*2016)+4)
 	i := 0
 	binary.BigEndian.PutUint32(b, uint32(len(ads.Devices)))
 	i += 4
@@ -81,7 +81,7 @@ func (ads AllDeviceStats) SigningBytes() []byte {
 // Serialize will convert an AllDeviceStats to a byte slice.
 func (ads AllDeviceStats) Serialize() []byte {
 	// Calculate the byte slice size
-	size := 4 + len(ads.Devices)*(32+8*2*4032) + 4 + 64 // Additional 64 for Signature
+	size := 4 + len(ads.Devices)*(32+8*2*2016) + 4 + 64 // Additional 64 for Signature
 	b := make([]byte, size)
 	i := 0
 
@@ -136,14 +136,14 @@ func DeserializeStreamAllDeviceStats(b []byte) (AllDeviceStats, int, error) {
 		copy(devices[x].PublicKey[:], b[i:i+32])
 		i += 32
 
-		for j := 0; j < 4032; j++ {
+		for j := 0; j < 2016; j++ {
 			if i+8 > len(b) {
 				return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for power output")
 			}
 			devices[x].PowerOutputs[j] = binary.BigEndian.Uint64(b[i : i+8])
 			i += 8
 		}
-		for j := 0; j < 4032; j++ {
+		for j := 0; j < 2016; j++ {
 			if i+8 > len(b) {
 				return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for impact rate")
 			}
@@ -243,6 +243,9 @@ func (s *GCAServer) buildDeviceStats(timeslotOffset uint32) (ads AllDeviceStats,
 		var ds DeviceStats
 		ds.PublicKey = s.equipment[shortID].PublicKey
 		for i, report := range reports {
+			if i >= 2016 {
+				break
+			}
 			ds.PowerOutputs[i] = report.PowerOutput
 		}
 		copy(ds.ImpactRates[:], s.equipmentImpactRate[shortID][:])

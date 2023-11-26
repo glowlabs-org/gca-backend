@@ -162,6 +162,7 @@ func (gcas *GCAServer) loadEquipmentHistory() error {
 			return fmt.Errorf("unable to decode all device stats: %v", err)
 		}
 		gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, ads)
+		gcas.equipmentReportsOffset = ads.TimeslotOffset+2016
 		data = data[i:]
 	}
 }
@@ -239,7 +240,11 @@ func (gcas *GCAServer) threadedMigrateReports(username, password string) {
 	for {
 		// This loop is pretty lightweight so every 3 seconds seems
 		// fine, even though action is only taken once a week.
-		time.Sleep(ReportMigrationFrequency)
+		select {
+		case <-gcas.quit:
+			return
+		case <-time.After(ReportMigrationFrequency):
+		}
 
 		// We only update if we are progressed most of the way through
 		// the second week.
