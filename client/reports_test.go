@@ -322,6 +322,16 @@ func TestAddingServers(t *testing.T) {
 	if len(statsResp.Devices) != 1 {
 		t.Fatal("expecting 1 device in the stats:", len(statsResp.Devices))
 	}
+	// Check that there are non-zero values in the output.
+	isData := false
+	for _, ir := range statsResp.Devices[0].ImpactRates {
+		if ir != 0 {
+			isData = true
+		}
+	}
+	if !isData {
+		t.Fatal("Expecting at least some IR values to have accrued, but there is nothing")
+	}
 
 	// Try restarting the client, make sure it can still submit reports to
 	// gcas2. It will need to potentially go through a sync to find gcas2

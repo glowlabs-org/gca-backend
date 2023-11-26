@@ -168,4 +168,10 @@ func TestTCPListener(t *testing.T) {
 	if err == nil {
 		t.Fatal("expecting error when reading non-existant bitfield")
 	}
+
+	// Close the server.
+	err = gcas.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

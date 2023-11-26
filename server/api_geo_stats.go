@@ -55,8 +55,16 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Load WattTime credentials and then get the auth token.
 	wtUsernamePath := filepath.Join("watttime_data", "username")
 	wtPasswordPath := filepath.Join("watttime_data", "password")
-	username := loadWattTimeCredentials(wtUsernamePath)
-	password := loadWattTimeCredentials(wtPasswordPath)
+	username, err := loadWattTimeCredentials(wtUsernamePath)
+	if err != nil {
+		http.Error(w, "Error in loading watttime username", http.StatusInternalServerError)
+		return
+	}
+	password, err := loadWattTimeCredentials(wtPasswordPath)
+	if err != nil {
+		http.Error(w, "Error in loading watttime password", http.StatusInternalServerError)
+		return
+	}
 	token, err := getWattTimeToken(username, password)
 	if err != nil {
 		http.Error(w, "Error in fetching watttime token", http.StatusInternalServerError)
@@ -113,38 +121,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		return
 	}
-}
-
-// getWattTimeToken makes an API call to WattTime to authenticate and retrieve an access token.
-func getWattTimeToken(username, password string) (string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api2.watttime.org/v2/login", nil)
-	if err != nil {
-		return "", err
-	}
-	req.SetBasicAuth(username, password)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	// Check for non-200 status code and handle specific errors
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == 403 {
-			return "", fmt.Errorf("authentication failed: invalid credentials")
-		}
-		return "", fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
-	}
-
-	var tokenResponse WattTimeTokenResponse
-	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
-	if err != nil {
-		return "", err
-	}
-
-	return tokenResponse.Token, nil
 }
 
 // fetchNASAData is a helper function to download the historical sunlight data

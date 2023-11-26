@@ -398,4 +398,9 @@ func TestConcurrency(t *testing.T) {
 	// Stop everything, and then wait 50 more milliseconds for good measure.
 	close(stopSignal)
 	time.Sleep(50 * time.Millisecond)
+
+	err = gcas.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
