@@ -174,8 +174,14 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// Load the watttime credentials.
 	wtUsernamePath := filepath.Join(server.baseDir, "watttime_data", "username")
 	wtPasswordPath := filepath.Join(server.baseDir, "watttime_data", "password")
-	username := loadWattTimeCredentials(wtUsernamePath)
-	password := loadWattTimeCredentials(wtPasswordPath)
+	username, err := loadWattTimeCredentials(wtUsernamePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load username: %v", err)
+	}
+	password, err := loadWattTimeCredentials(wtPasswordPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load password: %v", err)
+	}
 
 	// Start the background threads for various server functionalities
 	go server.threadedLaunchUDPServer(udpReady)

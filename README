@@ -17,6 +17,7 @@ Units:
 	+ MilliWatt hours is the base unit of precision for energy
 	+ Milliwatts is the base unit of precision for power
 	+ Grams is the base unit of precision for emissions
+	+ Grams per megawatt hour is the base unit of precision for emission rates
 	+ Timeslots (5 minutes) is the base unit of precision for protocol time
 	+ Seconds is the base unit of precision for clock time
 
