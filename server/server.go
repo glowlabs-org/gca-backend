@@ -40,6 +40,13 @@ import (
 // TODO: We want to create a coordination mechanism that makes it unlikely that
 // different GCAs will overlap when they assign ShortIDs. That way we can
 // easily migrate hardware from one GCA to another.
+//
+// TODO: We need some way for the GCA to download the historic signed equipment
+// reports so that the GCA knows the server isn't lying about the production of
+// the solar farms. That definitely feels like more of a post-launch concern
+// though. The recent reports endpoint sends signed reports but that doesn't
+// help for historic data, and GCAs sometimes need access to that historic
+// data.
 
 // GCAServer defines the structure for our Glow Certification Agent Server.
 type GCAServer struct {
@@ -55,9 +62,6 @@ type GCAServer struct {
 
 	recentEquipmentAuths []glow.EquipmentAuthorization // Keep recent auths to more easily synchronize with redundant servers
 	recentReports        []glow.EquipmentReport        // Keep recent reports to more easily synchronize with redundant servers
-
-	// TODO: We need some software to track the carbon impact of each piece
-	// of equipment. I guess we don't actually need it to be sorted by BA.
 
 	// The GCA interacts with the server in two stages. The first stage
 	// uses a temporary key which is created by the technicians before the
@@ -117,27 +121,18 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		return nil, fmt.Errorf("Logger initialization failed: %v", err)
 	}
 
-	// Compute the timeslot that should be used as the reports offset.
-	// This is aimed to be 0:00:00 on Monday UTC.
-	now := glow.CurrentTimeslot()
-	closestWeek := uint32(0)
-	for now-closestWeek > 3200 {
-		closestWeek += 2016
-	}
-
 	// Initialize GCAServer with the necessary fields
 	server := &GCAServer{
-		baseDir:                baseDir,
-		equipment:              make(map[uint32]glow.EquipmentAuthorization),
-		equipmentShortID:       make(map[glow.PublicKey]uint32),
-		equipmentBans:          make(map[uint32]struct{}),
-		equipmentImpactRate:    make(map[uint32]*[4032]float64),
-		equipmentMigrations:    make(map[glow.PublicKey]EquipmentMigration),
-		equipmentReports:       make(map[uint32]*[4032]glow.EquipmentReport),
-		equipmentReportsOffset: closestWeek,
-		recentReports:          make([]glow.EquipmentReport, 0, maxRecentReports),
-		logger:                 logger,
-		mux:                    mux,
+		baseDir:             baseDir,
+		equipment:           make(map[uint32]glow.EquipmentAuthorization),
+		equipmentShortID:    make(map[glow.PublicKey]uint32),
+		equipmentBans:       make(map[uint32]struct{}),
+		equipmentImpactRate: make(map[uint32]*[4032]float64),
+		equipmentMigrations: make(map[glow.PublicKey]EquipmentMigration),
+		equipmentReports:    make(map[uint32]*[4032]glow.EquipmentReport),
+		recentReports:       make([]glow.EquipmentReport, 0, maxRecentReports),
+		logger:              logger,
+		mux:                 mux,
 		httpServer: &http.Server{
 			Addr:    httpPort,
 			Handler: mux,
@@ -162,11 +157,21 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	if err := server.loadEquipment(); err != nil {
 		return nil, fmt.Errorf("failed to load server equipment: %v", err)
 	}
+	// Load the historic data for the equipment. This will also set the
+	// 'equipmentReportsOffset` value.
+	if err := server.loadEquipmentHistory(); err != nil {
+		return nil, fmt.Errorf("failed to load server equipment history: %v", err)
+	}
 	// Load all equipment reports
 	if err := server.loadEquipmentReports(); err != nil {
 		return nil, fmt.Errorf("failed to load equipment reports: %v", err)
 	}
 	// TODO: Load the persisted list of authorized servers.
+	//
+	// TODO: Sync with all of the other servers and get their latest
+	// equipmentReports before starting the threadedMigrateReports loop
+	// which will permanently archive our data and prevent it from being
+	// used again.
 
 	udpReady := make(chan struct{})
 	tcpReady := make(chan struct{})

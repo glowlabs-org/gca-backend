@@ -113,10 +113,15 @@ func (ads AllDeviceStats) Serialize() []byte {
 	return b
 }
 
-// DeserializeAllDeviceStats will reverse a call to AllDeviceStats.Serialize()
-func DeserializeAllDeviceStats(b []byte) (AllDeviceStats, error) {
+// DeserializeStreamAllDeviceStats will reverse a call to
+// AllDeviceStats.Serialize(). This call is unique because it will count the
+// number of bytes that it deserializes from the input array. The assumption is
+// that the input array contains multiple AllDeviceStats objects listed one
+// after another, and returning the size of each one allows them to be decoded
+// consecutively more easily.
+func DeserializeStreamAllDeviceStats(b []byte) (AllDeviceStats, int, error) {
 	if len(b) < 4 {
-		return AllDeviceStats{}, fmt.Errorf("byte slice too short")
+		return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short")
 	}
 
 	// Number of devices
@@ -126,21 +131,21 @@ func DeserializeAllDeviceStats(b []byte) (AllDeviceStats, error) {
 	devices := make([]DeviceStats, numDevices)
 	for x := 0; x < int(numDevices); x++ {
 		if i+32 > len(b) {
-			return AllDeviceStats{}, fmt.Errorf("byte slice too short for public key")
+			return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for public key")
 		}
 		copy(devices[x].PublicKey[:], b[i:i+32])
 		i += 32
 
 		for j := 0; j < 4032; j++ {
 			if i+8 > len(b) {
-				return AllDeviceStats{}, fmt.Errorf("byte slice too short for power output")
+				return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for power output")
 			}
 			devices[x].PowerOutputs[j] = binary.BigEndian.Uint64(b[i : i+8])
 			i += 8
 		}
 		for j := 0; j < 4032; j++ {
 			if i+8 > len(b) {
-				return AllDeviceStats{}, fmt.Errorf("byte slice too short for impact rate")
+				return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for impact rate")
 			}
 			devices[x].ImpactRates[j] = math.Float64frombits(binary.BigEndian.Uint64(b[i : i+8]))
 			i += 8
@@ -148,22 +153,23 @@ func DeserializeAllDeviceStats(b []byte) (AllDeviceStats, error) {
 	}
 
 	if i+4 > len(b) {
-		return AllDeviceStats{}, fmt.Errorf("byte slice too short for timeslot offset")
+		return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for timeslot offset")
 	}
 	timeslotOffset := binary.BigEndian.Uint32(b[i : i+4])
 	i += 4
 
 	if i+64 > len(b) {
-		return AllDeviceStats{}, fmt.Errorf("byte slice too short for signature")
+		return AllDeviceStats{}, 0, fmt.Errorf("byte slice too short for signature")
 	}
 	var signature glow.Signature
 	copy(signature[:], b[i:i+64])
+	i += 64
 
 	return AllDeviceStats{
 		Devices:        devices,
 		TimeslotOffset: timeslotOffset,
 		Signature:      signature,
-	}, nil
+	}, i, nil
 }
 
 // AllDeviceStatsHandler will return the statistics on all of the devices for

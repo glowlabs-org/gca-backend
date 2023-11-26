@@ -37,7 +37,7 @@ func TestSerializeDeserialize(t *testing.T) {
 	serializedData := testADS.Serialize()
 
 	// Deserialize
-	deserializedADS, err := DeserializeAllDeviceStats(serializedData)
+	deserializedADS, _, err := DeserializeStreamAllDeviceStats(serializedData)
 	if err != nil {
 		t.Fatalf("Deserialization failed: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestSerializeDeserialize(t *testing.T) {
 func TestEmptyData(t *testing.T) {
 	var emptyADS AllDeviceStats
 	serializedData := emptyADS.Serialize()
-	deserializedADS, err := DeserializeAllDeviceStats(serializedData)
+	deserializedADS, _, err := DeserializeStreamAllDeviceStats(serializedData)
 	if err != nil {
 		t.Fatalf("Deserialization failed for empty data: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestEmptyData(t *testing.T) {
 }
 
 func TestErrorHandling(t *testing.T) {
-	_, err := DeserializeAllDeviceStats([]byte{1, 2, 3}) // Insufficient data
+	_, _, err := DeserializeStreamAllDeviceStats([]byte{1, 2, 3}) // Insufficient data
 	if err == nil {
 		t.Errorf("Expected an error for insufficient data, but got none")
 	}
