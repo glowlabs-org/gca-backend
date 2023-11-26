@@ -457,4 +457,172 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Error("bad:", i, output)
 		}
 	}
+
+	// One more round of adding new reports in a new history.
+	err = updateMonitorFile(client.baseDir, []uint32{2*2016 + 1501, 2*2016 + 1505}, []uint64{300, 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * sendReportTime)
+	// Check the recent reports
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, report := range response.Reports {
+		if i == 1501 && report.PowerOutput != 299 {
+			t.Error("server does not seem to have the report", report.PowerOutput)
+		} else if i == 1505 && report.PowerOutput != 999 {
+			t.Error("server does not seem to have expected report", report.PowerOutput)
+		} else if i != 1501 && i != 1505 && report.PowerOutput != 0 {
+			t.Error("server has reports we didn't send")
+		}
+	}
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=%d", httpPort, 2016*2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("bad status:", string(body))
+	}
+	err = json.NewDecoder(resp.Body).Decode(&histResp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(histResp.Devices) != 1 {
+		t.Fatal("expected to see one device listed in the device history")
+	}
+	if histResp.TimeslotOffset != 2016*2 {
+		t.Fatal(histResp.TimeslotOffset)
+	}
+	for i, output := range histResp.Devices[0].PowerOutputs {
+		if i == 1501 && output != 299 {
+			t.Error("bad")
+		} else if i == 1505 && output != 999 {
+			t.Error("bad")
+		} else if i != 1501 && i != 1505 && output != 0 {
+			t.Error("bad:", i, output)
+		}
+	}
+	// Bury the new reports into history.
+	glow.SetCurrentTimeslot(3500 + 2*2016)
+	time.Sleep(2 * server.ReportMigrationFrequency)
+
+	// Restart the server and check that all the history is there.
+	err = gcas.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcas, err = server.NewGCAServer(gcasDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpPort, tcpPort, udpPort = gcas.Ports()
+	// Update the ports that the client has for this server because the
+	// client is actually now out of date. We can't control what ports get
+	// assigned during testing so we are just stuck with these invasive
+	// sort of fixes.
+	client.serverMu.Lock()
+	cSrv = client.gcaServers[gcas.PublicKey()]
+	cSrv.TcpPort = tcpPort
+	cSrv.UdpPort = udpPort
+	client.gcaServers[gcas.PublicKey()] = cSrv
+	client.serverMu.Unlock()
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&histResp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if histResp.TimeslotOffset != 0 {
+		t.Fatal(histResp.TimeslotOffset)
+	}
+	if len(histResp.Devices) != 1 {
+		t.Fatal("expected to see one device listed in the device history")
+	}
+	for i, output := range histResp.Devices[0].PowerOutputs {
+		if i == 1 && output != 499 {
+			t.Fatal("bad")
+		} else if i == 5 && output != 2999 {
+			t.Fatal("bad")
+		} else if i != 1 && i != 5 && output != 0 {
+			t.Fatal("bad")
+		}
+	}
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("bad status:", string(body))
+	}
+	err = json.NewDecoder(resp.Body).Decode(&histResp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(histResp.Devices) != 1 {
+		t.Fatal("expected to see one device listed in the device history")
+	}
+	if histResp.TimeslotOffset != 2016 {
+		t.Fatal(histResp.TimeslotOffset)
+	}
+	for i, output := range histResp.Devices[0].PowerOutputs {
+		if i == 1501 && output != 399 {
+			t.Error("bad")
+		} else if i == 1505 && output != 1999 {
+			t.Error("bad")
+		} else if i != 1501 && i != 1505 && output != 0 {
+			t.Error("bad:", i, output)
+		}
+	}
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=%d", httpPort, 2016*2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("bad status:", string(body))
+	}
+	err = json.NewDecoder(resp.Body).Decode(&histResp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(histResp.Devices) != 1 {
+		t.Fatal("expected to see one device listed in the device history")
+	}
+	if histResp.TimeslotOffset != 2016*2 {
+		t.Fatal(histResp.TimeslotOffset)
+	}
+	for i, output := range histResp.Devices[0].PowerOutputs {
+		if i == 1501 && output != 299 {
+			t.Error("bad")
+		} else if i == 1505 && output != 999 {
+			t.Error("bad")
+		} else if i != 1501 && i != 1505 && output != 0 {
+			t.Error("bad:", i, output)
+		}
+	}
 }

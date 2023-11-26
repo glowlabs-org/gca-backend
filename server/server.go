@@ -233,7 +233,7 @@ func (server *GCAServer) Close() error {
 	if err != nil {
 		// Log the error if the shutdown fails.
 		server.logger.Errorf("HTTP server shutdown error: %v", err)
-		return err
+		return fmt.Errorf("error shutting down the http server: %v", err)
 	}
 
 	// Close the TCP and UDP connection
@@ -247,16 +247,16 @@ func (server *GCAServer) Close() error {
 	}
 	server.mu.Unlock()
 	if err1 != nil {
-		return err1
+		return fmt.Errorf("error closing the udp connection: %v", err1)
 	}
 	if err2 != nil {
-		return err2
+		return fmt.Errorf("error closing the tcp connection: %v", err2)
 	}
 
 	// Close the logger
 	err = server.logger.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("error closing the logger: %v", err)
 	}
 	return nil
 }

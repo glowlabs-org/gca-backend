@@ -162,7 +162,7 @@ func (gcas *GCAServer) loadEquipmentHistory() error {
 			return fmt.Errorf("unable to decode all device stats: %v", err)
 		}
 		gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, ads)
-		gcas.equipmentReportsOffset = ads.TimeslotOffset+2016
+		gcas.equipmentReportsOffset = ads.TimeslotOffset + 2016
 		data = data[i:]
 	}
 }
