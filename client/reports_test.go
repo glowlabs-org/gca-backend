@@ -665,4 +665,9 @@ func TestAddingServers(t *testing.T) {
 
 	// TODO: We have to test banning servers. That one is going to take a
 	// while. Maybe 30 seconds even. Perhaps after launch.
+
+	// TODO: Test what happens if all GCAs are offline for a bit but the
+	// client keeps receiving new reports, and then one of the GCAs comes
+	// back online. Testing this will require manually modifying the ports
+	// in memory.
 }
