@@ -81,10 +81,13 @@ func (c *Client) staticLoadReading(timeslot uint32) (uint32, error) {
 		return 0, nil
 	}
 
+	// Read from the file.
 	var data [4]byte
 	byteOffset := 4 * (1 + timeslot - c.staticHistoryOffset)
 	_, err := c.staticHistoryFile.ReadAt(data[:], int64(byteOffset))
 	if err == io.EOF {
+		// If the timeslot is for a part of the file that was never
+		// written, the natural response is nothing.
 		return 0, nil
 	}
 	if err != nil {

@@ -22,18 +22,18 @@ func (er EquipmentReport) SigningBytes() []byte {
 	prefix := []byte("EquipmentReport")
 	bytes := make([]byte, len(prefix)+16)
 	copy(bytes, prefix)
-	binary.BigEndian.PutUint32(bytes[15:], er.ShortID)
-	binary.BigEndian.PutUint32(bytes[19:], er.Timeslot)
-	binary.BigEndian.PutUint64(bytes[23:], er.PowerOutput)
+	binary.LittleEndian.PutUint32(bytes[15:], er.ShortID)
+	binary.LittleEndian.PutUint32(bytes[19:], er.Timeslot)
+	binary.LittleEndian.PutUint64(bytes[23:], er.PowerOutput)
 	return bytes
 }
 
 // Serialize creates a compact binary representation of the data structure.
 func (er EquipmentReport) Serialize() []byte {
 	bytes := make([]byte, 80)
-	binary.BigEndian.PutUint32(bytes[0:], er.ShortID)
-	binary.BigEndian.PutUint32(bytes[4:], er.Timeslot)
-	binary.BigEndian.PutUint64(bytes[8:], er.PowerOutput)
+	binary.LittleEndian.PutUint32(bytes[0:], er.ShortID)
+	binary.LittleEndian.PutUint32(bytes[4:], er.Timeslot)
+	binary.LittleEndian.PutUint64(bytes[8:], er.PowerOutput)
 	copy(bytes[16:], er.Signature[:])
 	return bytes
 }
@@ -52,9 +52,9 @@ func DeserializeReport(i []byte) (EquipmentReport, error) {
 	var er EquipmentReport
 
 	// Deserialize each field from the byte slice into the struct.
-	er.ShortID = binary.BigEndian.Uint32(i[0:4])
-	er.Timeslot = binary.BigEndian.Uint32(i[4:8])
-	er.PowerOutput = binary.BigEndian.Uint64(i[8:16])
+	er.ShortID = binary.LittleEndian.Uint32(i[0:4])
+	er.Timeslot = binary.LittleEndian.Uint32(i[4:8])
+	er.PowerOutput = binary.LittleEndian.Uint64(i[8:16])
 	copy(er.Signature[:], i[16:80])
 
 	// Return the filled EquipmentReport struct.

@@ -53,9 +53,9 @@ func (as *AuthorizedServer) Serialize() []byte {
 	}
 	data[33] = byte(locationLength)
 	copy(data[34:], []byte(as.Location))
-	binary.BigEndian.PutUint16(data[34+locationLength:], as.HttpPort)
-	binary.BigEndian.PutUint16(data[36+locationLength:], as.TcpPort)
-	binary.BigEndian.PutUint16(data[38+locationLength:], as.UdpPort)
+	binary.LittleEndian.PutUint16(data[34+locationLength:], as.HttpPort)
+	binary.LittleEndian.PutUint16(data[36+locationLength:], as.TcpPort)
+	binary.LittleEndian.PutUint16(data[38+locationLength:], as.UdpPort)
 	copy(data[40+locationLength:], as.GCAAuthorization[:])
 	return data
 }

@@ -1,16 +1,9 @@
 package client
 
-// reports.go contains all of the code for sending reports to the server.
-
-// TODO: Add concurrency testing. Since the client doesn't have APIs, the
-// concurrency testing can be a bit less intensive than for when there's an API
-// to bash.
-
-// TODO: Need to add testing around how banned servers get handled.
-
-// TODO: The test suite needs to have some optional randomization on the
-// reports sending so that we can sometimes control the report not to send,
-// simulating a UDP failure.
+// reports.go contains all of the code for sending reports to the server. It
+// also contains the synchronization code which is responsible for migrating
+// the client to a new primary server every few hours (chosen randomly), as
+// well as code that will migrate the client to a new GCA if necessary.
 
 import (
 	"crypto/rand"
@@ -51,12 +44,14 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	glow.SendUDPReport(data, location)
 }
 
-// readEnergyFile will read the data from the energy file and return an array
+// staticReadEnergyFile will read the data from the energy file and return an array
 // that contains all of the values.
-func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
-	// Open the CSV file. We do a quick conditional switch because in prod
-	// the energy file is actually located in an absolute location rather
-	// than being part of the energy monitor directory.
+func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
+	// Open the CSV file. We do a quick conditional check because in prod
+	// the energy file is located in an absolute location rather than being
+	// part of the energy monitor directory, but in testing the location is
+	// in the energy monitor directory so that multiple clients can use
+	// different energy monitor files during testing.
 	filePath := EnergyFile
 	if EnergyFile[0] != '/' {
 		filePath = path.Join(c.staticBaseDir, EnergyFile)
@@ -125,30 +120,31 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 // GCA server, but that's not the same as the GCA, and any GCA transitions (and
 // also any GCA server lists) need to be authorized by the GCA.
 func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey glow.PublicKey) (timeslotOffset uint32, bitfield [504]byte, newGCA glow.PublicKey, newShortID uint32, gcaServers []server.AuthorizedServer, err error) {
-	// The first step is to make a connection to the server and download
-	// the list of reports that it current has.
+	// Open a TCP connection and send our shortID as the request. The
+	// server will respond with a bunch of information that will allow the
+	// client to remain synchronized with the GCA server.
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
 	conn, err := net.Dial("tcp", location)
 	if err != nil {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to dial the gca server: %v", err)
 	}
 	defer conn.Close()
-
-	// Send the request.
 	var buf [4]byte
-	binary.BigEndian.PutUint32(buf[:], c.shortID)
+	binary.LittleEndian.PutUint32(buf[:], c.shortID)
 	_, err = conn.Write(buf[:])
 	if err != nil {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to send reqeust to gca server: %v", err)
 	}
 
-	// Receive the response length
+	// Receive the response length, which is a two byte prefix to the
+	// actual response. No safety checks are needed here, any possible
+	// value is sane and will be processed correctly.
 	var respLenBuf [2]byte
 	_, err = io.ReadFull(conn, respLenBuf[:])
 	if err != nil {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read the response length: %v", err)
 	}
-	respLen := binary.BigEndian.Uint16(respLenBuf[:])
+	respLen := binary.LittleEndian.Uint16(respLenBuf[:])
 
 	// Receive the response.
 	respBuf := make([]byte, respLen)
@@ -160,8 +156,10 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("server did not send enough data: %v", err)
 	}
 
-	// Verify the signature.
-	signingTime := binary.BigEndian.Uint64(respBuf[respLen-72:])
+	// Verify the signature. No safety checks are needed here, as any
+	// possible values will be parsed correctly for the signing time and
+	// signature.
+	signingTime := binary.LittleEndian.Uint64(respBuf[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v vs %v", now, signingTime)
@@ -172,34 +170,50 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
 	}
 
-	// Extract the constant length fields.
+	// Extract the constant length fields. No safety checks are needed, as
+	// all values are binary values with no invariants.
 	var equipmentKey glow.PublicKey
 	copy(equipmentKey[:], respBuf[:32])
-	timeslotOffset = binary.BigEndian.Uint32(respBuf[32:36])
+	timeslotOffset = binary.LittleEndian.Uint32(respBuf[32:36])
 	copy(bitfield[:], respBuf[36:540])
 	copy(newGCA[:], respBuf[540:572])
-	newShortID = binary.BigEndian.Uint32(respBuf[572:576])
+	newShortID = binary.LittleEndian.Uint32(respBuf[572:576])
 	var newGCASignature glow.Signature
 	copy(newGCASignature[:], respBuf[respLen-(64+72):respLen-72])
 
-	// Ensure that the equipment key matches the client's public key.
+	// Ensure that the equipment key matches the client's public key. If
+	// they do not match, the GCAServer has some other public key
+	// associated with our shortID, and therefore this response is
+	// meaningless.
 	if equipmentKey != c.staticPubKey {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
 	}
 
-	// Ensure that if there's a new GCA, that the signature authorizing the
-	// GCA migration for the device is valid and comes from the current
-	// GCA.
+	// Ensure that if there's a new GCA, the signature authorizing the GCA
+	// migration for the device is valid and comes from the current GCA. No
+	// safety checks are needed, as all values are binary values with no
+	// invariants.
 	var blank glow.PublicKey
-	emb := append(equipmentKey[:], respBuf[540:respLen-(64+72)]...)
-	newGCASigningBytes := append([]byte("EquipmentMigration"), emb...)
+	migrationBytes := append(equipmentKey[:], respBuf[540:respLen-(64+72)]...)
+	newGCASigningBytes := append([]byte("EquipmentMigration"), migrationBytes...)
 	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature: %v", err)
 	}
 
-	// Extract the variable length fields.
+	// Extract the variable length fields. Safety checks are needed for
+	// each iteration to ensure that the respLen is long enough to hold the
+	// next pieces of data. The respLen needs to be checked once for
+	// reading all of the fields up to the locationLen, and then again for
+	// reading all of the fields after the locationLen. Can't do it in one
+	// go because we don't know the locationLen until after it is read.
 	i := 576
-	for i < int(respLen)-(72+64) {
+	end := int(respLen) - (72 + 64)
+	for i < end {
+		// Check that there are enough bytes to read up to the
+		// locationLen.
+		if i+34 > end {
+			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches")
+		}
 		var as server.AuthorizedServer
 		copy(as.PublicKey[:], respBuf[i:i+32])
 		i += 32
@@ -207,13 +221,16 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		i += 1
 		locationLen := int(respBuf[i])
 		i += 1
+		if i+locationLen+70 > end {
+			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches")
+		}
 		as.Location = string(respBuf[i : i+locationLen])
 		i += locationLen
-		as.HttpPort = binary.BigEndian.Uint16(respBuf[i : i+2])
+		as.HttpPort = binary.LittleEndian.Uint16(respBuf[i : i+2])
 		i += 2
-		as.TcpPort = binary.BigEndian.Uint16(respBuf[i : i+2])
+		as.TcpPort = binary.LittleEndian.Uint16(respBuf[i : i+2])
 		i += 2
-		as.UdpPort = binary.BigEndian.Uint16(respBuf[i : i+2])
+		as.UdpPort = binary.LittleEndian.Uint16(respBuf[i : i+2])
 		i += 2
 		copy(as.GCAAuthorization[:], respBuf[i:])
 		i += 64
@@ -451,7 +468,7 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 	// we haven't already sent them, the periodic synchronization will fix
 	// it up.
 	latestRecord := uint32(0)
-	records, err := c.readEnergyFile()
+	records, err := c.staticReadEnergyFile()
 	// We'll no-op if there's an error. One error that gets caught is if
 	// the monitoring equipment saves a duplicate reading. The monitoring
 	// equipment shouldn't have this issue, because it should be doing
@@ -492,7 +509,7 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 
 		// Read the energy file. No-op if there's an error. Can't
 		// continue because we still want to sleep.
-		records, err := c.readEnergyFile()
+		records, err := c.staticReadEnergyFile()
 		if err == nil {
 			for _, record := range records {
 				// We try saving the reading first, which can

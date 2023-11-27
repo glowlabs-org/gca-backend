@@ -88,7 +88,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	}
 
 	// Read the ShortID from the request.
-	id := binary.BigEndian.Uint32(buf)
+	id := binary.LittleEndian.Uint32(buf)
 
 	// Fetch the corresponding data.
 	var bitfield [504]byte
@@ -122,7 +122,7 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	// Copy in the public key.
 	copy(resp[2:34], equipment.PublicKey[:])
 	// Copy in the reports offset
-	binary.BigEndian.PutUint32(resp[34:38], reportsOffset)
+	binary.LittleEndian.PutUint32(resp[34:38], reportsOffset)
 	// Copy in the bitfield.
 	copy(resp[38:542], bitfield[:])
 	if migrationExists {
@@ -144,9 +144,9 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 			}
 			sBytes[33] = byte(locationLen)
 			copy(sBytes[34:], []byte(s.Location))
-			binary.BigEndian.PutUint16(sBytes[34+locationLen:], s.HttpPort)
-			binary.BigEndian.PutUint16(sBytes[36+locationLen:], s.TcpPort)
-			binary.BigEndian.PutUint16(sBytes[38+locationLen:], s.UdpPort)
+			binary.LittleEndian.PutUint16(sBytes[34+locationLen:], s.HttpPort)
+			binary.LittleEndian.PutUint16(sBytes[36+locationLen:], s.TcpPort)
+			binary.LittleEndian.PutUint16(sBytes[38+locationLen:], s.UdpPort)
 			copy(sBytes[40+locationLen:], s.GCAAuthorization[:])
 			resp = append(resp, sBytes...)
 		}
@@ -158,13 +158,13 @@ func (gcas *GCAServer) managedHandleSyncConn(conn net.Conn) {
 	// Copy in the unix timestamp
 	var timeBytes [8]byte
 	timestamp := time.Now().Unix()
-	binary.BigEndian.PutUint64(timeBytes[:], uint64(timestamp))
+	binary.LittleEndian.PutUint64(timeBytes[:], uint64(timestamp))
 	resp = append(resp, timeBytes[:]...)
 	// Create the signature
 	sig := glow.Sign(resp[2:], gcas.staticPrivateKey)
 	resp = append(resp, sig[:]...)
 	respLen := len(resp) - 2 // subtract 2 because the length prefix doesn't count
-	binary.BigEndian.PutUint16(resp[:2], uint16(respLen))
+	binary.LittleEndian.PutUint16(resp[:2], uint16(respLen))
 	_, err = conn.Write(resp)
 	if err != nil {
 		gcas.logger.Errorf("Failed to write response: %v", err)

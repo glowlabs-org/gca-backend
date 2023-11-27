@@ -31,7 +31,7 @@ func (em EquipmentMigration) Serialize() []byte {
 	result := make([]byte, 68)
 	copy(result, em.Equipment[:])
 	copy(result[32:], em.NewGCA[:])
-	binary.BigEndian.PutUint32(result[64:], em.NewShortID)
+	binary.LittleEndian.PutUint32(result[64:], em.NewShortID)
 	// Get the serialization of all the authorized servers.
 	for _, as := range em.NewServers {
 		result = append(result, as.Serialize()...)

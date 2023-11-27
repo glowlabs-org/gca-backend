@@ -27,7 +27,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 
 	// Prepare request payload
 	var buf [4]byte
-	binary.BigEndian.PutUint32(buf[:], shortID)
+	binary.LittleEndian.PutUint32(buf[:], shortID)
 
 	// Send the request
 	_, err = conn.Write(buf[:])
@@ -41,7 +41,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	if err != nil {
 		return 0, [504]byte{}, fmt.Errorf("unable to read response length: %v", err)
 	}
-	respLen := binary.BigEndian.Uint16(respLenBytes[:])
+	respLen := binary.LittleEndian.Uint16(respLenBytes[:])
 	resp := make([]byte, respLen)
 
 	// Read the full response
@@ -55,7 +55,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	copy(sig[:], resp[respLen-64:])
 
 	// Extract the signing time.
-	signingTime := binary.BigEndian.Uint64(resp[respLen-72:])
+	signingTime := binary.LittleEndian.Uint64(resp[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
 		return 0, [504]byte{}, fmt.Errorf("signature comes from an out of bounds time: %v", signingTime)
@@ -67,7 +67,7 @@ func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset 
 	}
 
 	// Extract the timeslot offset
-	timeslotOffset = binary.BigEndian.Uint32(resp[32:36])
+	timeslotOffset = binary.LittleEndian.Uint32(resp[32:36])
 
 	// Extract the bitfield
 	copy(bitfield[:], resp[36:540])
