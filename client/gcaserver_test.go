@@ -33,7 +33,7 @@ func TestSerializationDeserialization(t *testing.T) {
 	}
 
 	// Deserialize the map
-	deserializedMap, err := DeserializeGCAServerMap(serializedMap)
+	deserializedMap, err := UntrustedDeserializeGCAServerMap(serializedMap)
 	if err != nil {
 		t.Fatalf("Deserialization failed: %s", err)
 	}
@@ -77,7 +77,7 @@ func TestLocationLengthLimit(t *testing.T) {
 func TestDeserializeMalformedData(t *testing.T) {
 	malformedData := []byte{0, 1, 2, 3} // Insufficient bytes to form a proper GCAMap
 
-	_, err := DeserializeGCAServerMap(malformedData)
+	_, err := UntrustedDeserializeGCAServerMap(malformedData)
 	if err == nil {
 		t.Errorf("Expected deserialization to fail for malformed data, but it did not")
 	}
@@ -100,7 +100,7 @@ func TestPortsSerializationDeserialization(t *testing.T) {
 		t.Fatalf("Serialization of ports failed: %s", err)
 	}
 
-	deserializedMap, err := DeserializeGCAServerMap(serializedMap)
+	deserializedMap, err := UntrustedDeserializeGCAServerMap(serializedMap)
 	if err != nil {
 		t.Fatalf("Deserialization of ports failed: %s", err)
 	}
@@ -130,7 +130,7 @@ func TestDeserializationIncompleteData(t *testing.T) {
 	// Now truncate the serialized data to simulate incomplete data
 	truncatedData := serializedMap[:len(serializedMap)-2] // Removing bytes arbitrarily
 
-	_, err = DeserializeGCAServerMap(truncatedData)
+	_, err = UntrustedDeserializeGCAServerMap(truncatedData)
 	if err == nil {
 		t.Errorf("Expected deserialization to fail for incomplete data, but it did not")
 	}

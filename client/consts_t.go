@@ -20,6 +20,7 @@ const (
 	EnergyFile = "energy_data.csv"
 )
 
+// mimics the production version of randomTimeExtension()
 func randomTimeExtension() time.Duration {
 	var n int64
 	// Read random bits into n and check for errors

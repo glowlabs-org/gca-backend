@@ -442,7 +442,10 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 // threadedSendReports will wake up every minute, check whether there's a new
 // report available, and if so it'll send a report for the corresponding
 // timeslot.
-func (c *Client) threadedSendReports() {
+//
+// The thread needs to complete some initialization tasks before the client is
+// completely ready, that gets coordinated with an empty struct called 'ready'.
+func (c *Client) threadedSendReports(ready chan struct{}) {
 	// Right at startup, we save all of the existing records. We don't
 	// bother sending them because we assume we already sent them, and if
 	// we haven't already sent them, the periodic synchronization will fix
@@ -473,7 +476,7 @@ func (c *Client) threadedSendReports() {
 	// boot loop scenario, we don't want to blow all of our bandwidth doing
 	// sync operations.
 	ticks := 30
-	close(c.started)
+	close(ready)
 	for {
 		// Quit if the closeChan was closed.
 		select {

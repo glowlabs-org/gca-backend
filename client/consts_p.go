@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	// sendReportTime is set to 285 seconds, which is 15 seconds shorter
-	// than 5 minutes. Including the random time extension, you get to 289
+	// sendReportTime is set to 270 seconds, which is 30 seconds shorter
+	// than 5 minutes. Including the random time extension, you get to 274
 	// seconds at worst, which means that the delay should never be so long
 	// that an entire 5 minute window is missed.
 	//
 	// Even if it is missed, the code will pick up the two reports and send
 	// them both at once.
-	sendReportTime = 285 * time.Second
+	sendReportTime = 270 * time.Second
 
 	// EnergyFile is the file used by the monitoring equipment to write the total
 	// amount of energy that was measured in each timeslot.
