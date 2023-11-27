@@ -256,12 +256,14 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
-// threadedSyncWithServer will make a request to the server to figure out which
-// reports did not successfully get received by the server, and it will re-send
-// those reports.
+// threadedSyncWithServer will select a random server from the pool of servers
+// and then perform a sync operation. The sync operation includes downloading
+// the latest list of servers that have been authorized by the GCA, checking
+// for new migration orders from the GCA, and checking if the server is missing
+// any power reports.
 //
-// If the function fails to complete a successful sync operation with the
-// server, it will attempt to migrate to a new server.
+// The client is assuming that the various GCA servers are synchronizing power
+// reports that they receive from each other.
 func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Grab the state we need from the client under the safety of a mutex.
 	c.mu.Lock()
@@ -284,8 +286,14 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 
 	// Create a map to track servers that have already failed, so
 	// that we don't try the same server twice in the same sync
-	// attempt. We don't persist this because the server may come
-	// back later.
+	// attempt. We don't persist any data about how often servers are
+	// available, because we assume that unavailable servers will
+	// eventually be banned by the GCA. The client code is a little bit
+	// dumber in the hopes that the GCA is making an effort to take care of
+	// it.
+	//
+	// The Glow protocol expects the GCA's to be paying attention to their
+	// servers and their clients and properly caring for them.
 	failedServers := make(map[glow.PublicKey]struct{})
 	// Try up to 5 times to grab a random server.
 	var timeslotOffset uint32
@@ -327,19 +335,27 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 			}
 			servers[i], servers[j.Int64()] = servers[j.Int64()], servers[i]
 		}
+		found := false
 		for _, server := range servers {
 			_, exists := failedServers[server]
 			if exists || c.gcaServers[server].Banned {
 				continue
 			}
+			found = true
 			c.primaryServer = server
 			break
+		}
+		if !found {
+			// All servers have either failed or are banned,
+			// therefore this sync operation does not need to
+			// continue.
+			return
 		}
 		gcas = c.gcaServers[c.primaryServer]
 		gcasKey = c.primaryServer
 		c.mu.Unlock()
 
-		// Retry grabbing the bitfield.
+		// Try performing the sync operation with the chosen server.
 		var err error
 		timeslotOffset, bitfield, newGCA, newShortID, gcaServers, err = c.staticServerSync(gcas, gcasKey, gcaKey)
 		if err == nil {
@@ -382,12 +398,15 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		}
 		newServers := make(map[glow.PublicKey]GCAServer)
 		for _, s := range gcaServers {
-			newServers[s.PublicKey] = GCAServer{
-				Banned:   s.Banned,
-				Location: s.Location,
-				HttpPort: s.HttpPort,
-				TcpPort:  s.TcpPort,
-				UdpPort:  s.UdpPort,
+			_, exists := newServers[s.PublicKey]
+			if !exists || s.Banned {
+				newServers[s.PublicKey] = GCAServer{
+					Banned:   s.Banned,
+					Location: s.Location,
+					HttpPort: s.HttpPort,
+					TcpPort:  s.TcpPort,
+					UdpPort:  s.UdpPort,
+				}
 			}
 		}
 		raw, err := SerializeGCAServerMap(newServers)
@@ -404,23 +423,22 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		c.gcaPubKey = newGCA
 		c.shortID = newShortID
 		c.gcaServers = newServers
-	}
-	// Update the server map based on the new list of gca servers.
-	// Specifcially we want to look for new servers, as well as servers
-	// that are now banned.
-	//
-	// This code runs whether or not there's a new GCA, and it needs to run
-	// even if there's a new GCA because the update in the newGCA code does
-	// not properly handle server bans.
-	for _, s := range gcaServers {
-		_, exists := c.gcaServers[s.PublicKey]
-		if !exists || s.Banned {
-			c.gcaServers[s.PublicKey] = GCAServer{
-				Banned:   s.Banned,
-				Location: s.Location,
-				HttpPort: s.HttpPort,
-				TcpPort:  s.TcpPort,
-				UdpPort:  s.UdpPort,
+	} else {
+		// Update the server map based on the new list of gca servers.
+		// Specifcially we want to look for new servers, as well as
+		// servers that are now banned. This code runs conditionally
+		// because other code handles updating the gcaServers if
+		// there's a gca migration.
+		for _, s := range gcaServers {
+			_, exists := c.gcaServers[s.PublicKey]
+			if !exists || s.Banned {
+				c.gcaServers[s.PublicKey] = GCAServer{
+					Banned:   s.Banned,
+					Location: s.Location,
+					HttpPort: s.HttpPort,
+					TcpPort:  s.TcpPort,
+					UdpPort:  s.UdpPort,
+				}
 			}
 		}
 	}
@@ -456,17 +474,20 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	}
 }
 
-// threadedSendReports will wake up every minute, check whether there's a new
-// report available, and if so it'll send a report for the corresponding
-// timeslot.
+// threadedSendReports will periodically check for new readings in the energy
+// file, and if a new reading is found, a report will be created and sent to
+// the primary server. The report is sent over UDP, and no short-term attempt
+// is made to confirm that the report reached its destination. There is a
+// separate synchronization process that occurs at much larger intervals, which
+// will re-send any reports that failed to be delivered on their first attempt.
 //
 // The thread needs to complete some initialization tasks before the client is
-// completely ready, that gets coordinated with an empty struct called 'ready'.
+// completely ready, that gets coordinated with a basic channel.
 func (c *Client) threadedSendReports(ready chan struct{}) {
 	// Right at startup, we save all of the existing records. We don't
 	// bother sending them because we assume we already sent them, and if
 	// we haven't already sent them, the periodic synchronization will fix
-	// it up.
+	// everything up.
 	latestRecord := uint32(0)
 	records, err := c.staticReadEnergyFile()
 	// We'll no-op if there's an error. One error that gets caught is if
@@ -489,13 +510,27 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 
 	// Infinite loop to send reports. We start ticks at 30 so that the
 	// catchup function will run about 2.5 hours after boot. We don't want
-	// to run it immediately after boot because if we get stuck in a short
-	// boot loop scenario, we don't want to blow all of our bandwidth doing
-	// sync operations.
+	// to run it immediately after boot because if some process causes the
+	// device to restart frequently, the bandwidth costs of doing frequent
+	// sync operations could be quite expensive.
+	//
+	// The client is expected to be operating on a mobile network, which is
+	// why we use UDP at all. Some research suggested that packet delivery
+	// rate over UDP is much greater than 99%, but packets will nearly
+	// always arrive out of order.
+	//
+	// The client only ever sends one packet at a time (less than 200
+	// bytes), so ordering is not a concern. A 99% delivery rate is quite
+	// good, and means the background sync loop is not going to incur much
+	// overhead from packet loss.
+	//
+	// The infrequent sync loop is done using TCP, which is more expensive,
+	// but it also requires transferring more than one packet and we would
+	// rather let TCP handle the ordering than implement that ourselves.
 	ticks := 30
 	close(ready)
 	for {
-		// Quit if the closeChan was closed.
+		// Check if the server has shut down.
 		select {
 		case <-c.closed:
 			return
@@ -519,6 +554,13 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 				// different energy readings. That's a problem
 				// that will cause the timeslot to get banned,
 				// so we don't send the report if that happens.
+				//
+				// Even if the error is not a double report
+				// error, we don't want to send the server a
+				// reading that we aren't able to persist
+				// ourselves, because that could indicate other
+				// issues such as faulty hardware, and
+				// therefore the readings may not be accurate.
 				err := c.staticSaveReading(record.Timeslot, uint32(record.Energy))
 				if err != nil {
 					continue
@@ -538,13 +580,21 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 			}
 		}
 
-		// Sleep for a minute before checking again.
+		// Sleep before checking the file again. The sleep includes
+		// both a standard time and a random extra amount of time. The
+		// randomization helps multiple devices to spread out over a
+		// larger interval when sending information to the server,
+		// hopefully preventing the server from being in a situation
+		// where all of the hardware is sending it data in the same 3
+		// seconds followed by 5 minutes of absolutely no activity.
 		select {
 		case <-c.closed:
 			return
 		case <-time.After(sendReportTime + randomTimeExtension()):
 		}
 
+		// Once every 60 iterations a server sync is performed. That's
+		// just under 5 hours between each sync operation.
 		ticks++
 		if ticks >= 60 {
 			ticks = 0
