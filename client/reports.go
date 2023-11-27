@@ -45,7 +45,7 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 		PowerOutput: er.Energy,
 	}
 	sb := eqr.SigningBytes()
-	eqr.Signature = glow.Sign(sb, c.privkey)
+	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
 	glow.SendUDPReport(data, location)
@@ -59,7 +59,7 @@ func (c *Client) readEnergyFile() ([]EnergyRecord, error) {
 	// than being part of the energy monitor directory.
 	filePath := EnergyFile
 	if EnergyFile[0] != '/' {
-		filePath = path.Join(c.baseDir, EnergyFile)
+		filePath = path.Join(c.staticBaseDir, EnergyFile)
 	}
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -183,7 +183,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	copy(newGCASignature[:], respBuf[respLen-(64+72):respLen-72])
 
 	// Ensure that the equipment key matches the client's public key.
-	if equipmentKey != c.pubkey {
+	if equipmentKey != c.staticPubKey {
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
 	}
 
@@ -247,11 +247,11 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 // server, it will attempt to migrate to a new server.
 func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// Grab the state we need from the client under the safety of a mutex.
-	c.serverMu.Lock()
+	c.mu.Lock()
 	gcas := c.gcaServers[c.primaryServer]
 	gcasKey := c.primaryServer
 	gcaKey := c.gcaPubkey
-	c.serverMu.Unlock()
+	c.mu.Unlock()
 
 	// The sync loop starts out by randomly selecting a new server. We do
 	// this rather than stick with the current server because we want to
@@ -288,7 +288,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 
 		// Sleep for a tick.
 		select {
-		case <-c.closeChan:
+		case <-c.closed:
 			return
 		case <-time.After(sendReportTime):
 		}
@@ -298,7 +298,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		// 1. Pull all the servers into an array.
 		// 2. Randomly shuffle the array.
 		// 3. Select the first non-banned server.
-		c.serverMu.Lock()
+		c.mu.Lock()
 		servers := make([]glow.PublicKey, 0, len(c.gcaServers))
 		for server, _ := range c.gcaServers {
 			servers = append(servers, server)
@@ -320,7 +320,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		}
 		gcas = c.gcaServers[c.primaryServer]
 		gcasKey = c.primaryServer
-		c.serverMu.Unlock()
+		c.mu.Unlock()
 
 		// Retry grabbing the bitfield.
 		var err error
@@ -335,7 +335,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// device will need to update its servers and gcaPubkey and shortId.
 	// This will include updating all of the relevant persist files. The
 	// history does not need to be wiped.
-	c.serverMu.Lock()
+	c.mu.Lock()
 	blank := glow.PublicKey{}
 	if newGCA != c.gcaPubkey && newGCA != blank {
 		// Before updating the internal state, the on-disk files need
@@ -353,13 +353,13 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		// device that needs its SD card replaced. This isn't a
 		// terrible consequence. In the event of an error we panic and
 		// hope it doesn't happen again.
-		err := ioutil.WriteFile(filepath.Join(c.baseDir, GCAPubKeyFile), newGCA[:], 0644)
+		err := ioutil.WriteFile(filepath.Join(c.staticBaseDir, GCAPubKeyFile), newGCA[:], 0644)
 		if err != nil {
 			panic(err)
 		}
 		var shortIDBytes [4]byte
 		binary.LittleEndian.PutUint32(shortIDBytes[:], newShortID)
-		err = ioutil.WriteFile(filepath.Join(c.baseDir, ShortIDFile), shortIDBytes[:], 0644)
+		err = ioutil.WriteFile(filepath.Join(c.staticBaseDir, ShortIDFile), shortIDBytes[:], 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -377,7 +377,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		if err != nil {
 			panic(err)
 		}
-		err = ioutil.WriteFile(filepath.Join(c.baseDir, GCAServerMapFile), raw[:], 0644)
+		err = ioutil.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -411,11 +411,11 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(filepath.Join(c.baseDir, GCAServerMapFile), raw[:], 0644)
+	err = ioutil.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
 	if err != nil {
 		panic(err)
 	}
-	c.serverMu.Unlock()
+	c.mu.Unlock()
 
 	// Scan through the bitfield and submit any reports that the device has
 	// but the GCA server does not.
@@ -457,7 +457,7 @@ func (c *Client) threadedSendReports() {
 	// messes up somehow we would rather ignore the error.
 	if err == nil {
 		for _, record := range records {
-			err := c.saveReading(record.Timeslot, uint32(record.Energy))
+			err := c.staticSaveReading(record.Timeslot, uint32(record.Energy))
 			if err != nil {
 				continue
 			}
@@ -473,19 +473,19 @@ func (c *Client) threadedSendReports() {
 	// boot loop scenario, we don't want to blow all of our bandwidth doing
 	// sync operations.
 	ticks := 30
-	close(c.syncThread)
+	close(c.started)
 	for {
 		// Quit if the closeChan was closed.
 		select {
-		case <-c.closeChan:
+		case <-c.closed:
 			return
 		default:
 		}
 
 		// Grab the gca server for use when sending the report.
-		c.serverMu.Lock()
+		c.mu.Lock()
 		gcas := c.gcaServers[c.primaryServer]
-		c.serverMu.Unlock()
+		c.mu.Unlock()
 
 		// Read the energy file. No-op if there's an error. Can't
 		// continue because we still want to sleep.
@@ -499,7 +499,7 @@ func (c *Client) threadedSendReports() {
 				// different energy readings. That's a problem
 				// that will cause the timeslot to get banned,
 				// so we don't send the report if that happens.
-				err := c.saveReading(record.Timeslot, uint32(record.Energy))
+				err := c.staticSaveReading(record.Timeslot, uint32(record.Energy))
 				if err != nil {
 					continue
 				}
@@ -520,7 +520,7 @@ func (c *Client) threadedSendReports() {
 
 		// Sleep for a minute before checking again.
 		select {
-		case <-c.closeChan:
+		case <-c.closed:
 			return
 		case <-time.After(sendReportTime + randomTimeExtension()):
 		}

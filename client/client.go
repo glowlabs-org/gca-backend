@@ -8,40 +8,43 @@ package client
 //
 // The client is expected to be running on a lightweight IoT device that is
 // heavily bandwidth constrained. Most of the reports are submitted over UDP,
-// so there needs to be another thread running which checks that the reports
-// made it to the GCA server.
+// which is unreliable. Therefore a background thread checks the server every
+// ~6 hours to see what reports didn't make it. Udp was chosen to save
+// bandwidth, and to be more tolerant of latency.
 //
-// Because there's a non-trivial amount of money riding on the reports being
-// published, the client needs to maintain a robust list of servers that can be
-// used as failover servers in the event that the main GCA server goes down.
-// There is therefore a background thread that routinely pings all of the known
-// GCA servers to ask them for their list of backups. This happens in the same
-// background thread that checks for reports that didn't get submitted
-// correctly.
+// There are a few other tasks that need to be completed regularly, and the
+// code is structured to complete everything at the same time. The sync loop
+// will look for reports that didn't make it all the way to the server, it will
+// look for new servers that have been authorized by the GCA, it will look for
+// banned servers, and it will look for GCA migration orders.
 //
-// Every 6 hours, the client needs to run a routine that detects whether the
-// primary GCA server is still operational. If the GCA server is not
-// operational, the client needs to failover to one of the backup servers. The
-// client considers the primary server to be operational as long as the GCA has
-// not issued a ban for the server, and as long as the server is responding to
-// the TCP requests to check which reports were submitted successfully. The
-// client checks whether a ban has been issued by asking all of the failover
-// servers for a list of bans. This happens in the same thread that does all
-// the syncing.
+// The general threat model of the client is to assume that one of the servers
+// may go rogue. The client wants to ensure that if one server goes rogue, the
+// client will still be able to submit reports to the GCA. If the GCA
+// themselves goes rogue, the client can be fully corrupted and the only fix is
+// to replace the software with a brand new instance. Since replacing the
+// software just requires swapping out an SD card, even this is not really that
+// scary of a problem.
 //
-// When the client fails over to a new server, it'll select a server randomly
-// from the backups. That backup will become its new primary.
+// The client will randomly switch to a new server every time it syncs. This is
+// because it makes the client more resilient to a rogue GCA server. If a GCA
+// server goes rogue, the GCA can ban it. And then the client will eventually
+// (typically within a day or less) discover that the server has been banned
+// and it will switch away. If the client does not switch servers at every sync
+// operation, it could take much, much longer for the client to discover that
+// it's using a banned server. And that could prevent its reports from getting
+// to the GCA, which will prevent the owner from receiving rewards for
+// producing carbon credits.
 //
-// The GCA can optionally declare that a monitoring device is being migrated to
-// a new GCA. The client will have to look for that signal from the GCA. If it
-// receives that signal, it trusts the GCA and will move to the new GCA as its
-// trusted GCA. When it moves to the new GCA, it will receive a new ShortID.
-// The checks for this occur in the sync thread.
-
-// TODO: Need to build the systemd services that will automatically restart the
-// client if it turns off for some reason.
+// Another design consideration was to ensure that the client would not ever
+// overwhelm the servers with too many requests. The client explicitly spreads
+// out its messages so that large swarms of clients are hitting the servers at
+// random times throughout each 5 minute interval, rather than all hitting the
+// server right at the 5 minute mark for each timeslot.
 //
-// TODO: Should probably have the ssh port open just in case.
+// These clients are designed to last a long time without any code updates,
+// which is why there is a lot more defensive programming than may otherwise be
+// typical.
 
 import (
 	"crypto/rand"
@@ -62,74 +65,64 @@ type Client struct {
 	gcaServers    map[glow.PublicKey]GCAServer
 	primaryServer glow.PublicKey
 	shortID       uint32
-	serverMu      sync.Mutex
 
-	// NOTE: technically all of these fields should have a 'static' prefix,
-	// I guess at some point we can look into having an LLM go through and
-	// fix it all.
-	baseDir       string
-	closeChan     chan struct{}
-	historyFile   *os.File
-	historyOffset uint32
-	pubkey        glow.PublicKey
-	privkey       glow.PrivateKey
-	syncThread    chan struct{}
+	staticBaseDir       string
+	staticHistoryFile   *os.File
+	staticHistoryOffset uint32
+	staticPubKey        glow.PublicKey
+	staticPrivKey       glow.PrivateKey
+
+	// Sync primitives. 'closed' gets closed when Client.Close() has been
+	// called, and is mainly used to shut down background threads.
+	// 'started' gets closed when the client has finished setup, and is
+	// useful for  'started' is useful for testing.
+	closed  chan struct{}
+	mu      sync.Mutex
+	started chan struct{}
 }
 
 // NewClient will return a new client that is running smoothly.
 func NewClient(baseDir string) (*Client, error) {
-	// Step 3: Kick off the background loop that checks for monitoring data and sends UDP reports
-	// Step 4: Kick off the background loop that checks for reports that failed to submit, and checks if a failover is needed
-	// Step 5: Kick off the background loop that checks for new failover servers and new banned servers
-	// Step 6: Kick off the background loop that checks for migration orders
-
 	// Create an empty client.
 	c := &Client{
-		baseDir:    baseDir,
-		closeChan:  make(chan struct{}),
-		syncThread: make(chan struct{}),
+		staticBaseDir: baseDir,
+		closed:        make(chan struct{}),
+		started:       make(chan struct{}),
 	}
 
-	// Load the keypair for the client.
+	// Load the persist data for the client.
 	err := c.loadKeypair()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load client keypair: %v", err)
 	}
-
-	// Load the public key of the GCA.
 	err = c.loadGCAPub()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load GCA public key: %v", err)
 	}
-
-	// Load the list of GCA servers and their corresponding public keys.
 	err = c.loadGCAServers()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load GCA server list: %v", err)
 	}
-
-	// Open the history file.
 	err = c.loadHistory()
 	if err != nil {
 		return nil, fmt.Errorf("unable to open the history file: %v", err)
 	}
-
-	// Load the ShortID for the hardware.
 	err = c.loadShortID()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load the short id: %v", err)
 	}
 
-	// Launch the loop that will send UDP reports to the GCA server.
+	// Launch the loop that will send UDP reports to the GCA server. The
+	// regular synchronzation checks also happen inside this loop.
 	go c.threadedSendReports()
 
 	return c, nil
 }
 
-// Currently only closes the history file.
+// Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
-	close(c.closeChan)
-	return c.historyFile.Close()
+	close(c.closed)
+	return c.staticHistoryFile.Close()
 }
 
 // loadKeypair will load the client keys from disk. The GCA should have put
@@ -141,7 +134,7 @@ func (c *Client) Close() error {
 // the other hand the GCA is pretty much the unilaterally trusted authority in
 // this case anyway.
 func (c *Client) loadKeypair() error {
-	path := filepath.Join(c.baseDir, ClientKeyFile)
+	path := filepath.Join(c.staticBaseDir, ClientKeyFile)
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
@@ -149,8 +142,8 @@ func (c *Client) loadKeypair() error {
 	if err != nil {
 		return fmt.Errorf("unable to read keyfile: %v", err)
 	}
-	copy(c.pubkey[:], data[:32])
-	copy(c.privkey[:], data[32:])
+	copy(c.staticPubKey[:], data[:32])
+	copy(c.staticPrivKey[:], data[32:])
 	return nil
 }
 
@@ -158,7 +151,7 @@ func (c *Client) loadKeypair() error {
 // to verify that the servers it is reporting to are in good standing according
 // to the GCA.
 func (c *Client) loadGCAPub() error {
-	path := filepath.Join(c.baseDir, GCAPubKeyFile)
+	path := filepath.Join(c.staticBaseDir, GCAPubKeyFile)
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
@@ -174,7 +167,7 @@ func (c *Client) loadGCAPub() error {
 // viable recipients of client data. The servers syncrhonize between
 // themselves, so the client only needs to send to one of them.
 func (c *Client) loadGCAServers() error {
-	path := filepath.Join(c.baseDir, GCAServerMapFile)
+	path := filepath.Join(c.staticBaseDir, GCAServerMapFile)
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("GCA server file not found, client was configured incorrectly: %v", err)
@@ -191,13 +184,13 @@ func (c *Client) loadGCAServers() error {
 		return fmt.Errorf("no GCA servers found, client was configured incorrectly")
 	}
 
-	// Extract all servers into an array
+	// Create a randomized array of the servers and pick the first
+	// non-banned server from the randomized list. This ensures that even
+	// at startup the client is being robust against bad actors.
 	servers := make([]glow.PublicKey, 0, len(c.gcaServers))
 	for server, _ := range c.gcaServers {
 		servers = append(servers, server)
 	}
-
-	// Randomly shuffle the array
 	for i := range servers {
 		j, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
 		if err != nil {
@@ -205,8 +198,6 @@ func (c *Client) loadGCAServers() error {
 		}
 		servers[i], servers[j.Int64()] = servers[j.Int64()], servers[i]
 	}
-
-	// Iterate over the randomized array and return the first non-banned server
 	for _, server := range servers {
 		if !c.gcaServers[server].Banned {
 			c.primaryServer = server
@@ -222,7 +213,7 @@ func (c *Client) loadGCAServers() error {
 // bytes per message, which is valuable on IoT networks sending messages every
 // 5 minutes for 10 years.
 func (c *Client) loadShortID() error {
-	path := filepath.Join(c.baseDir, ShortIDFile)
+	path := filepath.Join(c.staticBaseDir, ShortIDFile)
 	data, err := ioutil.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client shortID not found, the client was configured incorrectly")

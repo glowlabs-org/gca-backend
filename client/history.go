@@ -1,5 +1,13 @@
 package client
 
+// history.go contains all of the logic for reading from the history file,
+// which contains all of the historic readings from the client that indicate
+// how much power a solar panel has produced.
+//
+// The file is structured so that the first 4 bytes indicate what timeslot the
+// file starts recording data at. Each following 4 bytes contains the number of
+// watt hours that was produced by the solar panel each timeslot.
+
 import (
 	"encoding/binary"
 	"fmt"
@@ -8,24 +16,16 @@ import (
 	"path/filepath"
 )
 
-// history.go contains all of the logic for reading from the history file,
-// which contains all of the historic readings from the monitoring hardware
-// that indicate how much power a solar panel has produced.
-//
-// The file is structured so that the first 4 bytes indicate what timeslot the
-// file starts recording data at. Each following 4 bytes contains the number of
-// watt hours that was produced by the solar panel each timeslot.
-
 // loadHistoryFile will open the history file, save the handle in the client,
 // and determine the timeslot offset of the history file.
 func (c *Client) loadHistory() error {
 	// Open the history file and make it part of the client.
-	path := filepath.Join(c.baseDir, HistoryFile)
+	path := filepath.Join(c.staticBaseDir, HistoryFile)
 	f, err := os.OpenFile(path, os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to open history file: %v", err)
 	}
-	c.historyFile = f
+	c.staticHistoryFile = f
 
 	// Read the offset bytes.
 	var offsetBytes [4]byte
@@ -35,19 +35,19 @@ func (c *Client) loadHistory() error {
 	}
 
 	// Convert to uint32
-	c.historyOffset = binary.LittleEndian.Uint32(offsetBytes[:])
+	c.staticHistoryOffset = binary.LittleEndian.Uint32(offsetBytes[:])
 	return nil
 }
 
-// saveReading will save a particular reading to the file, returning an error
-// if a reading already exists in that timeslot which does not match the
+// staticSaveReading will save a particular reading to the file, returning an
+// error if a reading already exists in that timeslot which does not match the
 // provided reading.
-func (c *Client) saveReading(timeslot uint32, reading uint32) error {
-	// Check that the reading is in-boudns on the file.
-	if timeslot < c.historyOffset {
+func (c *Client) staticSaveReading(timeslot uint32, reading uint32) error {
+	// Check that the reading is in-bounds on the file.
+	if timeslot < c.staticHistoryOffset {
 		return fmt.Errorf("cannot save a reading for a timeslot that predates the history file genesis")
 	}
-	byteOffset := 4 * (1 + timeslot - c.historyOffset)
+	byteOffset := 4 * (1 + timeslot - c.staticHistoryOffset)
 
 	// Load the reading from this offset.
 	current, err := c.staticLoadReading(timeslot)
@@ -62,9 +62,10 @@ func (c *Client) saveReading(timeslot uint32, reading uint32) error {
 		return fmt.Errorf("unable to save reading because we already have a different reading for this timeslot")
 	}
 
+	// Write the reading to the file.
 	var data [4]byte
 	binary.LittleEndian.PutUint32(data[:], reading)
-	_, err = c.historyFile.WriteAt(data[:], int64(byteOffset))
+	_, err = c.staticHistoryFile.WriteAt(data[:], int64(byteOffset))
 	if err != nil {
 		return fmt.Errorf("unable to write the reading: %v", err)
 	}
@@ -74,15 +75,15 @@ func (c *Client) saveReading(timeslot uint32, reading uint32) error {
 // staticLoadReading will load a reading from the provided timelsot, returning
 // an error if it is out of bounds. If no reading exists, '0' will be returned.
 func (c *Client) staticLoadReading(timeslot uint32) (uint32, error) {
-	if timeslot < c.historyOffset {
+	if timeslot < c.staticHistoryOffset {
 		// This timeslot doesn't have data, so the natural response is
 		// nothing.
 		return 0, nil
 	}
 
 	var data [4]byte
-	byteOffset := 4 * (1 + timeslot - c.historyOffset)
-	_, err := c.historyFile.ReadAt(data[:], int64(byteOffset))
+	byteOffset := 4 * (1 + timeslot - c.staticHistoryOffset)
+	_, err := c.staticHistoryFile.ReadAt(data[:], int64(byteOffset))
 	if err == io.EOF {
 		return 0, nil
 	}

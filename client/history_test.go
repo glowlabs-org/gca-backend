@@ -30,7 +30,7 @@ func TestClientHistory(t *testing.T) {
 	}
 
 	// Test saving and loading a reading.
-	err = c.saveReading(5, 500)
+	err = c.staticSaveReading(5, 500)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +45,13 @@ func TestClientHistory(t *testing.T) {
 	}
 
 	// Test saving the same reading twice.
-	err = c.saveReading(5, 500)
+	err = c.staticSaveReading(5, 500)
 	if err != nil {
 		t.Fatal("Saving the same reading twice should not result in error")
 	}
 
 	// Test saving a different reading for the same timesot.
-	err = c.saveReading(5, 501)
+	err = c.staticSaveReading(5, 501)
 	if err == nil {
 		t.Fatal("bad")
 	}
@@ -65,7 +65,7 @@ func TestClientHistory(t *testing.T) {
 	}
 
 	// Test saving a different reading in the same timeslot.
-	err = c.saveReading(5, 400)
+	err = c.staticSaveReading(5, 400)
 	if err == nil {
 		t.Fatal("Expected error when saving a different reading in the same timeslot")
 	}
@@ -78,7 +78,7 @@ func TestClientHistory(t *testing.T) {
 
 	// Saving and loading multiple readings.
 	for i := uint32(10); i < 15; i++ {
-		err = c.saveReading(i, i*100)
+		err = c.staticSaveReading(i, i*100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +133,7 @@ func TestClientHistory(t *testing.T) {
 
 	// Should get an error when trying to write to timeslot '5', as the
 	// file should be starting at slot 25.
-	err = c2.saveReading(5, 500)
+	err = c2.staticSaveReading(5, 500)
 	if err == nil {
 		t.Fatal("bad")
 	}
@@ -151,7 +151,7 @@ func TestClientHistory(t *testing.T) {
 
 	// Should get an error when trying to write to timeslot '5', as the
 	// file should be starting at slot 25.
-	err = c2.saveReading(25, 510)
+	err = c2.staticSaveReading(25, 510)
 	if err != nil {
 		t.Fatal("bad")
 	}

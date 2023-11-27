@@ -48,7 +48,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-client.syncThread
+	<-client.started
 	defer func() {
 		err := client.Close()
 		if err != nil {
@@ -57,7 +57,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	}()
 
 	// Update the monitoring file so that there is data to read.
-	err = updateMonitorFile(client.baseDir, []uint32{1, 5}, []uint64{500, 3000})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 
 	// Check whether the server got the reports.
 	httpPort, _, _ := gcas.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	// test the sync function, as the only way those readings will get to
 	// the server is if the sync function identifies that they are missing
 	// and sends them.
-	err = updateMonitorFile(client.baseDir, []uint32{1, 2, 5, 6}, []uint64{500, 100, 3000, 34404})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 2, 5, 6}, []uint64{500, 100, 3000, 34404})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(2 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(25 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,11 +191,11 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Ensure that the client is running properly.
-	<-c.syncThread
+	<-c.started
 
 	// Update the monitoring file for the client so that the client has
 	// stuff to report.
-	err = updateMonitorFile(c.baseDir, []uint32{1, 5}, []uint64{500, 3000})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestAddingServers(t *testing.T) {
 
 	// Ensure that at least one of the servers got a report.
 	httpPort1, _, _ := gcas1.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.pubkey))
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 	httpPort2, _, _ := gcas2.Ports()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,12 +272,12 @@ func TestAddingServers(t *testing.T) {
 	// The client should have successfully failed over at this point, even
 	// though it has nothing to report. Let's give it something to report,
 	// and then see if the report lands on gcas2.
-	err = updateMonitorFile(c.baseDir, []uint32{2, 6}, []uint64{550, 3500})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{2, 6}, []uint64{550, 3500})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,18 +349,18 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.syncThread
+	<-c.started
 
 	// Sleep long enough to let a sync happen.
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file so that the client has data to send to gcas2.
-	err = updateMonitorFile(c.baseDir, []uint32{3, 4, 7}, []uint64{55, 59, 1200})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{3, 4, 7}, []uint64{55, 59, 1200})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.syncThread
+	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// Client should now have gcas3 as a failover server. Close both the
@@ -455,16 +455,16 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.syncThread
+	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// Add some new data that can be reported.
-	err = updateMonitorFile(c.baseDir, []uint32{8}, []uint64{1800})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{8}, []uint64{1800})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,7 +509,7 @@ func TestAddingServers(t *testing.T) {
 	shortID := uint32(135) // Use a different short id for the new GCA to make sure the migration is correct.
 	ea := glow.EquipmentAuthorization{
 		ShortID:    shortID,
-		PublicKey:  c.pubkey,
+		PublicKey:  c.staticPubKey,
 		Latitude:   38,
 		Longitude:  -100,
 		Capacity:   12341234,
@@ -547,7 +547,7 @@ func TestAddingServers(t *testing.T) {
 	sb = as.SigningBytes()
 	as.GCAAuthorization = glow.Sign(sb, ngcaPrivKey)
 	em := server.EquipmentMigration{
-		Equipment:  c.pubkey,
+		Equipment:  c.staticPubKey,
 		NewGCA:     ngcaPubKey,
 		NewShortID: 135,
 		NewServers: []server.AuthorizedServer{as},
@@ -580,7 +580,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.syncThread
+	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// At this point, the client should have picked up the migration, but
@@ -593,16 +593,16 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.syncThread
+	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file as well for good measure.
-	err = updateMonitorFile(c.baseDir, []uint32{9}, []uint64{800})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{9}, []uint64{800})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +638,7 @@ func TestAddingServers(t *testing.T) {
 	}
 
 	// Check the old GCA, which should not be receiving reports anymore.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
