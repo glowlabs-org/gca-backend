@@ -35,9 +35,9 @@ func (server *GCAServer) parseReport(rawData []byte) (glow.EquipmentReport, erro
 	}
 
 	// Populate the EquipmentReport fields
-	report.ShortID = binary.BigEndian.Uint32(rawData[0:4])
-	report.Timeslot = binary.BigEndian.Uint32(rawData[4:8])
-	report.PowerOutput = binary.BigEndian.Uint64(rawData[8:16])
+	report.ShortID = binary.LittleEndian.Uint32(rawData[0:4])
+	report.Timeslot = binary.LittleEndian.Uint32(rawData[4:8])
+	report.PowerOutput = binary.LittleEndian.Uint64(rawData[8:16])
 	copy(report.Signature[:], rawData[16:])
 
 	// Validate the signature and the ShortID

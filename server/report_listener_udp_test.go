@@ -94,7 +94,7 @@ func TestParseReport(t *testing.T) {
 
 	// Test with a device not in the server's list.
 	reportData := make([]byte, 16) // make a blank report for a non-existent device
-	binary.BigEndian.PutUint32(reportData[0:4], uint32(numEquipment+1))
+	binary.LittleEndian.PutUint32(reportData[0:4], uint32(numEquipment+1))
 	_, err = server.parseReport(append(reportData, invalidSignature[:64]...))
 	if err == nil || err.Error() != fmt.Sprintf("unknown equipment ID: %d", numEquipment+1) {
 		t.Errorf("Expected unknown device ID error, got: %v", err)
