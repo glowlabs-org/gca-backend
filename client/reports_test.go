@@ -48,7 +48,6 @@ func TestPeriodicMonitoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-client.started
 	defer func() {
 		err := client.Close()
 		if err != nil {
@@ -190,8 +189,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Ensure that the client is running properly.
-	<-c.started
 
 	// Update the monitoring file for the client so that the client has
 	// stuff to report.
@@ -349,7 +346,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.started
 
 	// Sleep long enough to let a sync happen.
 	time.Sleep(35 * sendReportTime)
@@ -436,7 +432,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// Client should now have gcas3 as a failover server. Close both the
@@ -455,7 +450,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// Add some new data that can be reported.
@@ -580,7 +574,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// At this point, the client should have picked up the migration, but
@@ -593,7 +586,6 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-c.started
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file as well for good measure.

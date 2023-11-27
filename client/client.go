@@ -76,9 +76,8 @@ type Client struct {
 	// called, and is mainly used to shut down background threads.
 	// 'started' gets closed when the client has finished setup, and is
 	// useful for  'started' is useful for testing.
-	closed  chan struct{}
-	mu      sync.Mutex
-	started chan struct{}
+	closed chan struct{}
+	mu     sync.Mutex
 }
 
 // NewClient will return a new client that is running smoothly.
@@ -87,7 +86,6 @@ func NewClient(baseDir string) (*Client, error) {
 	c := &Client{
 		staticBaseDir: baseDir,
 		closed:        make(chan struct{}),
-		started:       make(chan struct{}),
 	}
 
 	// Load the persist data for the client.
@@ -114,7 +112,9 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
-	go c.threadedSendReports()
+	ready := make(chan struct{})
+	go c.threadedSendReports(ready)
+	<-ready
 
 	return c, nil
 }
@@ -176,7 +176,7 @@ func (c *Client) loadGCAServers() error {
 		return fmt.Errorf("unable to read gca server file: %v", err)
 	}
 
-	c.gcaServers, err = DeserializeGCAServerMap(data)
+	c.gcaServers, err = UntrustedDeserializeGCAServerMap(data)
 	if err != nil {
 		return fmt.Errorf("unable to decode the data in the gac server file: %v", err)
 	}

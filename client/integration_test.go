@@ -26,7 +26,6 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-client.started
 	defer func() {
 		err := client.Close()
 		if err != nil {

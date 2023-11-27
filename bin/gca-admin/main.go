@@ -74,7 +74,7 @@ func main() {
 		fmt.Println("unable to load list of GCA servers:", err)
 		return
 	}
-	serversMap, err := client.DeserializeGCAServerMap(serversData)
+	serversMap, err := client.UntrustedDeserializeGCAServerMap(serversData)
 	if err != nil {
 		fmt.Println("list of GCA servers appears correupt:", err)
 		return

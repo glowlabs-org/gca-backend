@@ -48,6 +48,12 @@ mutex, the inner object is not protected by the mutex of the parent.
 Mutexes are not allowed to stack. At no point in time should two mutexes be
 held at once.
 
+Mutexes must be locked and unlocked from the same context. It is not okay to
+lock a mutex, then call a function which will unlock that mutex on its own. If
+a mutex is locked, the reviewer must be able to see the location where the
+unlock occurs and must be able to appraise the correctness of the unlock
+without reading any other code.
+
 Exported methods of objects are assumed to require locking a mutex. Therefore,
 the implementation of these methods cannot assume that the caller is protecting
 them against race conditions. Further, callers must assume that the exported
@@ -68,3 +74,44 @@ Following all of the above concurrency rules is guaranteed to prevent race
 conditions and deadlocks. And though they may feel strict to someone who is not
 used to them, they actually are very expressive and allow the programmer to
 design nearly anything.
+
+Code must take great care not to panic while a mutex is being held, because the
+panic may prevent the mutex from being unlocked, and other threads in the
+codebase may get stuck. Code should never explicitly panic in a context where a
+mutex is held.
+
+## Coordination
+
+Any struct that has background threads should use a channel called 'closed'
+which gets closed when `Close()` is called on the object. That channel signals
+the background threads to shut down.
+
+Avoid having a similar channel to synchronize threads that need to complete
+some startup tasks. Instead, create a new channel for those threads before they
+are spun up, and make sure that those threads have finished starting up before
+placing the object in a concurrent environment.
+
+The more general principle at play here is to make sure that the users of an
+object do not have to worry about synchronization around the object. The New()
+function and Close() function should be the extent of management that is
+necessary.
+
+## Untrusted Data
+
+Any data that is received from an untrusted source must be tagged as untrusted
+in the variable name. The data can only be passed to other functions that are
+tagged as 'untrusted' until one of the functions fully cleans the data and
+ensures that it is not corrupt.
+
+The 'untrusted' tag for a function would come after any concurrency names. For
+example, if you had a managed and untrusted function named integrateInput, the
+full name would be managedUntrustedIntegrateInput, and not
+untrustedManagdIntegrateInput. Generally speaking however you should not be
+mixing the two, it is much better to sanitize and verify data before thrusting
+it into a concurrent environment.
+
+Data that is loaded from disk is typically considered to be trusted, unless it
+is being loaded from a public source (like 'Downloads') and the user/program
+has no way of knowing whether the data is valid. But programs should generally
+be able to trust data on disk that they either wrote themselves or when those
+files are naturally part of the program.
