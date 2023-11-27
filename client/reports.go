@@ -256,9 +256,9 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
-// syncWithServer will make a request to the server to figure out which reports
-// did not successfully get received by the server, and it will re-send those
-// reports.
+// threadedSyncWithServer will make a request to the server to figure out which
+// reports did not successfully get received by the server, and it will re-send
+// those reports.
 //
 // If the function fails to complete a successful sync operation with the
 // server, it will attempt to migrate to a new server.
@@ -267,7 +267,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	c.mu.Lock()
 	gcas := c.gcaServers[c.primaryServer]
 	gcasKey := c.primaryServer
-	gcaKey := c.gcaPubkey
+	gcaKey := c.gcaPubKey
 	c.mu.Unlock()
 
 	// The sync loop starts out by randomly selecting a new server. We do
@@ -352,9 +352,9 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	// device will need to update its servers and gcaPubkey and shortId.
 	// This will include updating all of the relevant persist files. The
 	// history does not need to be wiped.
-	c.mu.Lock()
 	blank := glow.PublicKey{}
-	if newGCA != c.gcaPubkey && newGCA != blank {
+	c.mu.Lock()
+	if newGCA != c.gcaPubKey && newGCA != blank {
 		// Before updating the internal state, the on-disk files need
 		// to be updated. A new GCA is a big deal, and a failure here
 		// could render the device useless. We don't have any ACID
@@ -401,7 +401,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 
 		// Need to update the gca pubkey + file, the shortID + file,
 		// and the list of GCA servers needs to be wiped clean.
-		c.gcaPubkey = newGCA
+		c.gcaPubKey = newGCA
 		c.shortID = newShortID
 		c.gcaServers = newServers
 	}
