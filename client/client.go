@@ -61,7 +61,7 @@ import (
 
 // The stateful object for the client.
 type Client struct {
-	gcaPubkey     glow.PublicKey
+	gcaPubKey     glow.PublicKey
 	gcaServers    map[glow.PublicKey]GCAServer
 	primaryServer glow.PublicKey
 	shortID       uint32
@@ -159,7 +159,7 @@ func (c *Client) loadGCAPub() error {
 	if err != nil {
 		return fmt.Errorf("unable to read keyfile: %v", err)
 	}
-	copy(c.gcaPubkey[:], data[:32])
+	copy(c.gcaPubKey[:], data[:32])
 	return nil
 }
 
