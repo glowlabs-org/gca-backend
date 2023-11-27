@@ -25,3 +25,46 @@ Always use LittleEndian when encoding numbers to binary.
 
 Anything that needs to be signed should have an explicit 'SigningBytes()'
 function.
+
+Comments about how long a duration is or how frequently an event happens may be
+out of date. The durations get tweaked all the time because there wasn't any
+formal system in place for deciding how to choose durations and frequencies for
+different tasks. They got tweaked and adjusted kinda arbitrarily, in the hopes
+that the tweaks were improving things.
+
+## Concurrency
+
+Objects that can be used in concurrent contexts will have a mutex inside of
+them. Only one mutex is allowed per object. The mutex protects all fields
+inside of the object, unless one of the fields is prefixed with 'static'. A
+'static' prefix indicates that the field is not allowed to change, and
+therefore can be read without holding the mutex. Static fields can be modified
+during construction, before the object enters into a concurrent context.
+
+If there is an object inside of an object without a mutex, that whole object is
+protect by the mutex of its parent. If an object inside of an object has a
+mutex, the inner object is not protected by the mutex of the parent.
+
+Mutexes are not allowed to stack. At no point in time should two mutexes be
+held at once.
+
+Exported methods of objects are assumed to require locking a mutex. Therefore,
+the implementation of these methods cannot assume that the caller is protecting
+them against race conditions. Further, callers must assume that the exported
+method will hold a mutex, therefore the caller cannot beholding a mutex
+themselves when calling exported methods.
+
+Unexported methods of objects default to assuming that they will be called with
+a mutex already held. They can freely access the state of their object under
+the assumption that the caller is already holding the lock.
+
+Unexported methods of objects prefixed by 'managed' will manage their own
+mutex. This means that they cannot be called while a mutex is held.
+
+Methods of an object prefixed by 'static' do not require the mutexes of the
+object in any way, and therefore are safe to call under any circumstances.
+
+Following all of the above concurrency rules is guaranteed to prevent race
+conditions and deadlocks. And though they may feel strict to someone who is not
+used to them, they actually are very expressive and allow the programmer to
+design nearly anything.

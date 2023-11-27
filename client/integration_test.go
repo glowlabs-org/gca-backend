@@ -26,7 +26,7 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-client.syncThread
+	<-client.started
 	defer func() {
 		err := client.Close()
 		if err != nil {
@@ -41,7 +41,7 @@ func TestEquipmentHistory(t *testing.T) {
 
 	// Update the monitoring file so that the client submits data to the
 	// server.
-	err = updateMonitorFile(client.baseDir, []uint32{1, 5}, []uint64{500, 3000})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestEquipmentHistory(t *testing.T) {
 
 	// Check that the server got the report.
 	httpPort, _, _ := gcas.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,12 +188,12 @@ func TestEquipmentHistory(t *testing.T) {
 	// client is actually now out of date. We can't control what ports get
 	// assigned during testing so we are just stuck with these invasive
 	// sort of fixes.
-	client.serverMu.Lock()
+	client.mu.Lock()
 	cSrv := client.gcaServers[gcas.PublicKey()]
 	cSrv.TcpPort = tcpPort
 	cSrv.UdpPort = udpPort
 	client.gcaServers[gcas.PublicKey()] = cSrv
-	client.serverMu.Unlock()
+	client.mu.Unlock()
 	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
@@ -226,13 +226,13 @@ func TestEquipmentHistory(t *testing.T) {
 	// to make sure that everything still works when multiple histories
 	// have been saved. The clock has been moved forward, so these reports
 	// should be going into the second history.
-	err = updateMonitorFile(client.baseDir, []uint32{2016 + 1501, 2016 + 1505}, []uint64{400, 2000})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{2016 + 1501, 2016 + 1505}, []uint64{400, 2000})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
 	// Check the recent reports
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,12 +395,12 @@ func TestEquipmentHistory(t *testing.T) {
 	// client is actually now out of date. We can't control what ports get
 	// assigned during testing so we are just stuck with these invasive
 	// sort of fixes.
-	client.serverMu.Lock()
+	client.mu.Lock()
 	cSrv = client.gcaServers[gcas.PublicKey()]
 	cSrv.TcpPort = tcpPort
 	cSrv.UdpPort = udpPort
 	client.gcaServers[gcas.PublicKey()] = cSrv
-	client.serverMu.Unlock()
+	client.mu.Unlock()
 	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
@@ -459,13 +459,13 @@ func TestEquipmentHistory(t *testing.T) {
 	}
 
 	// One more round of adding new reports in a new history.
-	err = updateMonitorFile(client.baseDir, []uint32{2*2016 + 1501, 2*2016 + 1505}, []uint64{300, 1000})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{2*2016 + 1501, 2*2016 + 1505}, []uint64{300, 1000})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
 	// Check the recent reports
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,12 +533,12 @@ func TestEquipmentHistory(t *testing.T) {
 	// client is actually now out of date. We can't control what ports get
 	// assigned during testing so we are just stuck with these invasive
 	// sort of fixes.
-	client.serverMu.Lock()
+	client.mu.Lock()
 	cSrv = client.gcaServers[gcas.PublicKey()]
 	cSrv.TcpPort = tcpPort
 	cSrv.UdpPort = udpPort
 	client.gcaServers[gcas.PublicKey()] = cSrv
-	client.serverMu.Unlock()
+	client.mu.Unlock()
 	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
