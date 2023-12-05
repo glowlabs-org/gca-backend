@@ -12,14 +12,14 @@ are okay but "privkey" is not.
 Filenames use camelCase and any non-standard filetype ends with the extention
 '.dat'. For example, filenames can be 'gcaPubKey.dat' or 'history.dat'
 
-Units:
-	+ 3 decimals of precision for latitude and longitude
-	+ MilliWatt hours is the base unit of precision for energy
-	+ Milliwatts is the base unit of precision for power
-	+ Grams is the base unit of precision for emissions
-	+ Grams per megawatt hour is the base unit of precision for emission rates
-	+ Timeslots (5 minutes) is the base unit of precision for protocol time
-	+ Seconds is the base unit of precision for clock time
+Units:  
+	+ 3 decimals of precision for latitude and longitude  
+	+ MilliWatt hours is the base unit of precision for energy  
+	+ Milliwatts is the base unit of precision for power  
+	+ Grams is the base unit of precision for emissions  
+	+ Grams per megawatt hour is the base unit of precision for emission rates  
+	+ Timeslots (5 minutes) is the base unit of precision for protocol time  
+	+ Seconds is the base unit of precision for clock time  
 
 Always use LittleEndian when encoding numbers to binary.
 
