@@ -18,6 +18,7 @@ Units:
 	+ Milliwatts is the base unit of precision for power  
 	+ Grams is the base unit of precision for emissions  
 	+ Grams per megawatthour is the base unit of precision for emission rates  
+	+ Protocol Fees are expressed in cents
 	+ Timeslots (5 minutes) is the base unit of precision for protocol time  
 	+ Seconds is the base unit of precision for clock time  
 	+ Protocol epochs are often called 'buckets' and last one week  

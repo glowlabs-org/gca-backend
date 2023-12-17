@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/client"
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -323,45 +324,99 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 		return fmt.Errorf("no servers provided")
 	}
 
-	// The user should have provided: latitude, longitude, capacity, debt,
-	// and an expiration. Validate all of the inputs.
-	if len(os.Args) != 7 {
-		fmt.Println()
-		fmt.Println("Usage: ./gca-admin new-equipment [latitude] [longitude] [capacity] [debt] [expiration]")
-		fmt.Println("\tPlease provide latitdue as a floating point value")
-		fmt.Println("\tPlease provide longitude as a floating point value")
-		fmt.Println("\tPlease provide capacity as an integer number of watts")
-		fmt.Println("\tPlease provide debt as an integer number of kilograms of CO2")
-		fmt.Println("\tPlease provide 'expiration' as an integer number of years")
-		fmt.Println()
-		return fmt.Errorf("command was not called correctly")
+	var latitude, longitude float64
+	var capacity, debt int
+	var expiration, initYear, initMonth, initDay int
+	var protocolFee int
+
+	fmt.Print("Enter latitude (3 decimals): ")
+	if _, err := fmt.Scanln(&latitude); err != nil {
+		fmt.Println("Error reading latitude:", err)
+		os.Exit(1)
 	}
-	fmt.Println()
-	latitude, err := strconv.ParseFloat(os.Args[2], 64)
+	fmt.Print("Enter longitude (3 decimals): ")
+	if _, err := fmt.Scanln(&longitude); err != nil {
+		fmt.Println("Error reading longitude:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter capacity (integer number of watts): ")
+	if _, err := fmt.Scanln(&capacity); err != nil {
+		fmt.Println("Error reading capacity:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter debt (integer number of kilograms of CO2): ")
+	if _, err := fmt.Scanln(&debt); err != nil {
+		fmt.Println("Error reading debt:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter lifetime (integer number of years, typically 10): ")
+	if _, err := fmt.Scanln(&expiration); err != nil {
+		fmt.Println("Error reading expiration:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter protocol fee (integer number of cents): ")
+	if _, err := fmt.Scanln(&protocolFee); err != nil {
+		fmt.Println("Error reading protocol fee:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter initialization year (integer): ")
+	if _, err := fmt.Scanln(&initYear); err != nil {
+		fmt.Println("Error reading initialization year:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter initialization month (integer): ")
+	if _, err := fmt.Scanln(&initMonth); err != nil {
+		fmt.Println("Error reading initialization month:", err)
+		os.Exit(1)
+	}
+	fmt.Print("Enter initialization day (integer): ")
+	if _, err := fmt.Scanln(&initDay); err != nil {
+		fmt.Println("Error reading initialization day:", err)
+		os.Exit(1)
+	}
+
+	// Printing the entered data
+	fmt.Printf("\nYou entered the following data:\n")
+	fmt.Printf("Latitude: %.3f\n", latitude)
+	fmt.Printf("Longitude: %.3f\n", longitude)
+	fmt.Printf("Capacity: %d watts\n", capacity)
+	fmt.Printf("Debt: %d kg of CO2\n", debt)
+	fmt.Printf("Lifetime: %d years\n", expiration)
+	fmt.Printf("Protocol Fee: %d cents\n", protocolFee)
+	fmt.Printf("Initialization Date: %d-%d-%d\n", initYear, initMonth, initDay)
+
+	// Asking for confirmation
+	var confirmation string
+	fmt.Print("\nIs this information correct? (yes/no): ")
+	if _, err := fmt.Scanln(&confirmation); err != nil {
+		fmt.Println("Error reading confirmation:", err)
+		os.Exit(1)
+	}
+
+	if confirmation != "yes" {
+		fmt.Println("Data entry aborted.")
+		os.Exit(0)
+	}
+
+	fmt.Println("Data confirmed. Proceeding...")
+
+	// Get the unix timestamp of the initialization date.
+	initDate := time.Date(initYear, time.Month(initMonth), initDay, 0, 0, 0, 0, time.UTC)
+	initUnix := initDate.Unix()
+	initTimeslot, err := glow.UnixToTimeslot(initUnix)
 	if err != nil {
-		return fmt.Errorf("unable to parse latitude: %v", err)
+		fmt.Println("Invalid init time:", err)
+		os.Exit(1)
 	}
-	fmt.Printf("latitude: %.3f\n", latitude)
-	longitude, err := strconv.ParseFloat(os.Args[3], 64)
+	// Perform other unit conversions.
+	secondsPerGlowYear := int64(3600 * 24 * 7 * 52)
+	expirationUnix := initUnix + int64(expiration)*secondsPerGlowYear
+	finalCapacity := uint64(capacity) * 1000 / 12 // watts to milliwatthours per 5 minutes
+	finalDebt := uint64(debt) * 1000              // kilograms to grams
+	finalExpiration, err := glow.UnixToTimeslot(expirationUnix)
 	if err != nil {
-		return fmt.Errorf("unable to parse longitude: %v", err)
+		return fmt.Errorf("expiration date for solar farm is out of bounds")
 	}
-	fmt.Printf("longitude: %.3f\n", longitude)
-	capacity, err := strconv.Atoi(os.Args[4])
-	if err != nil {
-		return fmt.Errorf("unable to parse capacity: %v", err)
-	}
-	fmt.Printf("capacity: %.3f kilowatts\n", float64(capacity)/1e6)
-	debt, err := strconv.Atoi(os.Args[5])
-	if err != nil {
-		return fmt.Errorf("unable to parse debt: %v", err)
-	}
-	fmt.Printf("debt: %.3f metric tons of CO2\n", float64(debt)/1e6)
-	expiration, err := strconv.Atoi(os.Args[6])
-	if err != nil {
-		return fmt.Errorf("unable to parse expiration: %v", err)
-	}
-	fmt.Printf("expiration: %d years\n", expiration)
 
 	// Load the latest shortid.
 	shortIDPath := filepath.Join("data", "latestShortID.dat")
@@ -445,13 +500,18 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 
 	// Create the authorization and submit it to all of the servers.
 	ea := glow.EquipmentAuthorization{
-		ShortID:    nextShortID,
-		PublicKey:  clientPubKey,
-		Latitude:   latitude,
-		Longitude:  longitude,
-		Capacity:   uint64(capacity),
-		Debt:       uint64(debt),
-		Expiration: uint32(expiration),
+		ShortID:   nextShortID,
+		PublicKey: clientPubKey,
+
+		Latitude:  latitude,
+		Longitude: longitude,
+
+		Capacity:   finalCapacity,
+		Debt:       finalDebt,
+		Expiration: finalExpiration,
+
+		Initialization: initTimeslot,
+		ProtocolFee:    uint64(protocolFee),
 	}
 	sb := ea.SigningBytes()
 	ea.Signature = glow.Sign(sb, gcaPrivKey)
