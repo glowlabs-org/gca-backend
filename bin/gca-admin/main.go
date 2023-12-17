@@ -75,6 +75,7 @@ func main() {
 	gcaKeyPath := filepath.Join(gcaDir, "gcaKeys.dat")
 	gcaTempKeyPath := filepath.Join(gcaDir, "gcaTempKeys.dat")
 	gcaTempPubKeyPath := filepath.Join(gcaDir, "gcaTempPubKey.dat")
+	serversPath := filepath.Join(gcaDir, "gcaServers.dat")
 
 	// Create the temp keys if they don't already exist. The idea behind
 	// the temp keys is that the technician who is creating the GCA servers
@@ -141,64 +142,7 @@ func main() {
 	var gcaTempPrivKey glow.PrivateKey
 	copy(gcaTempPrivKey[:], tempKeyData[32:])
 
-	// Check for authorize-server, a command that will use the gca temp key
-	// to declare the real gca key to the server, and also authorize the
-	// gca server and grab credentials for it.
-	if os.Args[1] == "authorize-server" {
-		if len(os.Args) != 3 {
-			fmt.Println("Usage: ./gca-admin authorize-server [server-location:port]")
-			return
-		}
-
-		gr := server.GCARegistration{
-			GCAKey: gcaPubKey,
-		}
-		sb := gr.SigningBytes()
-		sig := glow.Sign(sb, gcaTempPrivKey)
-		gr.Signature = sig
-		payload, err := json.Marshal(gr)
-		if err != nil {
-			fmt.Println("Unable to create GCARegistration:", err)
-			return
-		}
-		req, err := http.NewRequest("POST", fmt.Sprintf("%v/api/v1/register-gca", os.Args[2]), bytes.NewBuffer(payload))
-		if err != nil {
-			fmt.Println("Unable to create GCARegistration request:", err)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("Unable to submit GCARegistration request:", err)
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			respBodyBytes, readErr := ioutil.ReadAll(resp.Body)
-			if readErr != nil {
-				fmt.Println("failed to read response body:", err)
-				return
-			}
-			fmt.Printf("Received a non-200 status code: %d :: %s\n", resp.StatusCode, string(respBodyBytes))
-			return
-		}
-
-		// Decode the response from the server.
-		var grr server.GCARegistrationResponse
-		err = json.NewDecoder(resp.Body).Decode(&grr)
-		if err != nil {
-			fmt.Println("Unable to decode response:", err)
-			return
-		}
-
-		// TODO: Save the server locally.
-
-		return
-	}
-
 	// Load the list of servers for this GCA.
-	serversPath := filepath.Join("data", "gcaServers.dat")
 	serversData, err := ioutil.ReadFile(serversPath)
 	if err != nil {
 		fmt.Println("unable to load list of GCA servers:", err)
@@ -211,6 +155,14 @@ func main() {
 	}
 	for pk, server := range serversMap {
 		fmt.Printf("Loaded server %x: %v\n", pk, server)
+	}
+
+	// Check for authorize-server, a command that will use the gca temp key
+	// to declare the real gca key to the server, and also authorize the
+	// gca server and grab credentials for it.
+	if os.Args[1] == "authorize-server" {
+		authorizeServer(gcaPubKey, gcaTempPrivKey, serversPath, serversMap)
+		return
 	}
 
 	// TODO: Go through each server and download the list of other servers.
@@ -264,6 +216,78 @@ func newGCA(gcaKeyPath string) {
 		return
 	}
 	fmt.Println("GCA keys successfully written!")
+}
+
+// authorizeServer will authorize a new server.
+func authorizeServer(gcaPubKey glow.PublicKey, gcaTempPrivKey glow.PrivateKey, serversPath string, serversMap map[glow.PublicKey]client.GCAServer) {
+	if len(os.Args) != 3 {
+		fmt.Println("Usage: ./gca-admin authorize-server [server-location:port]")
+		return
+	}
+
+	gr := server.GCARegistration{
+		GCAKey: gcaPubKey,
+	}
+	sb := gr.SigningBytes()
+	sig := glow.Sign(sb, gcaTempPrivKey)
+	gr.Signature = sig
+	payload, err := json.Marshal(gr)
+	if err != nil {
+		fmt.Println("Unable to create GCARegistration:", err)
+		return
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%v/api/v1/register-gca", os.Args[2]), bytes.NewBuffer(payload))
+	if err != nil {
+		fmt.Println("Unable to create GCARegistration request:", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c := &http.Client{}
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("Unable to submit GCARegistration request:", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBodyBytes, readErr := ioutil.ReadAll(resp.Body)
+		if readErr != nil {
+			fmt.Println("failed to read response body:", err)
+			return
+		}
+		fmt.Printf("Received a non-200 status code: %d :: %s\n", resp.StatusCode, string(respBodyBytes))
+		return
+	}
+
+	// Decode the response from the server.
+	var grr server.GCARegistrationResponse
+	err = json.NewDecoder(resp.Body).Decode(&grr)
+	if err != nil {
+		fmt.Println("Unable to decode response:", err)
+		return
+	}
+
+	// Save the new server.
+	srv := client.GCAServer{
+		Banned:   false,
+		Location: os.Args[2],
+		HttpPort: 35015,
+		TcpPort:  35030,
+		UdpPort:  35045,
+	}
+	serversMap[grr.ServerPublicKey] = srv
+	serversData, err := client.SerializeGCAServerMap(serversMap)
+	if err != nil {
+		fmt.Println("Unable to serialize server map:", err)
+		return
+	}
+	err = ioutil.WriteFile(serversPath, serversData, 0644)
+	if err != nil {
+		fmt.Println("Unable to write server map:", err)
+		return
+	}
+	fmt.Println("Successfully initialized new server.")
+	return
 }
 
 // firstEquipmentCmd creates the shortID file and submits the first equipment
