@@ -134,7 +134,7 @@ func TestTCPListener(t *testing.T) {
 	// be accepted, time must be shifted. This will also trigger a report
 	// migration.
 	glow.SetCurrentTimeslot(4000)
-	time.Sleep(250 * time.Millisecond) // Manually set to 250ms because it would NDF sometimes at 150ms.
+	time.Sleep(450 * time.Millisecond) // Manually set to 450ms because it would NDF sometimes at 250ms.
 	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4031, 50)
 	if err != nil {
 		t.Fatal(err)
