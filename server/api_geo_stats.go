@@ -65,7 +65,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error in loading watttime password", http.StatusInternalServerError)
 		return
 	}
-	token, err := getWattTimeToken(username, password)
+	token, err := staticGetWattTimeToken(username, password)
 	if err != nil {
 		http.Error(w, "Error in fetching watttime token", http.StatusInternalServerError)
 		return

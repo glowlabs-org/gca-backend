@@ -246,7 +246,7 @@ func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) error {
 	// Get a new auth token. They expire relatively quickly so it's better
 	// to get a new token every time this function is called.
-	token, err := getWattTimeToken(username, password)
+	token, err := staticGetWattTimeToken(username, password)
 	if err != nil {
 		return fmt.Errorf("unable to get watttime token: %v", err)
 	}
@@ -289,9 +289,14 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 		// Update the struct which tracks the moer times. If the clock
 		// goes backwards in time for some reason, this can panic, so
 		// we have to double check the bounds.
+		//
+		// We also have to check that we aren't fetching data for a
+		// timeslot that is well beyond the current
+		// equipmentReportsOffset, which can happen if the server
+		// hasn't been online in a few weeks.
 		gcas.mu.Lock()
 		impactIndex := timeslot - gcas.equipmentReportsOffset
-		if timeslot >= gcas.equipmentReportsOffset {
+		if timeslot >= gcas.equipmentReportsOffset && impactIndex < 4032 {
 			gcas.equipmentImpactRate[shortID][impactIndex] = moer
 		}
 		gcas.mu.Unlock()
@@ -304,7 +309,7 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) error {
 	// Get a new auth token. They expire relatively quickly so it's better
 	// to get a new token every time this function is called.
-	token, err := getWattTimeToken(username, password)
+	token, err := staticGetWattTimeToken(username, password)
 	if err != nil {
 		return fmt.Errorf("unable to get watttime token: %v", err)
 	}
@@ -342,6 +347,14 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 		// Integrate all the data in one loop with the lock held.
 		gcas.mu.Lock()
 		for i, date := range dates {
+			// There's an edge case where the 'ero' is more than 2
+			// weeks in the past, which means there will be a lot
+			// more data than what we can process, so the loop has
+			// to be aborted early.
+			if i >= 4032 {
+				break
+			}
+
 			timeslot, err := glow.UnixToTimeslot(date)
 			if err != nil {
 				gcas.logger.Errorf("watttime returned data at an invalid timeslot: %v", err)
@@ -363,8 +376,9 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 	return nil
 }
 
-// getWattTimeToken makes an API call to WattTime to authenticate and retrieve an access token.
-func getWattTimeToken(username, password string) (string, error) {
+// staticGetWattTimeToken makes an API call to WattTime to authenticate and
+// retrieve an access token.
+func staticGetWattTimeToken(username, password string) (string, error) {
 	// Don't hit the watttime api during testing.
 	if testMode {
 		return "fake-token", nil

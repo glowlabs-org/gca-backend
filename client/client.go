@@ -61,21 +61,20 @@ import (
 
 // The stateful object for the client.
 type Client struct {
+	// Dynamic state
 	gcaPubKey     glow.PublicKey
 	gcaServers    map[glow.PublicKey]GCAServer
 	primaryServer glow.PublicKey
 	shortID       uint32
 
+	// Setup parameters
 	staticBaseDir       string
 	staticHistoryFile   *os.File
 	staticHistoryOffset uint32
 	staticPubKey        glow.PublicKey
 	staticPrivKey       glow.PrivateKey
 
-	// Sync primitives. 'closed' gets closed when Client.Close() has been
-	// called, and is mainly used to shut down background threads.
-	// 'started' gets closed when the client has finished setup, and is
-	// useful for  'started' is useful for testing.
+	// Sync primitives.
 	closed chan struct{}
 	mu     sync.Mutex
 }

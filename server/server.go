@@ -174,6 +174,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// used again.
 
 	udpReady := make(chan struct{})
+	migrateReady := make(chan struct{})
 	tcpReady := make(chan struct{})
 
 	// Load the watttime credentials.
@@ -194,18 +195,18 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	if err != nil {
 		// This is unfortunate, but this is not cause to abort startup,
 		// so we'll just log an error.
-		fmt.Println("Unable to get WattTime data for the most recent week:", err)
 		server.logger.Errorf("Unable to get WattTime data for the most recent week: %v", err)
 	}
 
 	// Start the background threads for various server functionalities
 	go server.threadedLaunchUDPServer(udpReady)
-	go server.threadedMigrateReports(username, password)
+	go server.threadedMigrateReports(username, password, migrateReady)
 	go server.threadedListenForSyncRequests(tcpReady)
 	go server.threadedCollectImpactData(username, password)
 	server.launchAPI()
 
 	<-udpReady
+	<-migrateReady
 	<-tcpReady
 
 	// Return the initialized server

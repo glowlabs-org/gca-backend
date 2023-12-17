@@ -115,3 +115,15 @@ is being loaded from a public source (like 'Downloads') and the user/program
 has no way of knowing whether the data is valid. But programs should generally
 be able to trust data on disk that they either wrote themselves or when those
 files are naturally part of the program.
+
+## API Structure
+
+Every API response should have a signature from the GCA server that
+authenticates it. This is especially important because data is being
+transferred over http rather than https, therefore authentication needs to be
+on everything.
+
+Signatures happen by calling the SigningBytes() function. All SigningBytes()
+functions should add a prefix with the struct name to minimize the chance for
+replay attacks. Any data that might only be valid for a certain period of time
+should have a timestamp attached to it.
