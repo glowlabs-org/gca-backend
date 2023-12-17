@@ -11,6 +11,9 @@ go build # build the latest version of the admin tools
 ./gca-admin # run the tools so that the gca temp keys get created if they don't exist yet
 
 # Create a 'user' on the server.
+ssh root@$1 'apt update'
+ssh root@$1 'apt upgrade'
+ssh root@$1 'apt install tmux'
 ssh root@$1 'adduser user --gecos ""'
 
 # Get our pubkey to the user
