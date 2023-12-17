@@ -14,23 +14,25 @@ Filenames use camelCase and any non-standard filetype ends with the extention
 
 Units:  
 	+ 3 decimals of precision for latitude and longitude  
-	+ MilliWatt hours is the base unit of precision for energy  
+	+ Milliwatthours is the base unit of precision for energy  
 	+ Milliwatts is the base unit of precision for power  
 	+ Grams is the base unit of precision for emissions  
-	+ Grams per megawatt hour is the base unit of precision for emission rates  
+	+ Grams per megawatthour is the base unit of precision for emission rates  
 	+ Timeslots (5 minutes) is the base unit of precision for protocol time  
 	+ Seconds is the base unit of precision for clock time  
+	+ Protocol epochs are often called 'buckets' and last one week  
+	+ Within the context of Glow, "one year" is actually exactly 52 weeks, or 364 days  
 
 Always use LittleEndian when encoding numbers to binary.
 
 Anything that needs to be signed should have an explicit 'SigningBytes()'
 function.
 
-Comments about how long a duration is or how frequently an event happens may be
-out of date. The durations get tweaked all the time because there wasn't any
-formal system in place for deciding how to choose durations and frequencies for
-different tasks. They got tweaked and adjusted kinda arbitrarily, in the hopes
-that the tweaks were improving things.
+Comments within the code about how long a duration is or how frequently an
+event happens may be out of date. The durations get tweaked all the time
+because there wasn't any formal system in place for deciding how to choose
+durations and frequencies for different tasks. They got tweaked and adjusted
+kinda arbitrarily, in the hopes that the tweaks were improving things.
 
 ## Concurrency
 
@@ -51,8 +53,8 @@ held at once.
 Mutexes must be locked and unlocked from the same context. It is not okay to
 lock a mutex, then call a function which will unlock that mutex on its own. If
 a mutex is locked, the reviewer must be able to see the location where the
-unlock occurs and must be able to appraise the correctness of the unlock
-without reading any other code.
+unlock occurs within the same file and must be able to appraise the correctness
+of the unlock without reading any other code.
 
 Exported methods of objects are assumed to require locking a mutex. Therefore,
 the implementation of these methods cannot assume that the caller is protecting
@@ -73,12 +75,19 @@ object in any way, and therefore are safe to call under any circumstances.
 Following all of the above concurrency rules is guaranteed to prevent race
 conditions and deadlocks. And though they may feel strict to someone who is not
 used to them, they actually are very expressive and allow the programmer to
-design nearly anything.
+design nearly anything. The conventions just take a bit of familiarity to use
+effecively.
 
-Code must take great care not to panic while a mutex is being held, because the
-panic may prevent the mutex from being unlocked, and other threads in the
-codebase may get stuck. Code should never explicitly panic in a context where a
-mutex is held.
+Code must take care not to panic, fatal, or exit while a mutex is being held,
+because this can cause a deadlock when any deferred functions are called.
+Programmers experienced with using these conventions have 95% or more of their
+deadlocks occur due to calling either panic() or t.Fatal() while holding a
+mutex and getting stuck as a deferred Close() call tries to grab the same
+mutex.
+
+The glow.SafeMu object can be used during debugging to locate the source of a
+deadlock. It's not meant to be used in production because it incurs reasonably
+meaningful computational overhead.
 
 ## Coordination
 
