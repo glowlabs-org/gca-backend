@@ -5,7 +5,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -144,7 +143,7 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey glow.Private
 			return nil, glow.PrivateKey{}, fmt.Errorf("unable to create gca dir: %v", err)
 		}
 	}
-	pubKeyPath := filepath.Join(dir, "gca.tempkey")
+	pubKeyPath := filepath.Join(dir, "gcaTempPubKey.dat")
 	if err := ioutil.WriteFile(pubKeyPath, tempPubKey[:], 0644); err != nil {
 		return nil, glow.PrivateKey{}, fmt.Errorf("failed to write public key to file: %v", err)
 	}
@@ -174,14 +173,14 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey glow.Private
 // GCA key.
 func (gcas *GCAServer) submitKnownGCAKey(tempPrivKey glow.PrivateKey, publicKey glow.PublicKey, privateKey glow.PrivateKey) error {
 	// Create a GCAKey object and populate it with the public key and signature.
-	gk := GCAKey{PublicKey: publicKey}
-	signingBytes := gk.SigningBytes()
-	gk.Signature = glow.Sign(signingBytes, tempPrivKey)
+	gr := GCARegistration{GCAKey: publicKey}
+	signingBytes := gr.SigningBytes()
+	gr.Signature = glow.Sign(signingBytes, tempPrivKey)
 
 	// Create a new request payload for the server.
-	reqPayload := RegisterGCARequest{
-		GCAKey:    fmt.Sprintf("%x", gk.PublicKey),
-		Signature: fmt.Sprintf("%x", gk.Signature),
+	reqPayload := GCARegistration{
+		GCAKey:    gr.GCAKey,
+		Signature: gr.Signature,
 	}
 	payloadBytes, err := json.Marshal(reqPayload)
 	if err != nil {
@@ -214,21 +213,13 @@ func (gcas *GCAServer) submitKnownGCAKey(tempPrivKey glow.PrivateKey, publicKey 
 	}
 
 	// Decode the JSON response from the server.
-	var jsonResponse map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&jsonResponse); err != nil {
+	var grr GCARegistrationResponse
+	err = json.NewDecoder(resp.Body).Decode(&grr)
+	if err != nil {
 		return fmt.Errorf("failed to decode json response: %v", err)
 	}
-
-	// Extract the server's public key from the JSON response.
-	serverPubKeyHex, ok := jsonResponse["ServerPublicKey"]
-	if !ok {
-		return fmt.Errorf("ServerPublicKey not found in response")
-	}
-
-	// Verify that the server's public key matches the expected public key.
-	expectedServerPubKeyHex := hex.EncodeToString(gcas.staticPublicKey[:])
-	if serverPubKeyHex != expectedServerPubKeyHex {
-		return fmt.Errorf("mismatch in server public key: expected %s, got %s", expectedServerPubKeyHex, serverPubKeyHex)
+	if grr.ServerPublicKey != gcas.staticPublicKey {
+		return fmt.Errorf("got wrong response from server: %v", grr)
 	}
 	return nil
 }
