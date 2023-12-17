@@ -218,7 +218,7 @@ func (gcas *GCAServer) submitKnownGCAKey(tempPrivKey glow.PrivateKey, publicKey 
 	if err != nil {
 		return fmt.Errorf("failed to decode json response: %v", err)
 	}
-	if grr.ServerPublicKey != gcas.staticPublicKey {
+	if grr.PublicKey != gcas.staticPublicKey {
 		return fmt.Errorf("got wrong response from server: %v", grr)
 	}
 	return nil

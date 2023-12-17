@@ -44,7 +44,10 @@ type GCARegistration struct {
 // GCARegistrationResponse defines the response that the server writes after a
 // successful GCA registration.
 type GCARegistrationResponse struct {
-	ServerPublicKey glow.PublicKey
+	PublicKey glow.PublicKey
+	HttpPort  uint16
+	TcpPort   uint16
+	UdpPort   uint16
 }
 
 // SigningBytes generates the byte slice used for signing or verifying the GCAKey.
@@ -88,7 +91,10 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Send the response as JSON with a status code of OK
 	resp := GCARegistrationResponse{
-		ServerPublicKey: s.staticPublicKey,
+		PublicKey: s.staticPublicKey,
+		HttpPort:  s.httpPort,
+		TcpPort:   s.tcpPort,
+		UdpPort:   s.udpPort,
 	}
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
