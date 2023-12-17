@@ -35,6 +35,7 @@ import (
 
 	"github.com/glowlabs-org/gca-backend/client"
 	"github.com/glowlabs-org/gca-backend/glow"
+	"github.com/glowlabs-org/gca-backend/server"
 )
 
 // help() displays a list of commands.
@@ -80,7 +81,7 @@ func main() {
 	// and the GCA lockbooks needs a way to ensure that only the lockbook
 	// can control the first GCA servers, but also that the technician
 	// doesn't have access to the real GCA keys.
-	_, err := os.Stat(gcaTempKeyPath)
+	_, err = os.Stat(gcaTempKeyPath)
 	if os.IsNotExist(err) {
 		// Create the temp keys.
 		var data [96]byte
@@ -125,16 +126,76 @@ func main() {
 	// commands. Load those keys.
 	keyData, err := ioutil.ReadFile(gcaKeyPath)
 	if err != nil {
-		fmt.Println("Unable to load gca keys:", err)
+		fmt.Println("Unable to load gca keys, may need to run 'new-gca':", err)
 		return
 	}
 	var gcaPubKey glow.PublicKey
 	var gcaPrivKey glow.PrivateKey
 	copy(gcaPubKey[:], keyData[:32])
 	copy(gcaPrivKey[:], keyData[32:])
+	tempKeyData, err := ioutil.ReadFile(gcaTempPubKeyPath)
+	if err != nil {
+		fmt.Println("Unable to load gca temp keys, won't be able to authorize new servers:", err)
+		return
+	}
+	var gcaTempPrivKey glow.PrivateKey
+	copy(gcaTempPrivKey[:], tempKeyData[32:])
 
-	// TODO: We are going to need a command along the lines of
-	// 'new-server'.
+	// Check for authorize-server, a command that will use the gca temp key
+	// to declare the real gca key to the server, and also authorize the
+	// gca server and grab credentials for it.
+	if os.Args[1] == "authorize-server" {
+		if len(os.Args) != 3 {
+			fmt.Println("Usage: ./gca-admin authorize-server [server-location:port]")
+			return
+		}
+
+		gr := server.GCARegistration{
+			GCAKey: gcaPubKey,
+		}
+		sb := gr.SigningBytes()
+		sig := glow.Sign(sb, gcaTempPrivKey)
+		gr.Signature = sig
+		payload, err := json.Marshal(gr)
+		if err != nil {
+			fmt.Println("Unable to create GCARegistration:", err)
+			return
+		}
+		req, err := http.NewRequest("POST", fmt.Sprintf("%v/api/v1/register-gca", os.Args[2]), bytes.NewBuffer(payload))
+		if err != nil {
+			fmt.Println("Unable to create GCARegistration request:", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("Unable to submit GCARegistration request:", err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			respBodyBytes, readErr := ioutil.ReadAll(resp.Body)
+			if readErr != nil {
+				fmt.Println("failed to read response body:", err)
+				return
+			}
+			fmt.Printf("Received a non-200 status code: %d :: %s\n", resp.StatusCode, string(respBodyBytes))
+			return
+		}
+
+		// Decode the response from the server.
+		var grr server.GCARegistrationResponse
+		err = json.NewDecoder(resp.Body).Decode(&grr)
+		if err != nil {
+			fmt.Println("Unable to decode response:", err)
+			return
+		}
+
+		// TODO: Save the server locally.
+
+		return
+	}
 
 	// Load the list of servers for this GCA.
 	serversPath := filepath.Join("data", "gcaServers.dat")

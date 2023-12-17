@@ -310,7 +310,7 @@ func (server *GCAServer) loadGCATempKey() error {
 
 // loadGCAPubkey loads the Glow Certification Agent public key from a file.
 func (server *GCAServer) loadGCAPubkey() error {
-	pubkeyPath := filepath.Join(server.baseDir, "gca.pubkey")
+	pubkeyPath := filepath.Join(server.baseDir, "gcaPubKey.dat")
 	pubkeyData, err := ioutil.ReadFile(pubkeyPath)
 	if os.IsNotExist(err) {
 		server.logger.Info("GCA Temp Key not available, waiting to receive over the API")

@@ -22,7 +22,6 @@ package server
 // This endpoint is a POST request.
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,63 +32,32 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-// RegisterGCARequest defines the inputs that need to be collected to secure
-// the GCA key. The GCA key is a 32 byte public key. The signature is a 64 byte
-// signature. They are presented using hex encodings.
-type RegisterGCARequest struct {
-	GCAKey    string `json:"GCAKey"`    // The 32-byte GCA public key, hex encoded
-	Signature string `json:"Signature"` // The 64-byte signature, hex encoded
-}
-
-// GCAKey struct represents the GCA's public key and a signature to verify it.
-type GCAKey struct {
-	PublicKey glow.PublicKey
+// GCARegistration defines a request from the GCA to register itself on a
+// server. The GCAKey is the GCA's real public key. The signature is signed by
+// the GCA temp key which was installed on the machine before the GCA received
+// their lockbook.
+type GCARegistration struct {
+	GCAKey    glow.PublicKey
 	Signature glow.Signature
 }
 
-// ToGCAKey converts a RegisterGCARequest to a GCAKey struct.
-// It decodes the hex-encoded GCAKey and Signature.
-func (req *RegisterGCARequest) ToGCAKey() (GCAKey, error) {
-	if len(req.GCAKey) != 64 {
-		return GCAKey{}, errors.New("GCAKey is of wrong length")
-	}
-	decodedGCAKey, err := hex.DecodeString(req.GCAKey)
-	if err != nil {
-		return GCAKey{}, err
-	}
-
-	if len(req.Signature) != 128 {
-		return GCAKey{}, fmt.Errorf("signature is of wrong length: %v", len(req.Signature))
-	}
-	decodedSignature, err := hex.DecodeString(req.Signature)
-	if err != nil {
-		return GCAKey{}, err
-	}
-
-	gk := GCAKey{}
-	copy(gk.PublicKey[:], decodedGCAKey)
-	copy(gk.Signature[:], decodedSignature)
-
-	return gk, nil
+// GCARegistrationResponse defines the response that the server writes after a
+// successful GCA registration.
+type GCARegistrationResponse struct {
+	ServerPublicKey glow.PublicKey
 }
 
 // SigningBytes generates the byte slice used for signing or verifying the GCAKey.
 //
 // This method excludes the Signature field from the byte slice and adds
 // a "GCAKey" prefix. The returned byte slice is intended for the signing operation.
-func (gk *GCAKey) SigningBytes() []byte {
-	// Initialize the prefix string and convert it to a byte slice
-	prefix := "GCAKey"
+func (gr *GCARegistration) SigningBytes() []byte {
+	prefix := "GCARegistration"
 	prefixBytes := []byte(prefix)
 
-	// Initialize a byte slice with sufficient length to hold the serialized PublicKey
-	// and the length of prefixBytes for the "GCAKey" prefix.
-	data := make([]byte, len(prefixBytes)+32) // 32 bytes for PublicKey
-
-	// Copy the prefix and the public key into the byte slice.
+	data := make([]byte, len(prefixBytes)+32)
 	copy(data[0:len(prefixBytes)], prefixBytes)
-	copy(data[len(prefixBytes):len(prefixBytes)+32], gk.PublicKey[:])
-
+	copy(data[len(prefixBytes):len(prefixBytes)+32], gr.GCAKey[:])
 	return data
 }
 
@@ -104,7 +72,7 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode the JSON request body into RegisterGCARequest struct
-	var request RegisterGCARequest
+	var request GCARegistration
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		s.logger.Error("Failed to decode request body:", err)
@@ -118,13 +86,12 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a JSON object with the hex-encoded public key of the GCA server
-	hexPublicKey := hex.EncodeToString(s.staticPublicKey[:])
-	response := map[string]string{"ServerPublicKey": hexPublicKey}
-
 	// Send the response as JSON with a status code of OK
+	resp := GCARegistrationResponse{
+		ServerPublicKey: s.staticPublicKey,
+	}
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		// Handle the error if JSON encoding fails
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		s.logger.Error("Failed to encode JSON response:", err)
@@ -137,27 +104,23 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 
 // registerGCA performs the actual registration based on the client request.
 // This function is responsible for the actual logic of registering the GCA.
-func (s *GCAServer) registerGCA(req RegisterGCARequest) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.gcaPubkeyAvailable {
+func (gcas *GCAServer) registerGCA(gr GCARegistration) error {
+	gcas.mu.Lock()
+	defer gcas.mu.Unlock()
+	if gcas.gcaPubkeyAvailable {
 		return fmt.Errorf("a GCA key has already been registered")
 	}
 
 	// Parse and verify the GCA key
-	gk, err := req.ToGCAKey()
-	if err != nil {
-		s.logger.Warn("Received bad GCA registration:", req)
-		return fmt.Errorf("unable to convert to GCA key: %v", err)
+	sb := gr.SigningBytes()
+	isValid := glow.Verify(gcas.gcaTempKey, sb, gr.Signature)
+	if !isValid {
+		gcas.logger.Warn("Received bad GCA registration:", gr)
+		return errors.New("invalid signature on GCAKey")
 	}
-	err = s.verifyGCAKey(gk)
+	err := gcas.saveGCAKey(gr)
 	if err != nil {
-		s.logger.Warn("Received bad GCA key signature:", req)
-		return fmt.Errorf("unable to verify GCA key: %v", err)
-	}
-	err = s.saveGCAKey(gk)
-	if err != nil {
-		s.logger.Warn("Unable to save GCA key:", gk)
+		gcas.logger.Warn("Unable to save GCA key:", gr)
 		return fmt.Errorf("unable to save GCA key: %v", err)
 	}
 	return nil
@@ -168,13 +131,13 @@ func (s *GCAServer) registerGCA(req RegisterGCARequest) error {
 // It uses the public key of some authority (let's assume it's available in
 // the server struct as someAuthorityPubkey) to verify the signature.
 // The method returns an error if the verification fails.
-func (gcas *GCAServer) verifyGCAKey(gk GCAKey) error {
+func (gcas *GCAServer) verifyGCAKey(gr GCARegistration) error {
 	// Generate the byte slice intended for the signing operation
-	signingBytes := gk.SigningBytes()
+	signingBytes := gr.SigningBytes()
 
 	// Perform the signature verification. Assume Verify is a function that exists
 	// to verify the signature.
-	isValid := glow.Verify(gcas.gcaTempKey, signingBytes, gk.Signature)
+	isValid := glow.Verify(gcas.gcaTempKey, signingBytes, gr.Signature)
 
 	// Check if the signature is valid
 	if !isValid {
@@ -187,26 +150,22 @@ func (gcas *GCAServer) verifyGCAKey(gk GCAKey) error {
 //
 // This function takes the GCA key, serialized as a byte array,
 // and writes it to a file. The path for the file is determined by
-// concatenating the server's base directory with "gca.pubkey".
-func (server *GCAServer) saveGCAKey(gk GCAKey) error {
+// concatenating the server's base directory with "gcaPubKey.dat"
+func (server *GCAServer) saveGCAKey(gr GCARegistration) error {
 	// Determine the file path for the public key.
 	// This should reside in the same directory as when reading it,
 	// usually specified in server.baseDir.
-	pubkeyPath := filepath.Join(server.baseDir, "gca.pubkey")
-
-	// Serialize the GCA public key from the GCAKey struct.
-	// In this case, we only need to save the public key, not the signature.
-	serializedPubkey := gk.PublicKey[:]
+	pubkeyPath := filepath.Join(server.baseDir, "gcaPubKey.dat")
 
 	// Write the serialized public key to a file.
 	// ioutil.WriteFile creates the file if it doesn't exist,
 	// or truncates it before writing if it does.
-	err := ioutil.WriteFile(pubkeyPath, serializedPubkey, 0644)
+	err := ioutil.WriteFile(pubkeyPath, gr.GCAKey[:], 0644)
 	if err != nil {
 		return fmt.Errorf("unable to write public key to file: %v", err)
 	}
 
-	server.gcaPubkey = gk.PublicKey
+	server.gcaPubkey = gr.GCAKey
 	server.gcaPubkeyAvailable = true
 	return nil
 }

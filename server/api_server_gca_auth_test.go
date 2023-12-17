@@ -4,8 +4,9 @@ package server
 // authorization process. The major test is the integration test, which tries
 // to walk the GCAServer through its entire lifecycle. This means that we set
 // up a server where the pubkey of the temporary GCA key has already been saved
-// to disk at the file "gca.tempkey". The test itself will have to create the
-// temporary key and save the public key of the temporary key to that location.
+// to disk at the file "gcaTempPubKey.dat". The test itself will have to create
+// the temporary key and save the public key of the temporary key to that
+// location.
 //
 // When the GCA server starts up, it will load and see the temporary key. Then
 // the integration test will need to create a new key which represents the real
