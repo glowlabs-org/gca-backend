@@ -46,8 +46,14 @@ new-gca
 	Generates brand new keys for the device. Should only
 	be called once per new GCA.
 
-new-server
+authorize-server
 	Authorizes a new GCA server.
+
+first-equipment
+	Creates the very first GCA equipment
+
+new-equipment
+	Creates a new GCA equipement
 `)
 }
 
@@ -86,9 +92,10 @@ func main() {
 	_, err = os.Stat(gcaTempKeyPath)
 	if os.IsNotExist(err) {
 		// Create the temp keys.
-		var data [96]byte
+		var data [64]byte
 		var pubData [32]byte
 		pubKey, privKey := glow.GenerateKeyPair()
+		fmt.Println(privKey, len(privKey))
 		copy(data[:32], pubKey[:])
 		copy(data[32:], privKey[:])
 		copy(pubData[:], pubKey[:])
@@ -135,7 +142,7 @@ func main() {
 	var gcaPrivKey glow.PrivateKey
 	copy(gcaPubKey[:], keyData[:32])
 	copy(gcaPrivKey[:], keyData[32:])
-	tempKeyData, err := ioutil.ReadFile(gcaTempPubKeyPath)
+	tempKeyData, err := ioutil.ReadFile(gcaTempKeyPath)
 	if err != nil {
 		fmt.Println("Unable to load gca temp keys, won't be able to authorize new servers:", err)
 		return
@@ -145,7 +152,7 @@ func main() {
 
 	// Load the list of servers for this GCA.
 	serversData, err := ioutil.ReadFile(serversPath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		fmt.Println("unable to load list of GCA servers:", err)
 		return
 	}
@@ -207,7 +214,7 @@ func newGCA(gcaKeyPath string) {
 	}
 
 	// Create the keys.
-	var data [96]byte
+	var data [32]byte
 	pubKey, privKey := glow.GenerateKeyPair()
 	copy(data[:32], pubKey[:])
 	copy(data[32:], privKey[:])
@@ -448,7 +455,7 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	fmt.Println("Creating equipment", nextShortID)
 
 	// Create keys for the client
-	var keyData [96]byte
+	var keyData [32]byte
 	keyPath := filepath.Join(dir, client.ClientKeyFile)
 	clientPubKey, clientPrivKey := glow.GenerateKeyPair()
 	copy(keyData[:32], clientPubKey[:])
