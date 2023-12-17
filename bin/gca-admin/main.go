@@ -271,11 +271,11 @@ func authorizeServer(gcaPubKey glow.PublicKey, gcaTempPrivKey glow.PrivateKey, s
 	srv := client.GCAServer{
 		Banned:   false,
 		Location: os.Args[2],
-		HttpPort: 35015,
-		TcpPort:  35030,
-		UdpPort:  35045,
+		HttpPort: grr.HttpPort,
+		TcpPort:  grr.TcpPort,
+		UdpPort:  grr.UdpPort,
 	}
-	serversMap[grr.ServerPublicKey] = srv
+	serversMap[grr.PublicKey] = srv
 	serversData, err := client.SerializeGCAServerMap(serversMap)
 	if err != nil {
 		fmt.Println("Unable to serialize server map:", err)
