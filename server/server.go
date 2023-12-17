@@ -299,7 +299,7 @@ func (server *GCAServer) loadGCAServerKeys() (glow.PublicKey, glow.PrivateKey, e
 
 // loadGCATempKey loads the temporary key of the Glow Certification Agent.
 func (server *GCAServer) loadGCATempKey() error {
-	path := filepath.Join(server.baseDir, "gca.tempkey")
+	path := filepath.Join(server.baseDir, "gcaTempPubKey.dat")
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("unable to read temp gca key from file: %v", err)

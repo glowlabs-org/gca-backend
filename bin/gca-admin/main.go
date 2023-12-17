@@ -8,9 +8,19 @@ package main
 // intentionally blocks any actions that may be harmful to the GCA or have
 // unintended consequences.
 
+// When a new server is created, there is an assumption that the new server
+// will have the tempPubKey of the GCA, which is created prior to the GCA
+// receiving a laptop. The server will need the gca temp key added at the
+// location '/home/user/gca-server/gcaTempPubKey.dat'. The temp key is stored
+// locally at "~/.config/gca-data/gcaTempPubKey.dat'.
+
 // TODO: We need to get the servers persisting the list of other servers so
 // that they retain the list after a restart. This persistence can probably
 // happen in authorized_servers.go
+
+// TODO: Need to ensure that any instructions for the GCAs will have them
+// double check that brand new keys were created when they call the new-gca
+// command.
 
 import (
 	"bytes"
@@ -33,6 +43,9 @@ func help() {
 new-gca 
 	Generates brand new keys for the device. Should only
 	be called once per new GCA.
+
+new-server
+	Authorizes a new GCA server.
 `)
 }
 
@@ -40,20 +53,8 @@ new-gca
 // sure that all of the basic requirements are in place. For example, a GCA key
 // is needed unless the 'new-gca' command is provided.
 func main() {
-	// Default information.
-	if len(os.Args) == 1 {
-		fmt.Println("GCA Admin Tool v0.1")
-		help()
-		return
-	}
 	if len(os.Args) < 1 {
 		fmt.Println("unrecognized usage")
-		return
-	}
-
-	// Check for a help command.
-	if os.Args[1] == "help" {
-		help()
 		return
 	}
 
@@ -64,12 +65,52 @@ func main() {
 		return
 	}
 	gcaDir := filepath.Join(homeDir, ".config", "gca-data")
-	gcaKeyPath := filepath.Join(gcaDir, "gcaKeys.dat")
-
 	// Ensure that the gca directory exists
 	err = os.MkdirAll(gcaDir, 0700)
 	if err != nil {
 		fmt.Println("Unable to create gca directory:", err)
+		return
+	}
+	gcaKeyPath := filepath.Join(gcaDir, "gcaKeys.dat")
+	gcaTempKeyPath := filepath.Join(gcaDir, "gcaTempKeys.dat")
+	gcaTempPubKeyPath := filepath.Join(gcaDir, "gcaTempPubKey.dat")
+
+	// Create the temp keys if they don't already exist. The idea behind
+	// the temp keys is that the technician who is creating the GCA servers
+	// and the GCA lockbooks needs a way to ensure that only the lockbook
+	// can control the first GCA servers, but also that the technician
+	// doesn't have access to the real GCA keys.
+	_, err := os.Stat(gcaTempKeyPath)
+	if os.IsNotExist(err) {
+		// Create the temp keys.
+		var data [96]byte
+		var pubData [32]byte
+		pubKey, privKey := glow.GenerateKeyPair()
+		copy(data[:32], pubKey[:])
+		copy(data[32:], privKey[:])
+		copy(pubData[:], pubKey[:])
+		err = ioutil.WriteFile(gcaTempKeyPath, data[:], 0400)
+		if err != nil {
+			fmt.Println("Unable to write GCA temp keys:", err)
+			return
+		}
+		err = ioutil.WriteFile(gcaTempPubKeyPath, pubData[:], 0400)
+		if err != nil {
+			fmt.Println("Unable to write GCA temp pub key:", err)
+			return
+		}
+		fmt.Println("GCA temp keys automatically created.")
+	}
+
+	// Default information.
+	if len(os.Args) == 1 {
+		fmt.Println("GCA Admin Tool v0.1")
+		help()
+		return
+	}
+	// Check for a help command.
+	if os.Args[1] == "help" {
+		help()
 		return
 	}
 
@@ -82,10 +123,9 @@ func main() {
 	// If the command is not 'new-gca', then the assumption is that the GCA
 	// keys already exist and will need to be used in one of the next
 	// commands. Load those keys.
-	keypath := filepath.Join(gcaDir, "gcaKeys.dat")
-	keyData, err := ioutil.ReadFile(keypath)
+	keyData, err := ioutil.ReadFile(gcaKeyPath)
 	if err != nil {
-		fmt.Println("unable to load gca keys:", err)
+		fmt.Println("Unable to load gca keys:", err)
 		return
 	}
 	var gcaPubKey glow.PublicKey
