@@ -1,16 +1,9 @@
 package main
 
-// gca-admin is a cli program that allows GCAs to perform all of their basic
-// admin functions. This includes initializing the GCA, initializing new GCA
-// servers, and initializing new monitoring devices.
-//
-// This binary is meant to be usable in production by GCAs, and therefore
-// intentionally blocks any actions that may be harmful to the GCA or have
-// unintended consequences.
+// gca-admin-testing is a parallel codebase to gca-admin which has many of the
+// same commands, but also contains commands that are useful for testing.
 
-// TODO: We need to get the servers persisting the list of other servers so
-// that they retain the list after a restart. This persistence can probably
-// happen in authorized_servers.go
+// TODO: Should probably de-duplicate most of the code.
 
 import (
 	"bytes"
@@ -27,15 +20,6 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-// help() displays a list of commands.
-func help() {
-	fmt.Print(`
-new-gca 
-	Generates brand new keys for the device. Should only
-	be called once per new GCA.
-`)
-}
-
 // main contains a harness to execute various commands. On startup, it makes
 // sure that all of the basic requirements are in place. For example, a GCA key
 // is needed unless the 'new-gca' command is provided.
@@ -43,7 +27,6 @@ func main() {
 	// Default information.
 	if len(os.Args) == 1 {
 		fmt.Println("GCA Admin Tool v0.1")
-		help()
 		return
 	}
 	if len(os.Args) < 1 {
@@ -51,38 +34,16 @@ func main() {
 		return
 	}
 
-	// Check for a help command.
-	if os.Args[1] == "help" {
-		help()
-		return
-	}
-
-	// Get the location of the gca directory.
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("Unable to locate home dir:", err)
-		return
-	}
-	gcaDir := filepath.Join(homeDir, ".config", "gca-data")
-	gcaKeyPath := filepath.Join(gcaDir, "gcaKeys.dat")
-
-	// Ensure that the gca directory exists
-	err = os.MkdirAll(gcaDir, 0700)
-	if err != nil {
-		fmt.Println("Unable to create gca directory:", err)
-		return
-	}
-
 	// Look for a new-gca command.
 	if os.Args[1] == "new-gca" {
-		newGCA(gcaKeyPath)
+		fmt.Println("not implemented")
 		return
 	}
 
 	// If the command is not 'new-gca', then the assumption is that the GCA
-	// keys already exist and will need to be used in one of the next
-	// commands. Load those keys.
-	keypath := filepath.Join(gcaDir, "gcaKeys.dat")
+	// keys already exist and are available locally. These keys are going
+	// to be part of all the other actions.
+	keypath := filepath.Join("data", "gcaKeys.dat")
 	keyData, err := ioutil.ReadFile(keypath)
 	if err != nil {
 		fmt.Println("unable to load gca keys:", err)
@@ -138,33 +99,6 @@ func main() {
 	}
 }
 
-// newGCA will create keys for a new GCA. It will refuse to generate new keys
-// if a file already exists containing GCA keys.
-func newGCA(gcaKeyPath string) {
-	// Check that gca keys don't already exist.
-	_, err := os.Stat(gcaKeyPath)
-	if err == nil {
-		fmt.Println("The GCA keys already exist")
-		return
-	}
-	if !os.IsNotExist(err) {
-		fmt.Println("Unexpected error:", err)
-		return
-	}
-
-	// Create the keys.
-	var data [96]byte
-	pubKey, privKey := glow.GenerateKeyPair()
-	copy(data[:32], pubKey[:])
-	copy(data[32:], privKey[:])
-	err = ioutil.WriteFile(gcaKeyPath, data[:], 0400)
-	if err != nil {
-		fmt.Println("Unable to write GCA keys:", err)
-		return
-	}
-	fmt.Println("GCA keys successfully written!")
-}
-
 // firstEquipmentCmd creates the shortID file and submits the first equipment
 // to the servers.
 func firstEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serversMap map[glow.PublicKey]client.GCAServer) error {
@@ -182,7 +116,7 @@ func firstEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, ser
 	// Write out the file.
 	var data [4]byte
 	binary.LittleEndian.PutUint32(data[:], 1)
-	err = ioutil.WriteFile(shortIDPath, data[:], 0400)
+	err = ioutil.WriteFile(shortIDPath, data[:], 0644)
 	if err != nil {
 		return fmt.Errorf("unable to write the short id file: %v", err)
 	}
