@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"os/user"
 	"path/filepath"
 	"syscall"
 
@@ -19,14 +18,14 @@ import (
 // main is the entry point of the application.
 func main() {
 	// Get the user's home directory in an OS-agnostic manner.
-	usr, err := user.Current()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Println("Error obtaining user's home directory:", err)
 		os.Exit(1)
 	}
 
 	// Create the server directory path within the user's home directory.
-	serverDir := filepath.Join(usr.HomeDir, "gca-server")
+	serverDir := filepath.Join(homeDir, "gca-server")
 
 	// Initialize a new GCAServer instance with the server directory.
 	gcaServer, err := server.NewGCAServer(serverDir)
