@@ -60,24 +60,16 @@ func TestRecentReportsIntegration(t *testing.T) {
 	if len(response.Reports) != 4032 {
 		t.Fatalf("Unexpected number of reports: got %d, want 4032", len(response.Reports))
 	}
-	if response.Signature == "" {
+	var sig glow.Signature
+	if response.Signature == sig {
 		t.Fatal("Signature is missing in the response")
 	}
 	// Verify the signature.
-	var sig [64]byte
 	signBytes, err := json.Marshal(response.Reports)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sigBytes, err := hex.DecodeString(response.Signature)
-	if err != nil {
-		t.Fatal(err)
-	}
-	copy(sig[:], sigBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !glow.Verify(server.staticPublicKey, signBytes, sig) {
+	if !glow.Verify(server.staticPublicKey, signBytes, response.Signature) {
 		t.Fatal("signature mismatch")
 	}
 

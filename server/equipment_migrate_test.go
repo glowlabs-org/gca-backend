@@ -42,17 +42,19 @@ func TestThreadedMigrateReports(t *testing.T) {
 	for i := 0; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
 	}
-	// Wait 150 milliseconds, which should trigger a prune. Except that no
+	// Wait 350 milliseconds, which should trigger a prune. Except that no
 	// prune should be triggered because we aren't inside the prune window.
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(350 * time.Millisecond)
 	// Verify that nothing got pruned.
 	for i := 0; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
@@ -60,13 +62,14 @@ func TestThreadedMigrateReports(t *testing.T) {
 
 	// Update the timeslot just enough that we shouldn't be getting pruned still.
 	glow.SetCurrentTimeslot(3000)
-	// Wait 150 milliseconds, which should trigger a prune. Except that no
+	// Wait 350 milliseconds, which should trigger a prune. Except that no
 	// prune should be triggered because we aren't inside the prune window.
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(350 * time.Millisecond)
 	// Verify that nothing got pruned.
 	for i := 0; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
@@ -74,30 +77,33 @@ func TestThreadedMigrateReports(t *testing.T) {
 
 	// Update the timeslot just enough that things should be getting pruned now.
 	glow.SetCurrentTimeslot(3300)
-	// Wait 150 milliseconds, which should trigger a prune. Except that no
+	// Wait 350 milliseconds, which should trigger a prune. Except that no
 	// prune should be triggered because we aren't inside the prune window.
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(350 * time.Millisecond)
 	// Verify that things got pruned
 	for i := 0; i < 2016; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
-			t.Fatal("equipment should still exist")
+			gcas.mu.Unlock()
+			t.Fatal("equipment should have been pruned")
 		}
 		gcas.mu.Unlock()
 	}
 	for i := 2016; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
 	}
 
 	// Wait for another prune cycle, verify nothing happens.
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(350 * time.Millisecond)
 	for i := 0; i < 2016; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
@@ -105,16 +111,18 @@ func TestThreadedMigrateReports(t *testing.T) {
 	for i := 2016; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
 	}
 
 	// Update the time to 5000, which should still not cause a prune.
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(350 * time.Millisecond)
 	for i := 0; i < 2016; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput < 2 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
@@ -122,6 +130,7 @@ func TestThreadedMigrateReports(t *testing.T) {
 	for i := 2016; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
+			gcas.mu.Unlock()
 			t.Fatal("equipment should still exist")
 		}
 		gcas.mu.Unlock()
@@ -130,11 +139,11 @@ func TestThreadedMigrateReports(t *testing.T) {
 	// Update the current timeslot to trigger another migration, now all of
 	// the reports should be migrated out.
 	glow.SetCurrentTimeslot(5300)
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(350 * time.Millisecond)
 	for i := 0; i < 4032; i++ {
 		gcas.mu.Lock()
 		if gcas.equipmentReports[dummyEquipment.ShortID][i].PowerOutput != 0 {
-			t.Fatal("equipment should still exist")
+			t.Error("all the reports should have been cycled out:", i)
 		}
 		gcas.mu.Unlock()
 	}

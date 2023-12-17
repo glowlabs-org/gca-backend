@@ -1,5 +1,7 @@
 package server
 
+// TODO: The code here does not align with standards.
+
 import (
 	"encoding/hex"
 	"encoding/json"
@@ -10,12 +12,10 @@ import (
 )
 
 // RecentReportsResponse defines the output containing the equipment reports and a signature.
-//
-// TODO: Need to add the equipmentReportsOffset to this struct so the caller
-// knows which batch of reports they are reading from.
 type RecentReportsResponse struct {
-	Reports   [4032]glow.EquipmentReport `json:"Reports"`   // Array of equipment reports
-	Signature string                     `json:"Signature"` // Signature of the GCA server
+	Reports        [4032]glow.EquipmentReport `json:"Reports"`        // Array of equipment reports
+	TimeslotOffset uint32                     `json:"TimeslotOffset"` // The timeslot offset of the first report
+	Signature      glow.Signature             `json:"Signature"`      // Signature of the GCA server
 }
 
 // RecentReportsHandler handles requests for fetching the most recent equipment reports.
@@ -87,13 +87,9 @@ func (s *GCAServer) getRecentReportsWithSignature(publicKey glow.PublicKey) (Rec
 	}
 
 	// Sign the serialized reports
-	signature := glow.Sign(reportsBytes, s.staticPrivateKey)
-
-	// Encode the signature to hex
-	hexSignature := hex.EncodeToString(signature[:])
-
+	sig := glow.Sign(reportsBytes, s.staticPrivateKey)
 	return RecentReportsResponse{
 		Reports:   *reports,
-		Signature: hexSignature,
+		Signature: sig,
 	}, nil
 }

@@ -236,33 +236,39 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 
 // threadedMigrateReports will infrequently update the equipment reports so
 // that the reports are always for the current week and the previous.
-func (gcas *GCAServer) threadedMigrateReports(username, password string) {
+//
+// Right at startup there's a situation where it may have been multiple weeks
+// since the server was last running. This means that the
+// equipmentReportsOffset of the server may need to be updated multiple times
+// in a row. To allow this, the loop will keep running until 'ero' is below
+// 3200.
+//
+// We don't want any of the other processes kicking off until the ero is
+// totally ready to go, so the 'ready' channel is used to signal to startup
+// that it's okay to proceed.
+func (gcas *GCAServer) threadedMigrateReports(username, password string, ready chan struct{}) {
+	readyClosed := false
 	for {
-		// This loop is pretty lightweight so every 3 seconds seems
-		// fine, even though action is only taken once a week.
-		select {
-		case <-gcas.quit:
-			return
-		case <-time.After(ReportMigrationFrequency):
-		}
-
-		// We only update if we are progressed most of the way through
-		// the second week.
 		gcas.mu.Lock()
 		ero := gcas.equipmentReportsOffset
 		gcas.mu.Unlock()
 		now := glow.CurrentTimeslot()
-		if int64(now)-int64(ero) > 4000 {
-			// TODO: Actually, the code has been adjusted so that
-			// this should not be a problem. We should proceed,
-			// business as usual, if this happens. But also, if
-			// this happens we need to do it a bunch more times
-			// so... we need to skip the reportMigrationFrequency
-			// sleep on the next round. We probably need to
-			// refactor this code a decent amount to make that
-			// clean.
-			panic("migration is late")
+		if int64(now)-int64(ero) < 4000 {
+			if !readyClosed {
+				readyClosed = true
+				close(ready)
+			}
+			// This loop is pretty lightweight so every 3 seconds seems
+			// fine, even though action is only taken once a week.
+			select {
+			case <-gcas.quit:
+				return
+			case <-time.After(ReportMigrationFrequency):
+			}
 		}
+
+		// We only update if we are progressed most of the way through
+		// the second week.
 		if int64(now)-int64(ero) > 3200 {
 			// Fetch all of the moer values for the week.
 			err := gcas.managedGetWattTimeWeekData(username, password)
