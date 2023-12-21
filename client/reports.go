@@ -99,9 +99,15 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		}
 
 		// Append the data to the records slice
+		//
+		// There's a multiplication here: 6667/1000 - effectively
+		// multiplying the output of the device by 6.667x. This is
+		// because we swapped out the hardware for a CT that produces
+		// 6.667x less current than what the firmware was designed for,
+		// so there has to be adjustments.
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
-			Energy:   uint64(energy),
+			Energy:   uint64(energy*6667/1e3),
 		})
 	}
 

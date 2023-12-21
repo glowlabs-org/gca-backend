@@ -26,3 +26,6 @@ ssh user@$1 'mkdir -p /home/user/gca-server'
 scp ~/.config/gca-data/gcaTempPubKey.dat user@$1:/home/user/gca-server/gcaTempPubKey.dat
 scp -r ~/.config/gca-data/watttime_data user@$1:/home/user/gca-server/watttime_data
 scp -r ~/.config/gca-data/gca-server user@$1:/home/user/gca-server/gca-server
+
+# Add execution permissions to gca-server
+ssh user@$1 'chmod +x /home/user/gca-server/gca-server'
