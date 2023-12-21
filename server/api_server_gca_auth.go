@@ -77,7 +77,7 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 	// Decode the JSON request body into RegisterGCARequest struct
 	var request GCARegistration
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		s.logger.Error("Failed to decode request body:", err)
 		return
 	}

@@ -1,6 +1,8 @@
 package glow
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -35,6 +37,16 @@ func GenerateKeyPair() (PublicKey, PrivateKey) {
 		if publicKeyCompressed[0] == 0x02 {
 			var publicKey PublicKey
 			copy(publicKey[:], publicKeyCompressed[1:]) // Skip the first byte (0x02 prefix)
+			/*
+				fmt.Printf("ADDR: %x\n", crypto.PubkeyToAddress(privateKeyECDSA.PublicKey))
+				fmt.Printf("PUB: %x\n", publicKey)
+				addr, err := PubKeyToAddr(publicKey)
+				if err != nil {
+					panic("consistency error with key generation")
+				}
+				fmt.Printf("ADDR2: %s\n", addr)
+			*/
+			// fmt.Printf("PRIV: %x\n", privateKey)
 			return publicKey, privateKey
 		}
 	}
@@ -69,4 +81,20 @@ func Verify(publicKey PublicKey, data []byte, signature Signature) bool {
 	}
 	hash := crypto.Keccak256Hash(data)
 	return crypto.VerifySignature(crypto.FromECDSAPub(publicKeyECDSA), hash.Bytes(), signature[:])
+}
+
+// PubKeyToAddr will convert a PublicKey to its corresponding Ethereum Address.
+func PubKeyToAddr(pk PublicKey) (string, error) {
+	// Decompress the public key
+	var compressedKey [33]byte
+	compressedKey[0] = 2
+	copy(compressedKey[1:], pk[:])
+	ecdsaKey, err := crypto.DecompressPubkey(compressedKey[:])
+	if err != nil {
+		return "", fmt.Errorf("unable to decompress pubkey: %v", err)
+	}
+
+	// Convert to ECDSA public key
+	address := crypto.PubkeyToAddress(*ecdsaKey)
+	return address.String(), nil
 }

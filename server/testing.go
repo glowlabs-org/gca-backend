@@ -176,13 +176,7 @@ func (gcas *GCAServer) submitKnownGCAKey(tempPrivKey glow.PrivateKey, publicKey 
 	gr := GCARegistration{GCAKey: publicKey}
 	signingBytes := gr.SigningBytes()
 	gr.Signature = glow.Sign(signingBytes, tempPrivKey)
-
-	// Create a new request payload for the server.
-	reqPayload := GCARegistration{
-		GCAKey:    gr.GCAKey,
-		Signature: gr.Signature,
-	}
-	payloadBytes, err := json.Marshal(reqPayload)
+	payloadBytes, err := json.Marshal(gr)
 	if err != nil {
 		return fmt.Errorf("error marshaling payload: %v", err)
 	}

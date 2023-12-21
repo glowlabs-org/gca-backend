@@ -49,7 +49,7 @@ new-gca
 authorize-server
 	Authorizes a new GCA server.
 
-first-equipment
+init-equipment
 	Creates the very first GCA equipment
 
 new-equipment
@@ -83,6 +83,8 @@ func main() {
 	gcaTempKeyPath := filepath.Join(gcaDir, "gcaTempKeys.dat")
 	gcaTempPubKeyPath := filepath.Join(gcaDir, "gcaTempPubKey.dat")
 	serversPath := filepath.Join(gcaDir, "gcaServers.dat")
+	shortIDPath := filepath.Join(gcaDir, "latestShortID.dat")
+	clientsPath := filepath.Join(gcaDir, "clients")
 
 	// Create the temp keys if they don't already exist. The idea behind
 	// the temp keys is that the technician who is creating the GCA servers
@@ -180,8 +182,8 @@ func main() {
 	// because we want to make sure that the intention is there. Otherwise
 	// the user may accidentally create equipment with conflicting short
 	// ids.
-	if os.Args[1] == "first-equipment" {
-		err := firstEquipmentCmd(gcaPubKey, gcaPrivKey, serversMap)
+	if os.Args[1] == "init-equipment" {
+		err := initEquipmentCmd(shortIDPath)
 		if err != nil {
 			fmt.Println("Unable to make first equipment:", err)
 			return
@@ -190,7 +192,7 @@ func main() {
 
 	// Check if the user wants to authorize a new device.
 	if os.Args[1] == "new-equipment" {
-		err := newEquipmentCmd(gcaPubKey, gcaPrivKey, serversMap)
+		err := newEquipmentCmd(gcaPubKey, gcaPrivKey, serversMap, shortIDPath, clientsPath)
 		if err != nil {
 			fmt.Println("Unable to create and authorize new equipment:", err)
 			return
@@ -214,7 +216,7 @@ func newGCA(gcaKeyPath string) {
 	}
 
 	// Create the keys.
-	var data [32]byte
+	var data [64]byte
 	pubKey, privKey := glow.GenerateKeyPair()
 	copy(data[:32], pubKey[:])
 	copy(data[32:], privKey[:])
@@ -228,8 +230,8 @@ func newGCA(gcaKeyPath string) {
 
 // authorizeServer will authorize a new server.
 func authorizeServer(gcaPubKey glow.PublicKey, gcaTempPrivKey glow.PrivateKey, serversPath string, serversMap map[glow.PublicKey]client.GCAServer) {
-	if len(os.Args) != 3 {
-		fmt.Println("Usage: ./gca-admin authorize-server [server-location:port]")
+	if len(os.Args) != 4 {
+		fmt.Println("Usage: ./gca-admin authorize-server [server-location] [port]")
 		return
 	}
 
@@ -237,14 +239,13 @@ func authorizeServer(gcaPubKey glow.PublicKey, gcaTempPrivKey glow.PrivateKey, s
 		GCAKey: gcaPubKey,
 	}
 	sb := gr.SigningBytes()
-	sig := glow.Sign(sb, gcaTempPrivKey)
-	gr.Signature = sig
+	gr.Signature = glow.Sign(sb, gcaTempPrivKey)
 	payload, err := json.Marshal(gr)
 	if err != nil {
 		fmt.Println("Unable to create GCARegistration:", err)
 		return
 	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%v/api/v1/register-gca", os.Args[2]), bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://%v:%v/api/v1/register-gca", os.Args[2], os.Args[3]), bytes.NewBuffer(payload))
 	if err != nil {
 		fmt.Println("Unable to create GCARegistration request:", err)
 		return
@@ -298,12 +299,11 @@ func authorizeServer(gcaPubKey glow.PublicKey, gcaTempPrivKey glow.PrivateKey, s
 	return
 }
 
-// firstEquipmentCmd creates the shortID file and submits the first equipment
-// to the servers.
-func firstEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serversMap map[glow.PublicKey]client.GCAServer) error {
+// initEquipmentCmd creates the shortID file so that equipment can be created
+// in the future.
+func initEquipmentCmd(shortIDPath string) error {
 	// Check whether the shortID file already exists, return an error if
 	// so.
-	shortIDPath := filepath.Join("data", "latestShortID.dat")
 	_, err := os.Stat(shortIDPath)
 	if err == nil {
 		return fmt.Errorf("it appears that the first equipment already exists")
@@ -315,16 +315,15 @@ func firstEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, ser
 	// Write out the file.
 	var data [4]byte
 	binary.LittleEndian.PutUint32(data[:], 1)
-	err = ioutil.WriteFile(shortIDPath, data[:], 0400)
+	err = ioutil.WriteFile(shortIDPath, data[:], 0600)
 	if err != nil {
 		return fmt.Errorf("unable to write the short id file: %v", err)
 	}
-
-	return newEquipmentCmd(gcaPubKey, gcaPrivKey, serversMap)
+	return nil
 }
 
 // newEquipmentCmd will create a new device and submit it to the remote server.
-func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serversMap map[glow.PublicKey]client.GCAServer) error {
+func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serversMap map[glow.PublicKey]client.GCAServer, shortIDPath string, clientsPath string) error {
 	// Check that there are servers, since this command makes network
 	// calls.
 	if len(serversMap) == 0 {
@@ -386,10 +385,10 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	fmt.Printf("\nYou entered the following data:\n")
 	fmt.Printf("Latitude: %.3f\n", latitude)
 	fmt.Printf("Longitude: %.3f\n", longitude)
-	fmt.Printf("Capacity: %d watts\n", capacity)
-	fmt.Printf("Debt: %d kg of CO2\n", debt)
+	fmt.Printf("Capacity: %.3f kw\n", float64(capacity)/1000)
+	fmt.Printf("Debt: %.3f metric tons of CO2\n", float64(debt)/1000)
 	fmt.Printf("Lifetime: %d years\n", expiration)
-	fmt.Printf("Protocol Fee: %d cents\n", protocolFee)
+	fmt.Printf("Protocol Fee: $%.2f\n", float64(protocolFee)/100)
 	fmt.Printf("Initialization Date: %d-%d-%d\n", initYear, initMonth, initDay)
 
 	// Asking for confirmation
@@ -426,7 +425,6 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	}
 
 	// Load the latest shortid.
-	shortIDPath := filepath.Join("data", "latestShortID.dat")
 	shortIDData, err := ioutil.ReadFile(shortIDPath)
 	if err != nil {
 		return fmt.Errorf("unable to read shortID file: %v", err)
@@ -446,7 +444,7 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 
 	// Create a directory for all of the equipment data.
 	clientName := "client_" + strconv.Itoa(int(nextShortID))
-	dir := filepath.Join("data", clientName)
+	dir := filepath.Join(clientsPath, clientName)
 	err = os.MkdirAll(dir, 0744)
 	if err != nil {
 		return fmt.Errorf("unable to create client directory: %v", err)
@@ -455,7 +453,7 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	fmt.Println("Creating equipment", nextShortID)
 
 	// Create keys for the client
-	var keyData [32]byte
+	var keyData [64]byte
 	keyPath := filepath.Join(dir, client.ClientKeyFile)
 	clientPubKey, clientPrivKey := glow.GenerateKeyPair()
 	copy(keyData[:32], clientPubKey[:])
