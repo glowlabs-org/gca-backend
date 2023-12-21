@@ -7,7 +7,6 @@
 # Call this script using `./server-setup.sh [ip-address]`
 
 # Build the basic tooling.
-go build # build the latest version of the admin tools
 ./gca-admin # run the tools so that the gca temp keys get created if they don't exist yet
 
 # Create a 'user' on the server.
