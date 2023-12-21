@@ -82,16 +82,20 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		energy, err := strconv.ParseUint(record[1], 10, 32)
 		if err != nil {
 			energy = 0
-		} else {
-			// Round the energy down so that we never over-estiamte the amount of
-			// power that has been produced.
-			energy = energy - 1
 		}
 
 		// 0, 1, and 2 are reserved sentinel values, so we just skip this
 		// reading if we are in that range.
 		if energy < 3 {
 			continue
+		}
+
+		// Round the energy down so that we never over-estiamte the amount of
+		// power that has been produced.
+		if energy%1000 == 0 {
+			energy = energy - 1000
+		} else {
+			energy = energy - 1
 		}
 
 		// Append the data to the records slice
@@ -507,6 +511,8 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 			}
 		}
 	}
+
+	// go c.threadedSyncWithServer(latestRecord)
 
 	// Infinite loop to send reports. We start ticks at 30 so that the
 	// catchup function will run about 2.5 hours after boot. We don't want

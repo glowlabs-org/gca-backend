@@ -118,7 +118,7 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 		PublicKey:  pub,
 		Latitude:   38,
 		Longitude:  -100,
-		Capacity:   12341234,
+		Capacity:   123412341234,
 		Debt:       11223344,
 		Expiration: 100e6 + glow.CurrentTimeslot(),
 	}

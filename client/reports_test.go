@@ -56,7 +56,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	}()
 
 	// Update the monitoring file so that there is data to read.
-	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5}, []uint64{500000, 3000000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,9 +80,9 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Fatal("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Fatal("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			t.Fatal("server has reports we didn't send")
@@ -98,7 +98,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	// test the sync function, as the only way those readings will get to
 	// the server is if the sync function identifies that they are missing
 	// and sends them.
-	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 2, 5, 6}, []uint64{500, 100, 3000, 34404})
+	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 2, 5, 6}, []uint64{500000, 100000, 3000000, 34404})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,12 +123,12 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Fatal("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Fatal("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
-			t.Fatal("server has reports we didn't send")
+			t.Error("server has reports we didn't send", i)
 		}
 	}
 
@@ -149,11 +149,11 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Fatal("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Fatal("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 2 && report.PowerOutput != 99 {
+		} else if i == 2 && report.PowerOutput != 99000 {
 			t.Fatal("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && i != 2 && report.PowerOutput != 0 {
 			t.Fatal("server has reports we didn't send")
@@ -192,7 +192,7 @@ func TestAddingServers(t *testing.T) {
 
 	// Update the monitoring file for the client so that the client has
 	// stuff to report.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{1, 5}, []uint64{500000, 3000000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,9 +216,9 @@ func TestAddingServers(t *testing.T) {
 	}
 	gcas1HasReports := true
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			gcas1HasReports = false
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			gcas1HasReports = false
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			gcas1HasReports = false
@@ -238,9 +238,9 @@ func TestAddingServers(t *testing.T) {
 	}
 	gcas2HasReports := true
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			gcas2HasReports = false
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			gcas2HasReports = false
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			gcas2HasReports = false
@@ -269,7 +269,7 @@ func TestAddingServers(t *testing.T) {
 	// The client should have successfully failed over at this point, even
 	// though it has nothing to report. Let's give it something to report,
 	// and then see if the report lands on gcas2.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{2, 6}, []uint64{550, 3500})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{2, 6}, []uint64{550000, 3500000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,11 +290,11 @@ func TestAddingServers(t *testing.T) {
 			// Reports 2 and 5 may or may not have been sent.
 			continue
 		}
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Fatal("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Fatal("expected power report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3499000 {
 			t.Fatal("expected power report")
 		} else if i != 1 && i != 5 && i != 2 && i != 6 && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
@@ -351,7 +351,7 @@ func TestAddingServers(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file so that the client has data to send to gcas2.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{3, 4, 7}, []uint64{55, 59, 1200})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{3, 4, 7}, []uint64{55000, 59000, 1200000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,15 +368,15 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Fatal("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 549000 {
 			t.Fatal("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Fatal("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3499000 {
 			t.Fatal("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1199000 {
 			t.Fatal("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
@@ -453,7 +453,7 @@ func TestAddingServers(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Add some new data that can be reported.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{8}, []uint64{1800})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{8}, []uint64{1800000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,21 +470,21 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 549000 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 54000 {
+			t.Error("expected power report", report.PowerOutput)
+		} else if i == 4 && report.PowerOutput != 58000 {
+			t.Error("expected power report", report.PowerOutput)
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 6 && report.PowerOutput != 3499000 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 7 && report.PowerOutput != 1199000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
-			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
-			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1799000 {
 			t.Error("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
@@ -589,7 +589,7 @@ func TestAddingServers(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file as well for good measure.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{9}, []uint64{800})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{9}, []uint64{800000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -606,23 +606,23 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 549000 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 54000 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 58000 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3499000 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1199000 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1799000 {
 			t.Error("expected power report")
-		} else if i == 9 && report.PowerOutput != 799 {
+		} else if i == 9 && report.PowerOutput != 799000 {
 			t.Error("expected power report")
 		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
@@ -642,21 +642,21 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 499000 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 549000 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 54000 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 58000 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 2999000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3499000 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1199000 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1799000 {
 			t.Error("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Error("expected no power report")

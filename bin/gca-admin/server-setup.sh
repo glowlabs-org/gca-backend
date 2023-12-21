@@ -24,5 +24,5 @@ ssh user@$1 'mkdir -p /home/user/gca-server'
 
 # Transfer a bunch of critical files over.
 scp ~/.config/gca-data/gcaTempPubKey.dat user@$1:/home/user/gca-server/gcaTempPubKey.dat
-scp -r ~/gca-server/watttime_data user@$1:/home/user/gca-server/watttime_data
-scp -r ~/gca-server/gca-server user@$1:/home/user/gca-server/gca-server
+scp -r ~/.config/gca-data/watttime_data user@$1:/home/user/gca-server/watttime_data
+scp -r ~/.config/gca-data/gca-server user@$1:/home/user/gca-server/gca-server
