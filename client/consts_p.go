@@ -22,6 +22,11 @@ const (
 	// EnergyFile is the file used by the monitoring equipment to write the total
 	// amount of energy that was measured in each timeslot.
 	EnergyFile = "/opt/halki/energy_data.csv"
+
+	// CTMultiplier is the multiplier that we use on the current
+	// transformer to correctly normalize the readings from the current
+	// transformer.
+	EnergyMultiplier = 6667
 )
 
 // randomTimeExtension returns a random amount of time between 0 seconds and 4

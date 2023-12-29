@@ -62,11 +62,11 @@ func TestEquipmentHistory(t *testing.T) {
 	}
 	for i, report := range response.Reports {
 		if i == 1 && report.PowerOutput != 499000 {
-			t.Fatal("server does not seem to have the report", report.PowerOutput)
+			t.Error("server does not seem to have the report", report.PowerOutput)
 		} else if i == 5 && report.PowerOutput != 2999000 {
-			t.Fatal("server does not seem to have expected report", report.PowerOutput)
+			t.Error("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
-			t.Fatal("server has reports we didn't send")
+			t.Error("server has reports we didn't send")
 		}
 	}
 
