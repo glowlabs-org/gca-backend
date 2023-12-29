@@ -73,7 +73,7 @@ func UntrustedDeserializeGCAServerMap(data []byte) (map[glow.PublicKey]GCAServer
 	for reader.Len() > 0 {
 		// Deserialize the PublicKey
 		if reader.Len() < 32 {
-			return nil, fmt.Errorf("not enough data to read PublicKey")
+			return nil, fmt.Errorf("not enough data to read PublicKey, only have %v bytes", reader.Len())
 		}
 		var key glow.PublicKey
 		if err := binary.Read(reader, binary.LittleEndian, &key); err != nil {

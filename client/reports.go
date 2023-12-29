@@ -11,7 +11,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"os"
@@ -107,7 +106,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		// so there has to be adjustments.
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
-			Energy:   uint64(energy*6667/1e3),
+			Energy:   uint64(energy * EnergyMultiplier / 1e3),
 		})
 	}
 
@@ -396,16 +395,17 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		// device that needs its SD card replaced. This isn't a
 		// terrible consequence. In the event of an error we panic and
 		// hope it doesn't happen again.
-		err := ioutil.WriteFile(filepath.Join(c.staticBaseDir, GCAPubKeyFile), newGCA[:], 0644)
+		err := os.WriteFile(filepath.Join(c.staticBaseDir, GCAPubKeyFile), newGCA[:], 0644)
 		if err != nil {
 			panic(err)
 		}
 		var shortIDBytes [4]byte
 		binary.LittleEndian.PutUint32(shortIDBytes[:], newShortID)
-		err = ioutil.WriteFile(filepath.Join(c.staticBaseDir, ShortIDFile), shortIDBytes[:], 0644)
+		err = os.WriteFile(filepath.Join(c.staticBaseDir, ShortIDFile), shortIDBytes[:], 0644)
 		if err != nil {
 			panic(err)
 		}
+		// Add new information.
 		newServers := make(map[glow.PublicKey]GCAServer)
 		for _, s := range gcaServers {
 			_, exists := newServers[s.PublicKey]
@@ -423,7 +423,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 		if err != nil {
 			panic(err)
 		}
-		err = ioutil.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
+		err = os.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -456,7 +456,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 	if err != nil {
 		panic(err)
 	}
-	err = ioutil.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
+	err = os.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
 	if err != nil {
 		panic(err)
 	}

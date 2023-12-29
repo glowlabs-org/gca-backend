@@ -18,6 +18,11 @@ const (
 	// EnergyFile is the file used by the monitoring equipment to write the total
 	// amount of energy that was measured in each timeslot.
 	EnergyFile = "energy_data.csv"
+
+	// CTMultiplier is the multiplier that we use on the current
+	// transformer to correctly normalize the readings from the current
+	// transformer.
+	EnergyMultiplier = 1000
 )
 
 // mimics the production version of randomTimeExtension()
