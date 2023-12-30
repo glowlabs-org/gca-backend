@@ -12,6 +12,7 @@ func (gcas *GCAServer) launchAPI() {
 	gcas.mux.HandleFunc("/api/v1/all-device-stats", gcas.AllDeviceStatsHandler)
 	gcas.mux.HandleFunc("/api/v1/authorized-servers", gcas.AuthorizedServersHandler)
 	gcas.mux.HandleFunc("/api/v1/authorize-equipment", gcas.AuthorizeEquipmentHandler)
+	gcas.mux.HandleFunc("/api/v1/equipment", gcas.EquipmentHandler)
 	gcas.mux.HandleFunc("/api/v1/equipment-migrate", gcas.EquipmentMigrateHandler)
 	gcas.mux.HandleFunc("/api/v1/register-gca", gcas.RegisterGCAHandler)
 	gcas.mux.HandleFunc("/api/v1/recent-reports", gcas.RecentReportsHandler)
