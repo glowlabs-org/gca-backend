@@ -663,6 +663,23 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 
+	// Do one check on the EquipmentHandler function. This is just to make
+	// sure that api endpoint has minimal coverage, because when this piece
+	// of the test was written, we were in a hurry and didn't fully test
+	// the endpoint. This was the fastest way to get basic coverage.
+	var el server.EquipmentResponse
+	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/equipment", httpPort3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("bad status")
+	}
+	err = json.NewDecoder(resp.Body).Decode(&el)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// TODO: We have to test banning servers. That one is going to take a
 	// while. Maybe 30 seconds even. Perhaps after launch.
 
