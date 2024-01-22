@@ -2,14 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
 type EquipmentResponse struct {
-	EquipmentList    map[string]uint32
 	EquipmentDetails map[uint32]glow.EquipmentAuthorization
 }
 
@@ -28,25 +26,13 @@ func (gcas *GCAServer) EquipmentHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Fill out the EquipmentResponse with data from the server.
 	er := EquipmentResponse{
-		EquipmentList:    make(map[string]uint32),
 		EquipmentDetails: make(map[uint32]glow.EquipmentAuthorization),
 	}
 	gcas.mu.Lock()
-	for k, v := range gcas.equipmentShortID {
-		er.EquipmentList[fmt.Sprint(k)] = v
-	}
 	for k, v := range gcas.equipment {
 		er.EquipmentDetails[k] = v
 	}
 	gcas.mu.Unlock()
-
-	// Marshal the EquipmentResponse to JSON
-	_, err := json.Marshal(er)
-	fmt.Println(err)
-	if err != nil {
-		http.Error(w, "Failed to encode JSON response: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
 
 	// Write the response
 	w.WriteHeader(http.StatusOK)
