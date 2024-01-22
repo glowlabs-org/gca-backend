@@ -78,10 +78,11 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		if err != nil {
 			continue
 		}
-		energy, err := strconv.ParseUint(record[1], 10, 32)
+		energyF64, err := strconv.ParseFloat(record[1], 64)
 		if err != nil {
-			energy = 0
+			energyF64 = 0
 		}
+		energy := uint64(energyF64)
 
 		// 0, 1, and 2 are reserved sentinel values, so we just skip this
 		// reading if we are in that range.
