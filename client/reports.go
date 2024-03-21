@@ -5,6 +5,8 @@ package client
 // the client to a new primary server every few hours (chosen randomly), as
 // well as code that will migrate the client to a new GCA if necessary.
 
+// TODO: Update to using 24 sentinel values instead of just 3.
+
 import (
 	"crypto/rand"
 	"encoding/binary"
