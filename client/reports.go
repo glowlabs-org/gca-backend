@@ -5,13 +5,6 @@ package client
 // the client to a new primary server every few hours (chosen randomly), as
 // well as code that will migrate the client to a new GCA if necessary.
 
-// TODO:
-//
-//  - [ ] Update code to try syncing every time if the sync fails
-//  - [ ] Update the code to strip out the checks for 1000
-//  - [ ] Update the code to use sentinel values to establish that there was data sent
-//  - [ ] Update code to drop the processing around 1000 values
-
 import (
 	"crypto/rand"
 	"encoding/binary"
@@ -24,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -91,6 +85,12 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		}
 		energy := uint64(energyF64)
 
+		// Round the energy down so that we never over-estiamte the amount of
+		// power that has been produced.
+		if energy != 0 {
+			energy = energy - 1
+		}
+
 		// 0-23 are reserved sentinel values, so any reading from the
 		// meter that comes in lower than that is considered to be a
 		// reading of 0. The sentinel value for a 0 reading is actually
@@ -103,22 +103,14 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		// tell the difference between a 0 report and a report that was
 		// never submitted because the device was offline or otherwise
 		// unable to get readings for the timeslot.
-		if energy <= 24 {
-			// We want the final value of the energy t obe set to
-			// '2', and it's going be decremented once, so we have
-			// to set the value to '3' here so that the final value
-			// becomes '2'.
-			energy = 3
+		if energy < 24 {
+			energy = 2
 		} else {
 			// The EnergyMultiplier is the adjustment that needs to
 			// be made to the hardware reading based on the delta
 			// between the current transformer
 			energy = energy * EnergyMultiplier / 1e3
 		}
-
-		// Round the energy down so that we never over-estiamte the amount of
-		// power that has been produced.
-		energy = energy - 1
 
 		// Append the data to the records slice
 		//
@@ -129,7 +121,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		// so there has to be adjustments.
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
-			Energy:   uint64(energy),
+			Energy:   energy,
 		})
 	}
 
@@ -296,7 +288,10 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 //
 // The client is assuming that the various GCA servers are synchronizing power
 // reports that they receive from each other.
-func (c *Client) threadedSyncWithServer(latestReading uint32) {
+//
+// This function returns true if the sync appears to have been successful,
+// false otherwise.
+func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 	// Grab the state we need from the client under the safety of a mutex.
 	c.mu.Lock()
 	gcas := c.gcaServers[c.primaryServer]
@@ -340,13 +335,13 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 			// that we can have relevant bits of logic
 			// after the loop which assume that a
 			// connection was made successfully.
-			return
+			return false
 		}
 
 		// Sleep for a tick.
 		select {
 		case <-c.closed:
-			return
+			return false
 		case <-time.After(sendReportTime):
 		}
 
@@ -381,7 +376,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 			// All servers have either failed or are banned,
 			// therefore this sync operation does not need to
 			// continue.
-			return
+			return false
 		}
 		gcas = c.gcaServers[c.primaryServer]
 		gcasKey = c.primaryServer
@@ -505,6 +500,8 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) {
 			c.staticSendReport(gcas, record)
 		}
 	}
+
+	return true
 }
 
 // threadedSendReports will periodically check for new readings in the energy
@@ -563,6 +560,7 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 	// but it also requires transferring more than one packet and we would
 	// rather let TCP handle the ordering than implement that ourselves.
 	ticks := 30
+	syncStatus := uint64(1)
 	close(ready)
 	for {
 		// Check if the server has shut down.
@@ -631,9 +629,16 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 		// Once every 60 iterations a server sync is performed. That's
 		// just under 5 hours between each sync operation.
 		ticks++
-		if ticks >= 60 {
+		if ticks >= 60 || atomic.LoadUint64(&syncStatus) == 0 {
 			ticks = 0
-			go c.threadedSyncWithServer(latestRecord)
+			go func() {
+				success := c.threadedSyncWithServer(latestRecord)
+				if success {
+					atomic.StoreUint64(&syncStatus, 1)
+				} else {
+					atomic.StoreUint64(&syncStatus, 0)
+				}
+			}()
 		}
 	}
 }
