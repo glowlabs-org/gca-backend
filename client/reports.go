@@ -5,7 +5,12 @@ package client
 // the client to a new primary server every few hours (chosen randomly), as
 // well as code that will migrate the client to a new GCA if necessary.
 
-// TODO: Update to using 24 sentinel values instead of just 3.
+// TODO:
+//
+//  - [ ] Update code to try syncing every time if the sync fails
+//  - [ ] Update the code to strip out the checks for 1000
+//  - [ ] Update the code to use sentinel values to establish that there was data sent
+//  - [ ] Update code to drop the processing around 1000 values
 
 import (
 	"crypto/rand"
@@ -86,19 +91,34 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		}
 		energy := uint64(energyF64)
 
-		// 0, 1, and 2 are reserved sentinel values, so we just skip this
-		// reading if we are in that range.
-		if energy < 3 {
-			continue
+		// 0-23 are reserved sentinel values, so any reading from the
+		// meter that comes in lower than that is considered to be a
+		// reading of 0. The sentinel value for a 0 reading is actually
+		// '2'. This is because prior versions had already reserved '1'
+		// for 'invalid / banned', and '0' is the default value if no
+		// report has been submitted at all.
+		//
+		// A '0' in the final structure means that no report was
+		// submitted. We use a value of '2' to mean zero so that we can
+		// tell the difference between a 0 report and a report that was
+		// never submitted because the device was offline or otherwise
+		// unable to get readings for the timeslot.
+		if energy <= 24 {
+			// We want the final value of the energy t obe set to
+			// '2', and it's going be decremented once, so we have
+			// to set the value to '3' here so that the final value
+			// becomes '2'.
+			energy = 3
+		} else {
+			// The EnergyMultiplier is the adjustment that needs to
+			// be made to the hardware reading based on the delta
+			// between the current transformer
+			energy = energy * EnergyMultiplier / 1e3
 		}
 
 		// Round the energy down so that we never over-estiamte the amount of
 		// power that has been produced.
-		if energy%1000 == 0 {
-			energy = energy - 1000
-		} else {
-			energy = energy - 1
-		}
+		energy = energy - 1
 
 		// Append the data to the records slice
 		//
@@ -109,7 +129,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		// so there has to be adjustments.
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
-			Energy:   uint64(energy * EnergyMultiplier / 1e3),
+			Energy:   uint64(energy),
 		})
 	}
 

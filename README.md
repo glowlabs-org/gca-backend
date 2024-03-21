@@ -1,7 +1,9 @@
 # GCA Backend
 
 This repository contains all of the code related to running the GCA servers,
-and the clients that report to the servers,
+and the clients that report to the servers.
+
+Run tests with `go test -v -tags test ./...`
 
 ## Standards and Conventions
 
