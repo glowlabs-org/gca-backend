@@ -54,6 +54,9 @@ init-equipment
 
 new-equipment
 	Creates a new GCA equipement
+
+resubmit
+	Submits an existing GCA equipment to the server
 `)
 }
 
@@ -195,6 +198,16 @@ func main() {
 		err := newEquipmentCmd(gcaPubKey, gcaPrivKey, serversMap, shortIDPath, clientsPath)
 		if err != nil {
 			fmt.Println("Unable to create and authorize new equipment:", err)
+			return
+		}
+		return
+	}
+
+	// Check if the user wants to resubmit an authorization
+	if os.Args[1] == "resubmit" {
+		err := resubmitCmd(gcaPubKey, gcaPrivKey, serversMap, clientsPath)
+		if err != nil {
+			fmt.Println("Unable to resubmit equipment:", err)
 			return
 		}
 		return
@@ -503,7 +516,7 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 		return fmt.Errorf("unable to write history file header: %v", err)
 	}
 
-	// Create the authorization and submit it to all of the servers.
+	// Create the authorization.
 	ea := glow.EquipmentAuthorization{
 		ShortID:   nextShortID,
 		PublicKey: clientPubKey,
@@ -524,10 +537,77 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	if err != nil {
 		return fmt.Errorf("unable to marshal equipment authorization: %v", err)
 	}
+
+	// Save the authorization to disk so that it can be resubmitted in the future.
+	clientAuthorizationPath := filepath.Join(dir, client.AuthorizationFile)
+	err = ioutil.WriteFile(clientAuthorizationPath, j, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to write authorization file to disk: %v", err)
+	}
+
+	// Submit the authorization to all servers.
 	fmt.Println()
 	for _, server := range serversMap {
 		url := fmt.Sprintf("http://%v:%v/api/v1/authorize-equipment", server.Location, server.HttpPort)
 		resp, err := http.Post(url, "application/json", bytes.NewBuffer(j))
+		if err != nil || resp.StatusCode != http.StatusOK || resp.Body.Close() != nil {
+			fmt.Printf("Had difficulties submitting auth to %v: %v\n", server.Location, err)
+		} else {
+			fmt.Println("Equipment successfully authorized on", server.Location)
+		}
+	}
+	return nil
+}
+
+// resubmitCmd is used when the admin wants to resbumit an authorized solar
+// farm to the GCA servers.
+func resubmitCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serversMap map[glow.PublicKey]client.GCAServer, clientsPath string) error {
+	// Check that there are servers, since this command makes network
+	// calls.
+	if len(serversMap) == 0 {
+		return fmt.Errorf("no servers provided")
+	}
+
+	// Ensure that a shortID was provided.
+	if len(os.Args) != 3 {
+		return fmt.Errorf("Usage: ./gca-admin resubmit [shortID]")
+	}
+
+	// Convert the provided shortID to a uint16
+	num, err := strconv.ParseUint(os.Args[2], 10, 16)
+	if err != nil {
+		return fmt.Errorf("Provided shortID must be an integer between 0 and 65000")
+	}
+	shortID := uint16(num)
+
+	// Load the client authorization from disk.
+	clientName := "client_" + strconv.Itoa(int(shortID))
+	dir := filepath.Join(clientsPath, clientName)
+	filePath := filepath.Join(dir, client.AuthorizationFile)
+	b, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("Unable to load the path for this ShortID")
+	}
+	fmt.Println("The following data was loaded:")
+	fmt.Println(string(b))
+
+	// Asking for confirmation
+	var confirmation string
+	fmt.Print("\nIs this information correct? (yes/no): ")
+	if _, err := fmt.Scanln(&confirmation); err != nil {
+		fmt.Println("Error reading confirmation:", err)
+		os.Exit(1)
+	}
+
+	if confirmation != "yes" {
+		fmt.Println("Data entry aborted.")
+		os.Exit(0)
+	}
+	fmt.Println("Data confirmed. Proceeding...")
+
+	for _, server := range serversMap {
+		url := fmt.Sprintf("http://%v:%v/api/v1/authorize-equipment", server.Location, server.HttpPort)
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(b))
 		if err != nil || resp.StatusCode != http.StatusOK || resp.Body.Close() != nil {
 			fmt.Printf("Had difficulties submitting auth to %v: %v\n", server.Location, err)
 		} else {

@@ -1,6 +1,10 @@
 package client
 
 const (
+	// The file that contains the authorization for the client, signed by
+	// the GCA.
+	AuthorizationFile = "authorization.dat"
+
 	// The file that contains the keypair for the client, authorized by the GCA.
 	ClientKeyFile = "clientKeys.dat"
 
