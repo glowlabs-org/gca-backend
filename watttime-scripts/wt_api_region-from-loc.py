@@ -37,9 +37,9 @@ if __name__ == "__main__":
         token = f.read().strip()
     
     if len(sys.argv) < 3:
-        print('No coordinates on command line, using Apple HQ location (CAISO_NORTH)')
-        latitude = 37.335
-        longitude = -122.009
+        print('No coordinates on command line, using Coit Tower (CAISO_NORTH)')
+        latitude = 37.803
+        longitude = -122.406
     else:
         latitude = sys.argv[1]
         longitude = sys.argv[2]
