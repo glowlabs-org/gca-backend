@@ -2,3 +2,6 @@ __pycache__
 data
 username
 password
+email
+org
+token
