@@ -10,6 +10,8 @@ The scripts query the [Marginal CO2](https://watttime.org/data-science/data-sign
 
 WattTime's V3 API returns [JSON:API](https://jsonapi.org/) format.
 
+API Scripts use [Coit Tower](https://maps.app.goo.gl/AezxN3Rw7Qpiamka9) as the default location.
+
 ## NASA Power
 
 Details of NASA Power API: [NASA Power API](https://power.larc.nasa.gov/docs/services/api/).

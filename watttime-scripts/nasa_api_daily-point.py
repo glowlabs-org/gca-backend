@@ -41,9 +41,9 @@ def nasa_daily(latitude, longitude, start, end):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print('No coordinates on command line, using Apple HQ location')
-        latitude = 37.335
-        longitude = -122.009
+        print('No coordinates on command line, using Coit Tower')
+        latitude = 37.803
+        longitude = -122.406
     else:
         latitude = sys.argv[1]
         longitude = sys.argv[2]
