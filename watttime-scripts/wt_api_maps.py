@@ -4,30 +4,17 @@ import os
 import sys
 import json
 
-# Your existing functions
-def load_credentials(filename):
-    with open(filename, 'r') as f:
-        return f.read().strip()
-
-def get_token(username, password):
-    login_url = 'https://api2.watttime.org/v2/login'
-    response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
-    if response.status_code == 200:
-        return response.json()['token']
-    else:
-        sys.exit(f"Failed to get token, status code: {response.status_code}")
-
 # New function to save the balancing authority maps
-def save_ba_maps():
-    # Replace 'your_credentials_file.txt' with the actual path to your credentials file
-    username = load_credentials('username')
-    password = load_credentials('password')
-    token = get_token(username, password)
+def save_ba_maps(token):
+    if token is None:
+         sys.exit(f"Login failed")
     
-    maps_url = 'https://api2.watttime.org/v2/maps'
+    maps_url = 'https://api.watttime.org/v3/maps'
     headers = {'Authorization': 'Bearer {}'.format(token)}
-    
-    response = requests.get(maps_url, headers=headers)
+    params = {
+        'signal_type': 'co2_moer',
+    }
+    response = requests.get(maps_url, headers=headers, params=params)
     
     if response.status_code != 200:
         sys.exit(f"Failed to get maps, status code: {response.status_code}")
@@ -46,6 +33,11 @@ def save_ba_maps():
 
     print(f"Balancing authority maps saved to {file_path}")
 
-# Run the function
-save_ba_maps()
+if __name__ == "__main__":
+    # Assumes 'token' file exists. If it does not or token is expired,
+    # call the wt_api_login.py script again.
+    
+    with open('token', 'r') as f:
+        token = f.read().strip()
 
+    save_ba_maps(token)

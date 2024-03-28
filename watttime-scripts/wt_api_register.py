@@ -8,7 +8,8 @@ def register(username, password, email):
             'email': email,
             'org': 'Glow International, Inc.'}
     rsp = requests.post(register_url, json=params)
-    print(rsp.status_code, rsp.text)
+    if rsp.status_code != 200:
+        print(rsp.status_code, rsp.text)
 
 if __name__ == "__main__":
     # Load username and password from files

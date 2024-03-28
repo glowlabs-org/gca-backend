@@ -28,10 +28,11 @@ def get_historical_data(token, region, tsstart, tsend):
         'signal_type': 'co2_moer'
     }
     rsp = requests.get(url, headers=headers, params=params)
-    if rsp.status_code == 200:
-        return rsp.json()
-    else:
+    if rsp.status_code != 200:
+        print(rsp.status_code, rsp.text)
         return None
+
+    return rsp.json()
 
 if __name__ == "__main__":
     # Assumes 'token' file exists. If it does not or token is expired,

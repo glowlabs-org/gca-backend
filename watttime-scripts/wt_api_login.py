@@ -20,11 +20,11 @@ def login(username, password):
     """    
     login_url = 'https://api.watttime.org/login'
     rsp = requests.get(login_url, auth=HTTPBasicAuth(username, password))
-    print(rsp.status_code, rsp.text)
-    if rsp.status_code == 200:
-        return rsp.json()['token']
-    else:
+    if rsp.status_code != 200:
+        print(rsp.status_code, rsp.text)
         return None
+
+    return rsp.json()['token']
 
 if __name__ == "__main__":
     # Load username and password from files
@@ -38,3 +38,4 @@ if __name__ == "__main__":
     if tok is not None:
         with open('token', 'w') as f:
             f.write(tok)
+        print('Login ok')

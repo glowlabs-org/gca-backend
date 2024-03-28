@@ -3,31 +3,7 @@ import json
 import requests
 import time
 from concurrent.futures import ThreadPoolExecutor
-
-# Function to fetch data from NASA API
-def fetch_nasa_data(latitude, longitude):
-    url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
-    params = {
-        "parameters": "ALLSKY_SFC_SW_DWN",
-        "community": "RE",
-        "longitude": longitude,
-        "latitude": latitude,
-        "start": "20220101",
-        "end": "20221231",
-        "format": "json"
-    }
-    response = requests.get(url, params=params)
-    
-    # Check if the response was successful
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            # Further checks can be added to validate response contents
-            return data
-        except json.JSONDecodeError:
-            raise ValueError("Invalid JSON received")
-    else:
-        raise Exception(f"Error fetching data: {response.status_code}, {response.text}")
+import nasa_api_hourly_point as nh
 
 # Function to save data to disk
 def save_to_disk(data, latitude, longitude):
@@ -52,7 +28,9 @@ def fetch_and_save(latitude, longitude):
     while attempt < max_retries:
         try:
             print(f"Fetching data for latitude {latitude} and longitude {longitude}")
-            data = fetch_nasa_data(latitude, longitude)
+            data = nh.nasa_hourly(latitude, longitude, "20220101", "20221231")
+            if data is None:
+                raise Exception("Nasa power API get failed")
             save_to_disk(data, latitude, longitude)
             print(f"Data saved for latitude {latitude} and longitude {longitude}")
             break  # If save was successful, break out of the loop
