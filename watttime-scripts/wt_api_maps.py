@@ -3,6 +3,7 @@ from requests.auth import HTTPBasicAuth
 import os
 import sys
 import json
+from datetime import datetime
 
 # Your existing functions
 def load_credentials(filename):
@@ -46,6 +47,20 @@ def save_ba_maps():
 
     print(f"Balancing authority maps saved to {file_path}")
 
-# Run the function
-save_ba_maps()
+if __name__ == "__main__":
+    # Downloads the region map file to data/ba_maps.json.
+    # This script requires a license from WattTime,
+    # and does not depend on any other script.
 
+    metadata = {
+        "generation_time": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    path = "data"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    path = os.path.join(path, "ba_maps_meta.json")
+    with open(path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    print("Creating a region map file")
+    save_ba_maps()
