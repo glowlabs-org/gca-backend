@@ -103,7 +103,8 @@ if __name__ == "__main__":
     if not os.path.exists(path):
         os.makedirs(path)
     path = os.path.join(path, "nasa_meta.json")
-    with open(path, 'w') as f:
-        json.dump(metadata, f, indent=2)
+    if not os.path.isfile(path):
+        with open(path, 'w') as f:
+            json.dump(metadata, f, indent=2)
 
     main()
