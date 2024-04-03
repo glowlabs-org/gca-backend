@@ -8,6 +8,7 @@ from requests.auth import HTTPBasicAuth
 from os import path
 from statistics import mean
 from collections import defaultdict
+from wt_api_hist_download import fetch_and_save_historical_data
 
 def prompt_for_coordinates():
     latitude = float(input("Please enter the latitude: "))
@@ -60,44 +61,6 @@ def get_balancing_authority(token, latitude, longitude):
     else:
         print(f"Unexpected error: {response.content}")
         sys.exit("An unexpected error occurred while fetching the balancing authority.")
-
-def fetch_and_save_historical_data(token, ba):
-    """
-    Fetch and save historical data for a given balancing authority.
-    
-    Parameters:
-        token (str): WattTime API authorization token.
-        ba (str): Abbreviation of the balancing authority.
-
-    Returns:
-        None
-    """
-    data_path = path.join("data", ba)
-    if path.exists(data_path):
-        print(f"Data for {ba} already exists locally.")
-    else:
-        # Construct historical data URL and headers
-        historical_url = 'https://api2.watttime.org/v2/historical'
-        headers = {'Authorization': f'Bearer {token}'}
-        params = {'ba': ba}
-        
-        # Fetch historical data
-        rsp = requests.get(historical_url, headers=headers, params=params)
-        
-        # Create a directory for the balancing authority
-        if not os.path.exists(data_path):
-            os.mkdir(data_path)
-        
-        # Save the zip file
-        zip_path = path.join("data", ba, f'{ba}_historical.zip')
-        with open(zip_path, 'wb') as fp:
-            fp.write(rsp.content)
-        
-        # Extract the zip file
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(ba)
-        
-        print(f"Wrote and unzipped historical data for {ba} to the directory: {ba}")
         
 def load_csv_files(ba):
     """
@@ -209,15 +172,21 @@ def calculate_carbon_credits_b(nasa_data, moer_data):
     print(f"Total Carbon Credits for 1 kW of Solar Panels: {total_carbon_credits:.2f} metric tons CO2")
 
 if __name__ == "__main__":
+    # Command line: latitude longitude
+    if len(sys.argv) < 3:
+        print('No coordinates on command line, using Coit Tower (CAISO_NORTH)')
+        latitude = 37.803
+        longitude = -122.406
+    else:
+        latitude = sys.argv[1]
+        longitude = sys.argv[2]
+        
     # Load API credentials
     username = load_credentials('username')
     password = load_credentials('password')
 
     # Fetch WattTime API token
     token = get_token(username, password)
-
-    # Get latitude and longitude from the user
-    latitude, longitude = prompt_for_coordinates()
 
     # Fetch balancing authority
     ba = get_balancing_authority(token, latitude, longitude)
@@ -234,4 +203,3 @@ if __name__ == "__main__":
     moer_data = load_csv_files(ba)
     combo_print = calculate_carbon_credits(nasa_data, moer_data)
     combo_print = calculate_carbon_credits_b(nasa_data, moer_data)
-
