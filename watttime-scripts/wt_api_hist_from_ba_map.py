@@ -33,8 +33,9 @@ def list_regions_from_ba_maps(token):
         mapdat = json.load(f)
     print(f"loaded {len(mapdat['features'])} ba regions")
     lmap = []
-    for feat in mapdat['features']:         
-        print(f"{feat['properties']['abbrev']:21} {feat['properties']['name']}")
+    for feat in mapdat['features']:
+        coord = feat['geometry']['coordinates'][0][0][0]
+        print(f"{feat['properties']['abbrev']:21} {feat['properties']['name']} ({coord[1]} {coord[0]})") # print lat long coordinates from the polygon
 
 if __name__ == "__main__":
     # Load API credentials

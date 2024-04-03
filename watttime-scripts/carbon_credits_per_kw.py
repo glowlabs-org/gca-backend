@@ -22,10 +22,11 @@ def fetch_nasa_data(latitude, longitude):
         "community": "RE",
         "longitude": longitude,
         "latitude": latitude,
-        "start": "20220101",
-        "end": "20221231",
+        "start": "20230101",
+        "end": "20231231",
         "format": "json"
     }
+    print(f"Using time range {params['start']} to {params['end']}")
     # Make request and return parsed response
     response = requests.get(url, params=params)
     return json.loads(response.text)
@@ -73,7 +74,7 @@ def load_csv_files(ba):
     """
     folder_path = os.path.join("data", ba)
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    prefix = f"{ba}_2022"
+    prefix = f"{ba}_2023"
     for filename in os.listdir(folder_path):
         if filename.startswith(prefix) and filename.endswith('.csv'):
             filepath = os.path.join(folder_path, filename)
@@ -189,7 +190,8 @@ if __name__ == "__main__":
 
     # Fetch balancing authority
     ba = get_balancing_authority(token, latitude, longitude)
-    
+    print(f"Region {ba}")
+
     # Check if the balancing authority is available for the given location
     if ba is None:
         sys.exit("Location not supported")
