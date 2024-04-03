@@ -4,6 +4,7 @@ import csv
 import json
 from collections import defaultdict
 from shapely.geometry import Point
+import sys
 
 # Function to load all BA history into memory
 def load_all_ba_history():
@@ -25,6 +26,7 @@ def load_all_ba_history():
                             day, time = rest.split('T')
                             hour = time.split(':')[0]
                             ba_histories[ba_folder][year][day][hour].append(moer)
+    print("generated ba_histories for", ba_histories.keys())
     return ba_histories
 
 # determines what BA is responsible for a specific coordinate.
@@ -92,8 +94,17 @@ csvfile = open("data/solar_values.csv", 'a', newline='')
 for latitude in latitudes:
     csvfile.flush()
     for longitude in longitudes:
+
+        ba = get_ba_by_coords(gdf, latitude, longitude)
+        if ba is None:
+            continue
+
+        # ensure that the region's historical data is available
+        if not ba in ba_histories:
+            continue
+        
         # Load the solar data for this coordinate.
-        print(latitude, longitude)
+        print(latitude, longitude, ba)
         solar_history = load_solar_history(latitude, longitude)
 
         # We will produce a 4x4 grid for each solar data point. This
@@ -109,7 +120,7 @@ for latitude in latitudes:
                 ba_history = ba_histories.get(ba)
                 if ba_history is None:
                     continue
-                
+
                 # Process the data to determine the total carbon credits for this coordinate.
                 total_kwh = 0
                 total_moer = 0
