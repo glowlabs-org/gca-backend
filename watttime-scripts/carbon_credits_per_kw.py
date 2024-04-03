@@ -1,7 +1,6 @@
 import csv
 import os
 import json
-import zipfile
 import requests
 import sys
 from requests.auth import HTTPBasicAuth
