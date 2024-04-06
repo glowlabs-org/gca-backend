@@ -26,7 +26,7 @@ const (
 	// CTMultiplier is the multiplier that we use on the current
 	// transformer to correctly normalize the readings from the current
 	// transformer.
-	EnergyMultiplier = 6667
+	EnergyMultiplier = 4000
 )
 
 // randomTimeExtension returns a random amount of time between 0 seconds and 4

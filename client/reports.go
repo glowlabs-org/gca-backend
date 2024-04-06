@@ -83,13 +83,13 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		if err != nil {
 			energyF64 = 0
 		}
-		energy := uint64(energyF64)
 
-		// Round the energy down so that we never over-estiamte the amount of
-		// power that has been produced.
-		if energy != 0 {
-			energy = energy - 1
-		}
+		// NOTE: 'energy' might be a negative number, which will cast
+		// as an underflowed uint64. To the best of my knowledge, there
+		// is nothing wrong with that, but all downstream applications
+		// will have to accept the numbers and know to convert them to
+		// their respective negative values.
+		energy := uint64(energyF64)
 
 		// 0-23 are reserved sentinel values, so any reading from the
 		// meter that comes in lower than that is considered to be a
@@ -104,21 +104,22 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		// never submitted because the device was offline or otherwise
 		// unable to get readings for the timeslot.
 		if energy < 24 {
+			// We set the energy value to '2' because that is the
+			// sentinel value to indicate that the report was
+			// effectively blank.
 			energy = 2
 		} else {
 			// The EnergyMultiplier is the adjustment that needs to
 			// be made to the hardware reading based on the delta
-			// between the current transformer
+			// between the current transformer that was used by MP
+			// Consulting during testing and the current
+			// transformer that is used by the GCA on the solar
+			// farm. As of writing, the delta was 4x, so the
+			// EnergyMultiplier was set to 4000.
 			energy = energy * EnergyMultiplier / 1e3
 		}
 
 		// Append the data to the records slice
-		//
-		// There's a multiplication here: 6667/1000 - effectively
-		// multiplying the output of the device by 6.667x. This is
-		// because we swapped out the hardware for a CT that produces
-		// 6.667x less current than what the firmware was designed for,
-		// so there has to be adjustments.
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
 			Energy:   energy,
