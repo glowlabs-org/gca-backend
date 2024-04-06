@@ -101,15 +101,15 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// for this timestamp, set the value to '3' to indicate
 			// that there was a parse error.
 			energy = 3
-		} else if energy < 24 {
+		} else if energyF64 > -24 && energyF64 < 24 {
 			// If the energy value read successfully but it read
-			// below a value of 24, set the value to '2' to
-			// indicate that there was a reading that effectively
-			// counts as 0 power. We use '2' as the 'no power'
-			// sentinel because '0' is the number that appears if
-			// no report is submitted at all, and we want to
-			// distinguish between no report submitted at all and a
-			// blank report being submitted.
+			// below an absolute value of 24, set the value to '2'
+			// to indicate that there was a reading that
+			// effectively counts as 0 power. We use '2' as the 'no
+			// power' sentinel because '0' is the number that
+			// appears if no report is submitted at all, and we
+			// want to distinguish between no report submitted at
+			// all and a blank report being submitted.
 			//
 			// Note that the sentinel value '1' is already reserve
 			// to indicate that the gca server has banned a
