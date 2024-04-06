@@ -504,9 +504,12 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 			if err != nil || powerOutput < 2 {
 				continue
 			}
+			// Because we now handle negative numbers, the uint32
+			// needs to be cast to an int32 before being upscaled
+			// to a uint64.
 			record := EnergyRecord{
 				Timeslot: i + timeslotOffset,
-				Energy:   uint64(powerOutput),
+				Energy:   uint64(int32(powerOutput)),
 			}
 			c.staticSendReport(gcas, record)
 		}
@@ -539,6 +542,21 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 	// messes up somehow we would rather ignore the error.
 	if err == nil {
 		for _, record := range records {
+			// Downcasting a uint64 to a uint32 is a pretty
+			// questionable choice, in hindsight I'm not sure why I
+			// thought that was okay. But it's not something worth
+			// fixing at the moment, so we just have to be careful
+			// in the rest of the code to make sure that we upscale
+			// it again properly when the value is loaded.
+			//
+			// Since we now generate negative numbers by
+			// underflowing the reading, this means that the uint32
+			// needs to be cast to an int32 before being recast to
+			// a uint64.
+			//
+			// Downcasting an underflowed uint64 to a uint32
+			// results in an underflow of the same value in the
+			// uint32, so nothing special is needed here.
 			err := c.staticSaveReading(record.Timeslot, uint32(record.Energy))
 			if err != nil {
 				continue
@@ -548,8 +566,6 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 			}
 		}
 	}
-
-	// go c.threadedSyncWithServer(latestRecord)
 
 	// Infinite loop to send reports. We start ticks at 30 so that the
 	// catchup function will run about 2.5 hours after boot. We don't want

@@ -14,6 +14,12 @@ import (
 	"github.com/glowlabs-org/gca-backend/server"
 )
 
+// TODO: We need to add more testing around negative values and floating point
+// values in the energy data file. We know from live data in the field that the
+// floating point values are handled gracefully, however the test suite should
+// cover them anyway to ensure there are no regressions from potential future
+// updates.
+
 // updateMonitorFile is an apparatus that allows the monitor file to be changed
 // during testing, simulating a new reading being taken.
 func updateMonitorFile(dir string, newTimeslots []uint32, newReadings []uint64) error {
@@ -25,7 +31,10 @@ func updateMonitorFile(dir string, newTimeslots []uint32, newReadings []uint64) 
 	newFileDataStr := "timestamp,energy (mWh)"
 	for i := 0; i < len(newTimeslots); i++ {
 		if newReadings[i] != 34404 {
-			newFileDataStr += fmt.Sprintf("\n%v,%v", int64(newTimeslots[i]*300)+glow.GenesisTime, newReadings[i])
+			// The reading needs to be cast to an int64 so that
+			// underflowed inputs end up in the file as negative
+			// values.
+			newFileDataStr += fmt.Sprintf("\n%v,%v", int64(newTimeslots[i]*300)+glow.GenesisTime, int64(newReadings[i]))
 		} else {
 			newFileDataStr += fmt.Sprintf("\n%v,random error here", int64(newTimeslots[i]*300)+glow.GenesisTime)
 		}
@@ -456,8 +465,11 @@ func TestAddingServers(t *testing.T) {
 	}
 	time.Sleep(35 * sendReportTime)
 
-	// Add some new data that can be reported.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{8}, []uint64{1800})
+	// Add some new data that can be reported. This new data includes a
+	// negative value.
+	negUint := uint64(1)
+	negUint -= 50 // The final value needs to be more than 24 below 0.
+	err = updateMonitorFile(c.staticBaseDir, []uint32{8, 9}, []uint64{1800, negUint})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +502,9 @@ func TestAddingServers(t *testing.T) {
 			t.Error("expected power report")
 		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
+		} else if i == 9 && report.PowerOutput != negUint {
+			t.Error("expected negative power report", report.PowerOutput)
+		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
 		}
 	}
@@ -593,7 +607,7 @@ func TestAddingServers(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file as well for good measure.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{9}, []uint64{800})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{10}, []uint64{800})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,9 +640,11 @@ func TestAddingServers(t *testing.T) {
 			t.Error("expected power report")
 		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if i == 9 && report.PowerOutput != 800 {
-			t.Error("expected power report")
-		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
+		} else if i == 10 && report.PowerOutput != 800 {
+			t.Error("expected power report", report.PowerOutput)
+		} else if i == 9 && report.PowerOutput != negUint {
+			t.Error("expected negative power report")
+		} else if (i < 1 || i > 10) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
 		}
 	}
@@ -662,7 +678,9 @@ func TestAddingServers(t *testing.T) {
 			t.Error("expected power report")
 		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
+		} else if i == 9 && report.PowerOutput != negUint {
+			t.Error("expected negative power report")
+		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
 		}
 	}

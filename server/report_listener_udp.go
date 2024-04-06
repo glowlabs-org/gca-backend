@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -96,8 +97,11 @@ func (server *GCAServer) integrateReport(report glow.EquipmentReport) {
 		server.logger.Warn("Received second report for timeslot")
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput = 1
 	}
-	// Ban the report timeslot if the production is greater than the capacity.
-	if report.PowerOutput > server.equipment[report.ShortID].Capacity*MaxCapacityBuffer/100 {
+	// Ban the report timeslot if the production is greater than the
+	// capacity. Reports declare negative numbers by underflowing the
+	// uint64, so we have to check with a typecast whether the report has
+	// been underflowed. We don't ban underflowed reports.
+	if report.PowerOutput > server.equipment[report.ShortID].Capacity*MaxCapacityBuffer/100 && report.PowerOutput < math.MaxInt64 {
 		server.equipmentReports[report.ShortID][report.Timeslot-server.equipmentReportsOffset].PowerOutput = 1
 	}
 
