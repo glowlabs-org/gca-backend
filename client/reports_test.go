@@ -80,9 +80,9 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Fatal("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			t.Fatal("server has reports we didn't send")
@@ -123,12 +123,12 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 2 {
-			t.Error("server did not get error report")
+		} else if i == 6 && report.PowerOutput != 3 {
+			t.Error("server did not get error report:", report.PowerOutput)
 		} else if i != 1 && i != 5 && i != 6 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send", i, report.PowerOutput)
 		}
@@ -151,13 +151,13 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 2 && report.PowerOutput != 99 {
+		} else if i == 2 && report.PowerOutput != 100 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 2 {
+		} else if i == 6 && report.PowerOutput != 3 {
 			t.Error("server did not get error report")
 		} else if i != 1 && i != 2 && i != 5 && i != 6 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send", i, report.PowerOutput)
@@ -220,9 +220,9 @@ func TestAddingServers(t *testing.T) {
 	}
 	gcas1HasReports := true
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			gcas1HasReports = false
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			gcas1HasReports = false
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			gcas1HasReports = false
@@ -242,9 +242,9 @@ func TestAddingServers(t *testing.T) {
 	}
 	gcas2HasReports := true
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			gcas2HasReports = false
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			gcas2HasReports = false
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			gcas2HasReports = false
@@ -294,11 +294,11 @@ func TestAddingServers(t *testing.T) {
 			// Reports 2 and 5 may or may not have been sent.
 			continue
 		}
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Fatal("expected power report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Fatal("expected power report")
 		} else if i != 1 && i != 5 && i != 2 && i != 6 && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
@@ -372,15 +372,15 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Fatal("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Fatal("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Fatal("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Fatal("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
@@ -474,21 +474,21 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report", report.PowerOutput)
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
@@ -610,23 +610,23 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if i == 9 && report.PowerOutput != 799 {
+		} else if i == 9 && report.PowerOutput != 800 {
 			t.Error("expected power report")
 		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
@@ -646,21 +646,21 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
