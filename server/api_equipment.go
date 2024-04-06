@@ -8,7 +8,7 @@ import (
 )
 
 type EquipmentResponse struct {
-	EquipmentList map[uint32]glow.EquipmentAuthorization
+	EquipmentDetails map[uint32]glow.EquipmentAuthorization
 }
 
 // EquipmentHandler returns a list of all equipment, the corresponding
@@ -26,11 +26,11 @@ func (gcas *GCAServer) EquipmentHandler(w http.ResponseWriter, r *http.Request) 
 
 	// Fill out the EquipmentResponse with data from the server.
 	er := EquipmentResponse{
-		EquipmentList: make(map[uint32]glow.EquipmentAuthorization),
+		EquipmentDetails: make(map[uint32]glow.EquipmentAuthorization),
 	}
 	gcas.mu.Lock()
 	for k, v := range gcas.equipment {
-		er.EquipmentList[k] = v
+		er.EquipmentDetails[k] = v
 	}
 	gcas.mu.Unlock()
 
