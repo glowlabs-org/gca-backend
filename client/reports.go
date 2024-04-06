@@ -68,55 +68,65 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 	for {
 		record, err := reader.Read()
 		if err != nil {
-			break // Stop at EOF or on error
+			// Stop at EOF or on error. An error here means we
+			// couldn't read a timestamp, which means we don't know
+			// what timestamp to tell the server for having errors.
+			// Whether it's an EOF or a real error, the best move
+			// is to break.
+			break
 		}
 
 		timestamp, err := strconv.ParseInt(record[0], 10, 64)
 		if err != nil {
-			continue // Skip records with invalid timestamps
+			// If the timestamp can't be read, we don't know what
+			// timestamp to submit to the server as having an
+			// error, we just ignore the read in this case.
+			continue
 		}
 		timeslot, err := glow.UnixToTimeslot(timestamp)
 		if err != nil {
+			// If the timeslot can't be determined, we don't know
+			// what timeslot to submit to the server as having an
+			// error, we just ignore the read in this case.
 			continue
 		}
+
+		// Parse the value. If the value is not parsed correctly, it's
+		// probably because the firmware version is wrong or because
+		// the file has a text error instead of a number.
+		var energy uint64
 		energyF64, err := strconv.ParseFloat(record[1], 64)
 		if err != nil {
-			energyF64 = 0
-		}
-
-		// NOTE: 'energy' might be a negative number, which will cast
-		// as an underflowed uint64. To the best of my knowledge, there
-		// is nothing wrong with that, but all downstream applications
-		// will have to accept the numbers and know to convert them to
-		// their respective negative values.
-		energy := uint64(energyF64)
-
-		// 0-23 are reserved sentinel values, so any reading from the
-		// meter that comes in lower than that is considered to be a
-		// reading of 0. The sentinel value for a 0 reading is actually
-		// '2'. This is because prior versions had already reserved '1'
-		// for 'invalid / banned', and '0' is the default value if no
-		// report has been submitted at all.
-		//
-		// A '0' in the final structure means that no report was
-		// submitted. We use a value of '2' to mean zero so that we can
-		// tell the difference between a 0 report and a report that was
-		// never submitted because the device was offline or otherwise
-		// unable to get readings for the timeslot.
-		if energy < 24 {
-			// We set the energy value to '2' because that is the
-			// sentinel value to indicate that the report was
-			// effectively blank.
+			// In the event of a parse error for the energy reading
+			// for this timestamp, set the value to '3' to indicate
+			// that there was a parse error.
+			energy = 3
+		} else if energy < 24 {
+			// If the energy value read successfully but it read
+			// below a value of 24, set the value to '2' to
+			// indicate that there was a reading that effectively
+			// counts as 0 power. We use '2' as the 'no power'
+			// sentinel because '0' is the number that appears if
+			// no report is submitted at all, and we want to
+			// distinguish between no report submitted at all and a
+			// blank report being submitted.
+			//
+			// Note that the sentinel value '1' is already reserve
+			// to indicate that the gca server has banned a
+			// timeslot.
 			energy = 2
 		} else {
-			// The EnergyMultiplier is the adjustment that needs to
-			// be made to the hardware reading based on the delta
-			// between the current transformer that was used by MP
-			// Consulting during testing and the current
-			// transformer that is used by the GCA on the solar
-			// farm. As of writing, the delta was 4x, so the
-			// EnergyMultiplier was set to 4000.
-			energy = energy * EnergyMultiplier / 1e3
+			// NOTE: 'energy' might be a negative number, which will cast
+			// as an underflowed uint64. To the best of my knowledge, there
+			// is nothing wrong with that, but all downstream applications
+			// will have to accept the numbers and know to convert them to
+			// their respective negative values.
+			//
+			// The EnergyMultiplier needs to be applied in advance
+			// of performing the underflow conversion, otherwise
+			// the multiplier will be multiplying a giant uint64 by
+			// 4 rather than multiplying a negative number by 4.
+			energy = uint64(EnergyMultiplier * energyF64 / 1e3)
 		}
 
 		// Append the data to the records slice
