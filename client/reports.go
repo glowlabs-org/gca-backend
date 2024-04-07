@@ -512,6 +512,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 				Energy:   uint64(int32(powerOutput)),
 			}
 			c.staticSendReport(gcas, record)
+			time.Sleep(UDPSleepSyncTime)
 		}
 	}
 

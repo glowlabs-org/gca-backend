@@ -23,6 +23,13 @@ const (
 	// transformer to correctly normalize the readings from the current
 	// transformer.
 	EnergyMultiplier = 1000
+
+	// UDPSleepSyncTime sets the amount of time that the system sleeps
+	// between each UDP packet that gets sent. We sleep between packets
+	// because the cell network can only handle at points less than 1 kbps
+	// of traffic, and sending a ton of packets all at once during a sync
+	// operation is all but guaranteed to get them dropped.
+	UDPSleepSyncTime = time.Millisecond
 )
 
 // mimics the production version of randomTimeExtension()
