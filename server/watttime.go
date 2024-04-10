@@ -277,6 +277,7 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 		moer, date, err := getWattTimeIndex(token, lats[i], longs[i])
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
+			gcas.logger.Errorf("lat: %v, long: %v", lats[i], longs[i])
 			continue
 		}
 		timeslot, err := glow.UnixToTimeslot(date)
@@ -341,6 +342,7 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 		moers, dates, err := getWattTimeData(token, lats[i], longs[i], startTime)
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
+			gcas.logger.Errorf("lat: %v, long: %v, startTime: %v", lats[i], longs[i], startTime)
 			continue
 		}
 
@@ -412,4 +414,21 @@ func staticGetWattTimeToken(username, password string) (string, error) {
 	}
 
 	return tokenResponse.Token, nil
+}
+
+// threadedGetWattTimeWeekData wakes up periodically and refreshes the weekly
+// WattTime data.
+func (gcas *GCAServer) threadedGetWattTimeWeekData(username, password string) {
+	for {
+		select {
+		case <-gcas.quit:
+			return
+		case <-time.After(WattTimeWeekDataUpdateFrequency):
+		}
+
+		err := gcas.managedGetWattTimeWeekData(username, password)
+		if err != nil {
+			gcas.logger.Errorf("Threaded call unable to get WattTime data for the most recent week: %v", err)
+		}
+	}
 }
