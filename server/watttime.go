@@ -308,6 +308,11 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 // managedGetWattTimeWeekData will grab all of the data for the latest week and
 // fill out the impact rates as much as possible.
 func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) error {
+	// Disable this test during testing, as the testing does not have WattTime access.
+	if testMode {
+		return nil
+	}
+
 	// Get a new auth token. They expire relatively quickly so it's better
 	// to get a new token every time this function is called.
 	token, err := staticGetWattTimeToken(username, password)
@@ -426,6 +431,8 @@ func (gcas *GCAServer) threadedGetWattTimeWeekData(username, password string) {
 		case <-time.After(WattTimeWeekDataUpdateFrequency):
 		}
 
+		// This API is called during startup, so it is safe to sleep before calling it here. The
+		// intention is to call it periodically, most likely once per day.
 		err := gcas.managedGetWattTimeWeekData(username, password)
 		if err != nil {
 			gcas.logger.Errorf("Threaded call unable to get WattTime data for the most recent week: %v", err)
