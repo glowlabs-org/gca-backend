@@ -308,7 +308,7 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 // managedGetWattTimeWeekData will grab all of the data for the latest week and
 // fill out the impact rates as much as possible.
 func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) error {
-	// Disable this test during testing, as the testing does not have WattTime access.
+	// Disable this during testing, as the testing does not have WattTime access.
 	if testMode {
 		return nil
 	}
