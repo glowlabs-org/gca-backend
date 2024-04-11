@@ -203,6 +203,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	go server.threadedMigrateReports(username, password, migrateReady)
 	go server.threadedListenForSyncRequests(tcpReady)
 	go server.threadedCollectImpactData(username, password)
+	go server.threadedGetWattTimeWeekData(username, password)
 	server.launchAPI()
 
 	<-udpReady
