@@ -343,17 +343,48 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 		return fmt.Errorf("no servers provided")
 	}
 
+	var shortID uint32
 	var latitude, longitude float64
 	var capacity, debt int
 	var expiration, initYear, initMonth, initDay int
 	var protocolFee int
 
-	fmt.Print("Enter latitude (3 decimals): ")
+	fmt.Print("Enter a ShortID: ")
+	if _, err := fmt.Scanln(&shortID); err != nil {
+		fmt.Println("Error reading ShortID:", err)
+		os.Exit(1)
+	}
+	if shortID % 5 != 0 {
+		fmt.Println("ShortID must be a multiple of 5")
+		os.Exit(1)
+	}
+	if shortID < 50 {
+		fmt.Println("ShortID must be greater than 50")
+		os.Exit(1)
+	}
+	if shortID >= 65535 {
+		fmt.Println("ShortID must be less than 65535")
+		os.Exit(1)
+	}
+
+	// Check that the shortID hasn't been used yet.
+	dirName := "client_" + strconv.Itoa(int(shortID))
+	dirPath := filepath.Join(clientsPath, dirName)
+	_, err := os.Stat(dirPath)
+	if !os.IsNotExist(err) {
+		fmt.Println("This ShortID has already been used")
+		os.Exit(1)
+	}
+	// Change the variable name here to have better compatibility with the
+	// legacy code which automatically generated the shortID.
+	nextShortID := shortID
+
+	fmt.Print("Enter latitude (5 decimals): ")
 	if _, err := fmt.Scanln(&latitude); err != nil {
 		fmt.Println("Error reading latitude:", err)
 		os.Exit(1)
 	}
-	fmt.Print("Enter longitude (3 decimals): ")
+	fmt.Print("Enter longitude (5 decimals): ")
 	if _, err := fmt.Scanln(&longitude); err != nil {
 		fmt.Println("Error reading longitude:", err)
 		os.Exit(1)
@@ -396,8 +427,9 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 
 	// Printing the entered data
 	fmt.Printf("\nYou entered the following data:\n")
-	fmt.Printf("Latitude: %.3f\n", latitude)
-	fmt.Printf("Longitude: %.3f\n", longitude)
+	fmt.Printf("\nShortID: %v", shortID)
+	fmt.Printf("Latitude: %.5f\n", latitude)
+	fmt.Printf("Longitude: %.5f\n", longitude)
 	fmt.Printf("Capacity: %.3f kw\n", float64(capacity)/1000)
 	fmt.Printf("Debt: %.3f metric tons of CO2\n", float64(debt)/1000)
 	fmt.Printf("Lifetime: %d years\n", expiration)
@@ -435,24 +467,6 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	finalExpiration, err := glow.UnixToTimeslot(expirationUnix)
 	if err != nil {
 		return fmt.Errorf("expiration date for solar farm is out of bounds")
-	}
-
-	// Load the latest shortid.
-	shortIDData, err := ioutil.ReadFile(shortIDPath)
-	if err != nil {
-		return fmt.Errorf("unable to read shortID file: %v", err)
-	}
-	if len(shortIDData) != 4 {
-		return fmt.Errorf("shortID file should have 4 bytes")
-	}
-	nextShortID := binary.LittleEndian.Uint32(shortIDData)
-
-	// Update the latest shortid to the next value, so that multiple
-	// equipment doesn't get created with the same ShortID.
-	binary.LittleEndian.PutUint32(shortIDData, nextShortID+1)
-	err = ioutil.WriteFile(shortIDPath, shortIDData, 0644)
-	if err != nil {
-		return fmt.Errorf("unable to write updated ShortID file: %v", err)
 	}
 
 	// Create a directory for all of the equipment data.
@@ -495,6 +509,7 @@ func newEquipmentCmd(gcaPubKey glow.PublicKey, gcaPrivKey glow.PrivateKey, serve
 	}
 
 	// Give the client its short id
+	shortIDData := make([]byte, 4)
 	clientShortIDPath := filepath.Join(dir, client.ShortIDFile)
 	binary.LittleEndian.PutUint32(shortIDData, nextShortID)
 	err = ioutil.WriteFile(clientShortIDPath, shortIDData, 0644)
