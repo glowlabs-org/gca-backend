@@ -61,9 +61,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send")
@@ -90,9 +90,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
-			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		if i == 1 && output != 500 {
+			t.Fatal("bad:", i, output)
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -127,9 +127,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -163,9 +163,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -211,9 +211,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -243,9 +243,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1501 && report.PowerOutput != 399 {
+		if i == 1501 && report.PowerOutput != 400 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 1505 && report.PowerOutput != 1999 {
+		} else if i == 1505 && report.PowerOutput != 2000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1501 && i != 1505 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send")
@@ -274,9 +274,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -305,9 +305,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1501 && output != 399 {
+		if i == 1501 && output != 400 {
 			t.Fatal("bad")
-		} else if i == 1505 && output != 1999 {
+		} else if i == 1505 && output != 2000 {
 			t.Fatal("bad")
 		} else if i != 1501 && i != 1505 && output != 0 {
 			t.Fatal("bad")
@@ -340,9 +340,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -370,9 +370,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1501 && output != 399 {
+		if i == 1501 && output != 400 {
 			t.Error("bad")
-		} else if i == 1505 && output != 1999 {
+		} else if i == 1505 && output != 2000 {
 			t.Error("bad")
 		} else if i != 1501 && i != 1505 && output != 0 {
 			t.Error("bad:", i, output)
@@ -418,9 +418,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -448,9 +448,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1501 && output != 399 {
+		if i == 1501 && output != 400 {
 			t.Error("bad")
-		} else if i == 1505 && output != 1999 {
+		} else if i == 1505 && output != 2000 {
 			t.Error("bad")
 		} else if i != 1501 && i != 1505 && output != 0 {
 			t.Error("bad:", i, output)
@@ -476,9 +476,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1501 && report.PowerOutput != 299 {
+		if i == 1501 && report.PowerOutput != 300 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 1505 && report.PowerOutput != 999 {
+		} else if i == 1505 && report.PowerOutput != 1000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1501 && i != 1505 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send")
@@ -506,9 +506,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1501 && output != 299 {
+		if i == 1501 && output != 300 {
 			t.Error("bad")
-		} else if i == 1505 && output != 999 {
+		} else if i == 1505 && output != 1000 {
 			t.Error("bad")
 		} else if i != 1501 && i != 1505 && output != 0 {
 			t.Error("bad:", i, output)
@@ -556,9 +556,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal("expected to see one device listed in the device history")
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1 && output != 499 {
+		if i == 1 && output != 500 {
 			t.Fatal("bad")
-		} else if i == 5 && output != 2999 {
+		} else if i == 5 && output != 3000 {
 			t.Fatal("bad")
 		} else if i != 1 && i != 5 && output != 0 {
 			t.Fatal("bad")
@@ -586,9 +586,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1501 && output != 399 {
+		if i == 1501 && output != 400 {
 			t.Error("bad")
-		} else if i == 1505 && output != 1999 {
+		} else if i == 1505 && output != 2000 {
 			t.Error("bad")
 		} else if i != 1501 && i != 1505 && output != 0 {
 			t.Error("bad:", i, output)
@@ -616,9 +616,9 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(histResp.TimeslotOffset)
 	}
 	for i, output := range histResp.Devices[0].PowerOutputs {
-		if i == 1501 && output != 299 {
+		if i == 1501 && output != 300 {
 			t.Error("bad")
-		} else if i == 1505 && output != 999 {
+		} else if i == 1505 && output != 1000 {
 			t.Error("bad")
 		} else if i != 1501 && i != 1505 && output != 0 {
 			t.Error("bad:", i, output)

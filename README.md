@@ -139,3 +139,10 @@ Signatures happen by calling the SigningBytes() function. All SigningBytes()
 functions should add a prefix with the struct name to minimize the chance for
 replay attacks. Any data that might only be valid for a certain period of time
 should have a timestamp attached to it.
+
+## Assumptions
+
+The glow-monitor assumes that there will be at least 30 minutes of network
+uptime every day during the daylight, with at most 2 consecutive days of
+downtime. More downtime than that will result in missing power reports that
+under-represent a solar farms contributions.

@@ -18,5 +18,6 @@ const (
 	testMode                = true
 	wattTimeFrequency       = 20 * time.Millisecond
 
-	ReportMigrationFrequency = 100 * time.Millisecond
+	ReportMigrationFrequency        = 100 * time.Millisecond
+	WattTimeWeekDataUpdateFrequency = 1000 * time.Millisecond
 )
