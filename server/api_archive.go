@@ -24,7 +24,12 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Apply rate limiting, probably one call per second would be enough.
+	if r.ContentLength != 0 {
+		http.Error(w, "Request should not have a body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Apply rate limiting, probably allowing one call per second would be enough.
 
 	buffer := new(bytes.Buffer)
 	zipw := zip.NewWriter(buffer)
@@ -54,7 +59,7 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gcas *GCAServer) addFile(name string, zipw *zip.Writer) error {
-	// To avoid races with any components writing to the file, lock here.
+	// To avoid races with any components writing to the file, lock up here.
 	gcas.mu.Lock()
 	defer gcas.mu.Unlock()
 

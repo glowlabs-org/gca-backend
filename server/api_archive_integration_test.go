@@ -31,7 +31,7 @@ func TestApiArchiveIntegration(t *testing.T) {
 		"equipment-reports.dat":        false,
 	}
 
-	// Load all the generated data
+	// Load all the generated data.
 	dmap := make(map[string][]byte)
 
 	for f, _ := range fmap {
@@ -64,7 +64,8 @@ func TestApiArchiveIntegration(t *testing.T) {
 	}
 
 	for _, zipf := range rzip.File {
-		// Make sure there is not and extra file in the zip contents.
+		// Make sure there is not an extra file in the zip contents,
+		// and keep track of the ones we find.
 		if _, ok := fmap[zipf.Name]; ok {
 			fmap[zipf.Name] = true
 		} else {
@@ -85,6 +86,9 @@ func TestApiArchiveIntegration(t *testing.T) {
 		}
 
 		if zipf.Name == "server.keys" {
+			// Special case, must have the public key as the first 32 bytes,
+			// followed by 64 zeroes.
+
 			if len(data) != 96 || len(data) != len(dmap[zipf.Name]) {
 				t.Fatal(fmt.Errorf("%v from zipfile wrong length", zipf.Name))
 			}
@@ -95,7 +99,6 @@ func TestApiArchiveIntegration(t *testing.T) {
 			if !bytes.Equal(data[32:], zbuf) {
 				t.Fatal(fmt.Errorf("file %v zip contained private data contents", zipf.Name))
 			}
-
 		} else {
 			if !bytes.Equal(data, dmap[zipf.Name]) {
 				t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
@@ -113,7 +116,7 @@ func TestApiArchiveIntegration(t *testing.T) {
 // TODO: To avoid cut and paste, should consolidate some of these helper routines.
 
 // Create a server test environment with populated files.
-// Returns the test environment directory.
+// Returns a running GCA server, and the test environment directory name.
 func ServerTestEnvironment(name string) (*GCAServer, string, error) {
 	gcas, dirname, _, gcaPrivKey, err := SetupTestEnvironment(name)
 	if err != nil {
