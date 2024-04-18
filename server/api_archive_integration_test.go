@@ -126,7 +126,7 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 
 	// Have two goroutines send 4 times the limit for twice the time
 	ch := make(chan int, 8*apiArchiveLimit)
-	dur := 2 * apiArchiveRate / 4
+	dur := 2 * apiArchiveRate / (4 * apiArchiveLimit)
 
 	t.Logf("limit %v rate %v dur %v", apiArchiveLimit, apiArchiveRate, dur)
 
