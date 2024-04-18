@@ -137,7 +137,7 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	go callApi(4*apiArchiveLimit, dur, gcas, ch)
 
 	reqs := 0
-	for i := 0; i < 6*apiArchiveLimit; i++ {
+	for i := 0; i < 8*apiArchiveLimit; i++ {
 		resp := <-ch
 		switch resp {
 		case http.StatusOK:
