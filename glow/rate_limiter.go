@@ -23,29 +23,41 @@ func NewRateLimiter(limit int, rate time.Duration) *RateLimiter {
 	}
 }
 
-// Test the rate limiter to decide if a call is allowed.
+// Ask the rate limiter if a request is allowed.
 // Returns true if allowed, false otherwise.
 func (r *RateLimiter) Allow() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	cur := time.Now()
+	now := time.Now()
 
 	// expire requests
-	exp := cur.Add(-r.rate)
-	idx := 0
+	exp := now.Add(-r.rate)
+	idx := -1
 	for i, t := range r.reqs {
 		if t.After(exp) {
 			idx = i
 			break
 		}
 	}
-	r.reqs = r.reqs[idx:]
+
+	if idx == -1 {
+		r.reqs = r.reqs[:0] // Clear the list since none of the entries were after the expiry time
+	} else {
+		r.reqs = r.reqs[idx:] // Retain starting at first index after the expiry time
+	}
 
 	if len(r.reqs) < r.limit {
-		r.reqs = append(r.reqs, cur)
+		r.reqs = append(r.reqs, now)
 		return true
 	}
 
 	return false
+}
+
+// Clear the rate limiter. Used for testing.
+func (r *RateLimiter) Clear() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.reqs = r.reqs[:0]
 }

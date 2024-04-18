@@ -5,8 +5,33 @@ import (
 	"time"
 )
 
+func TestRateLimiterSingle(t *testing.T) {
+	rl := NewRateLimiter(1, 50*time.Millisecond)
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+	count := 0
+	allowed := 0
+	for _ = range ticker.C {
+		if rl.Allow() {
+			allowed++
+		}
+		count++
+		if count == 4 {
+			break
+		}
+	}
+
+	t.Logf("allowed %v", allowed)
+
+	if allowed != 2 {
+		t.Errorf("Single test failed, wanted %v got %v", 2, allowed)
+	}
+}
+
 // Basic multithreaded RateLimiter test
-func TestRateLimiter(t *testing.T) {
+func TestRateLimiterMultithreaded(t *testing.T) {
 
 	maxcalls := 5
 	maxdur := 100 * time.Millisecond

@@ -14,7 +14,7 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-func TestApiArchiveIntegration(t *testing.T) {
+func TestApiArchive(t *testing.T) {
 	// Create a populated test environment and start a new server.
 	gcas, dir, err := ServerTestEnvironment(t.Name())
 	if err != nil {
@@ -42,6 +42,9 @@ func TestApiArchiveIntegration(t *testing.T) {
 		}
 		dmap[f] = data
 	}
+
+	// Clear the rate limiter
+	ApiArchiveRateLimiter.Clear()
 
 	// Post the archive request
 	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort), "", nil)
@@ -109,6 +112,64 @@ func TestApiArchiveIntegration(t *testing.T) {
 	for f, found := range fmap {
 		if !found {
 			t.Fatal(fmt.Errorf("%v not found in zipfile", f))
+		}
+	}
+}
+
+func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
+	// Create a populated test environment and start a new server.
+	gcas, _, err := ServerTestEnvironment(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gcas.Close()
+
+	// Have two goroutines send 4 times the limit for twice the time
+	ch := make(chan int, 8*apiArchiveLimit)
+	dur := 2 * apiArchiveRate / 4
+
+	t.Logf("limit %v rate %v dur %v", apiArchiveLimit, apiArchiveRate, dur)
+
+	// Clear the rate limiter
+	ApiArchiveRateLimiter.Clear()
+
+	go callApi(4*apiArchiveLimit, dur, gcas, ch)
+	go callApi(4*apiArchiveLimit, dur, gcas, ch)
+
+	reqs := 0
+	for i := 0; i < 6*apiArchiveLimit; i++ {
+		resp := <-ch
+		switch resp {
+		case http.StatusOK:
+			reqs++
+		case http.StatusTooManyRequests:
+		default:
+			t.Fatalf("Archive API call returned an invalid response %v", resp)
+		}
+	}
+
+	// Expecting 2 times the limit got through
+	if reqs != 2*apiArchiveLimit {
+		t.Errorf("Archive API expected %v responses, got %v", 2*apiArchiveLimit, reqs)
+	}
+}
+
+func callApi(n int, dur time.Duration, gcas *GCAServer, ch chan<- int) {
+	ticker := time.NewTicker(dur)
+	defer ticker.Stop()
+
+	count := 0
+
+	for _ = range ticker.C {
+		resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort), "", nil)
+		if err != nil {
+			ch <- -1
+		} else {
+			ch <- resp.StatusCode
+		}
+		count++
+		if count == n {
+			return
 		}
 	}
 }

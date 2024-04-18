@@ -13,7 +13,18 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/glowlabs-org/gca-backend/glow"
 )
+
+var (
+	ApiArchiveRateLimiter *glow.RateLimiter // Provide a rate limiter for this API.
+)
+
+func init() {
+	fmt.Printf("init rate limiter limit %v rate %v\n", apiArchiveLimit, apiArchiveRate)
+	ApiArchiveRateLimiter = glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate)
+}
 
 // ArchiveHandler provides the POST /archive api endpoint. It returns
 // uninterpreted file data intended to be used by an external service
@@ -29,7 +40,10 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Apply rate limiting, probably allowing one call per second would be enough.
+	if !ApiArchiveRateLimiter.Allow() {
+		http.Error(w, "Too many requests", http.StatusTooManyRequests)
+		return
+	}
 
 	buffer := new(bytes.Buffer)
 	zipw := zip.NewWriter(buffer)
