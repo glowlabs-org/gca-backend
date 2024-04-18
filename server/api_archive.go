@@ -22,7 +22,6 @@ var (
 )
 
 func init() {
-	fmt.Printf("init rate limiter limit %v rate %v\n", apiArchiveLimit, apiArchiveRate)
 	ApiArchiveRateLimiter = glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate)
 }
 
