@@ -5,6 +5,11 @@ and the clients that report to the servers.
 
 Run tests with `go test -v -tags test ./...`
 
+To run a subset of tests, use the following:
+```
+go test -v -tags test -run TestRateLimiter ./... # runs all RateLimiter tests
+```
+
 ## Standards and Conventions
 
 Within the code, "PublicKey" can be abbreviated to "PubKey" or "pubKey", but
