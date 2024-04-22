@@ -40,8 +40,6 @@ func TestRateLimiterMultithreaded(t *testing.T) {
 
 	ch := make(chan bool, 2*testcalls)
 
-	start := time.Now()
-
 	go simulateCalls(testcalls, testint, rl, ch)
 	go simulateCalls(testcalls, testint, rl, ch)
 
