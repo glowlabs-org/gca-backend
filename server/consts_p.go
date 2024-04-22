@@ -21,6 +21,6 @@ const (
 	ReportMigrationFrequency        = 1 * time.Hour
 	WattTimeWeekDataUpdateFrequency = 24 * time.Hour
 
-	apiArchiveLimit = 1
-	apiArchiveRate  = time.Second
+	apiArchiveLimit = 3
+	apiArchiveRate  = 3 * time.Second
 )
