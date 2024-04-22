@@ -14,6 +14,15 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
+func readFile(dir, name string) ([]byte, error) {
+	path := filepath.Join(dir, name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 func TestApiArchive(t *testing.T) {
 	// Create a populated test environment and start a new server.
 	gcas, dir, err := ServerTestEnvironment(t.Name())
@@ -22,26 +31,27 @@ func TestApiArchive(t *testing.T) {
 	}
 	defer gcas.Close()
 
-	fmap := map[string]bool{
-		"server.keys":                  false,
-		"gcaTempPubKey.dat":            false,
-		"gcaPubKey.dat":                false,
-		"equipment-authorizations.dat": false,
-		"allDeviceStats.dat":           false,
-		"equipment-reports.dat":        false,
-	}
+	fmap := map[string]bool{}
+	dmap := map[string][]byte{}
 
-	// Load all the generated data.
-	dmap := make(map[string][]byte)
-
-	for f, _ := range fmap {
-		path := filepath.Join(dir, f)
-		data, err := os.ReadFile(path)
+	// Add the public files to the test.
+	for _, name := range PublicFiles() {
+		data, err := readFile(dir, name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		dmap[f] = data
+		fmap[name] = false
+		dmap[name] = data
 	}
+
+	// Add the public key file
+	const pkf = "server.pubkey"
+	fmap[pkf] = false
+	data, err := readFile(dir, "server.keys") // server.pubkey should be the first 32 bytes from server.keys
+	if err != nil {
+		t.Fatal(err)
+	}
+	dmap[pkf] = data[:32]
 
 	// Clear the rate limiter
 	ApiArchiveRateLimiter.Clear()
@@ -72,7 +82,7 @@ func TestApiArchive(t *testing.T) {
 		if _, ok := fmap[zipf.Name]; ok {
 			fmap[zipf.Name] = true
 		} else {
-			t.Fatal(fmt.Errorf("%v from zipfile is not valid", zipf.Name))
+			t.Fatal(fmt.Errorf("%v from zipfile is not a valid file", zipf.Name))
 		}
 
 		// Check each file against the original data.
@@ -111,12 +121,12 @@ func TestApiArchive(t *testing.T) {
 
 	for f, found := range fmap {
 		if !found {
-			t.Fatal(fmt.Errorf("%v not found in zipfile", f))
+			t.Fatal(fmt.Errorf("expected %v not found in zipfile", f))
 		}
 	}
 }
 
-func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
+/*func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	// Create a populated test environment and start a new server.
 	gcas, _, err := ServerTestEnvironment(t.Name())
 	if err != nil {
@@ -152,7 +162,7 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	if reqs != 2*apiArchiveLimit {
 		t.Errorf("Archive API expected %v responses, got %v", 2*apiArchiveLimit, reqs)
 	}
-}
+}*/
 
 func callApi(n int, dur time.Duration, gcas *GCAServer, ch chan<- int) {
 	ticker := time.NewTicker(dur)

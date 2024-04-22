@@ -14,3 +14,10 @@ const (
 	// banned. There's in implied division by 100, so 135 implies 135%.
 	MaxCapacityBuffer = 135
 )
+
+// Since Go does not support constant lists from mutable types, provide a
+// list of files which can be shared publically here. If new public files are
+// added to this server, this function should be modified to return them.
+func PublicFiles() [5]string {
+	return [5]string{"gcaTempPubKey.dat", "gcaPubKey.dat", "equipment-authorizations.dat", "allDeviceStats.dat", "equipment-reports.dat"}
+}

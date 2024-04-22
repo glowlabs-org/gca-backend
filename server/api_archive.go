@@ -45,19 +45,23 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	buffer := new(bytes.Buffer)
-	zipw := zip.NewWriter(buffer)
+	znw := zip.NewWriter(buffer)
 
-	files := []string{"server.keys", "gcaTempPubKey.dat", "gcaPubKey.dat", "equipment-authorizations.dat", "allDeviceStats.dat", "equipment-reports.dat"}
-
-	for _, name := range files {
-		err := gcas.addFile(name, zipw)
+	for _, name := range PublicFiles() {
+		err := gcas.addFile(name, znw)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error zipping file %v: %v", name, err), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	if err := zipw.Close(); err != nil {
+	// Add the pseudo file server.pubkey
+	if err := gcas.addPubKeyFile("server.pubkey", znw); err != nil {
+		http.Error(w, fmt.Sprintf("Error zipping server.pubkey: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if err := znw.Close(); err != nil {
 		if _, err := w.Write(buffer.Bytes()); err != nil {
 			http.Error(w, "Failed to close zip writer", http.StatusInternalServerError)
 			return
@@ -121,6 +125,40 @@ func (gcas *GCAServer) addFile(name string, zipw *zip.Writer) error {
 		if _, err := io.Copy(writer, file); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
+	gcas.mu.Lock()
+	defer gcas.mu.Unlock()
+
+	path := filepath.Join(gcas.baseDir, "server.keys")
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	writer, err := znw.CreateHeader(&zip.FileHeader{
+		Name:     "server.pubkey",
+		Method:   zip.Deflate,
+		Modified: fileInfo.ModTime(),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Copy all the file contents
+	if _, err := io.CopyN(writer, file, 32); err != nil {
+		return err
 	}
 	return nil
 }
