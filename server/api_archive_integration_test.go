@@ -54,7 +54,7 @@ func TestApiArchive(t *testing.T) {
 	dmap[pkf] = data[:32]
 
 	// Clear the rate limiter
-	ApiArchiveRateLimiter.Clear()
+	gcas.ApiArchiveRateLimiter.Clear()
 
 	// Post the archive request
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort))
@@ -160,7 +160,7 @@ func TestApiArchive(t *testing.T) {
 	if reqs != 2*apiArchiveLimit {
 		t.Errorf("Archive API expected %v responses, got %v", 2*apiArchiveLimit, reqs)
 	}
-}*/
+}
 
 func callApi(n int, dur time.Duration, gcas *GCAServer, ch chan<- int) {
 	ticker := time.NewTicker(dur)
@@ -181,6 +181,7 @@ func callApi(n int, dur time.Duration, gcas *GCAServer, ch chan<- int) {
 		}
 	}
 }
+*/
 
 // TODO: To avoid cut and paste, should consolidate some of these helper routines.
 

@@ -13,17 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-
-	"github.com/glowlabs-org/gca-backend/glow"
 )
-
-var (
-	ApiArchiveRateLimiter *glow.RateLimiter // Provide a rate limiter for this API.
-)
-
-func init() {
-	ApiArchiveRateLimiter = glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate)
-}
 
 // ArchiveHandler provides the POST /archive api endpoint. It returns
 // uninterpreted file data intended to be used by an external service
@@ -39,7 +29,7 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !ApiArchiveRateLimiter.Allow() {
+	if !gcas.ApiArchiveRateLimiter.Allow() {
 		http.Error(w, fmt.Sprintf("Too many requests, this server allows %v every %v", apiArchiveLimit, apiArchiveRate), http.StatusTooManyRequests)
 		return
 	}

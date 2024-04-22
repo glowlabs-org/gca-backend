@@ -97,7 +97,10 @@ type GCAServer struct {
 	udpPort        uint16         // The port that the UDP conn is listening on
 	tcpPort        uint16         // The port that the TCP listener is using
 	quit           chan bool      // A channel to initiate server shutdown
-	mu             sync.Mutex
+
+	ApiArchiveRateLimiter *glow.RateLimiter // Rate limiter for the /archive endpoint.
+
+	mu sync.Mutex
 }
 
 // NewGCAServer initializes a new instance of GCAServer and returns either
@@ -137,7 +140,8 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 			Addr:    httpPort,
 			Handler: mux,
 		},
-		quit: make(chan bool),
+		quit:                  make(chan bool),
+		ApiArchiveRateLimiter: glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate),
 	}
 
 	// Load the GCA Server keys.
