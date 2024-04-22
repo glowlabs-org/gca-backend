@@ -138,8 +138,6 @@ func TestApiArchive(t *testing.T) {
 	ch := make(chan int, 8*apiArchiveLimit)
 	dur := 2 * apiArchiveRate / (4 * apiArchiveLimit)
 
-	t.Logf("limit %v rate %v dur %v", apiArchiveLimit, apiArchiveRate, dur)
-
 	// Clear the rate limiter
 	ApiArchiveRateLimiter.Clear()
 

@@ -23,8 +23,6 @@ func TestRateLimiterSingle(t *testing.T) {
 		}
 	}
 
-	t.Logf("allowed %v", allowed)
-
 	if allowed != 2 {
 		t.Errorf("Single test failed, wanted %v got %v", 2, allowed)
 	}
@@ -58,8 +56,6 @@ func TestRateLimiterMultithreaded(t *testing.T) {
 			called++
 		}
 	}
-
-	t.Logf("allow %v logs in %v, requests %v allowed %v in %v", maxcalls, maxdur, called, allowed, time.Since(start))
 
 	if allowed != 3*maxcalls {
 		t.Errorf("Wrong count, wanted %v got %v", 3*maxcalls, allowed)
