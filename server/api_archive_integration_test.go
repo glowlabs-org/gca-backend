@@ -53,9 +53,6 @@ func TestApiArchive(t *testing.T) {
 	}
 	dmap[pkf] = data[:32]
 
-	// Clear the rate limiter
-	gcas.ApiArchiveRateLimiter.Clear()
-
 	// Post the archive request
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort))
 	if err != nil {

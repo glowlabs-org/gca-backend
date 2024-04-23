@@ -54,10 +54,3 @@ func (r *RateLimiter) Allow() bool {
 
 	return false
 }
-
-// Clear the rate limiter. Used for testing.
-func (r *RateLimiter) Clear() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.reqs = r.reqs[:0]
-}

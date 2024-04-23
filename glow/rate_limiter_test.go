@@ -1,9 +1,141 @@
 package glow
 
 import (
+	"fmt"
+	"math/rand"
+	"sort"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// Test configuration.
+type TestConfig struct {
+	limit    int
+	rate     time.Duration
+	threads  int           // Number of threads to start.
+	requests int           // Requests to make per thread.
+	duration time.Duration // Maximum duration of the test.
+}
+
+func TestRateLimiter(t *testing.T) {
+
+	limits := []int{1, 3, 10}
+	rate_ms := 24
+	threads := []int{1, 10, 20, 50}
+	durs_ms := []int{15, 24, 32, 48}
+
+	ch := make(chan TestConfig)
+
+	var wg sync.WaitGroup
+
+	// Parallelize the tests.
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for config := range ch { // Finished when empty and closed.
+
+				if err := config.runTest(); err != nil {
+					t.Errorf("Test failed: %v", err)
+				}
+			}
+		}()
+	}
+
+	for _, i := range limits {
+		for _, j := range threads {
+			for _, k := range durs_ms {
+				ch <- TestConfig{
+					limit:    i,
+					rate:     time.Duration(rate_ms) * time.Millisecond,
+					threads:  j,
+					requests: i, // Each thread sends the limit.
+					duration: time.Duration(k) * time.Millisecond,
+				}
+			}
+		}
+	}
+
+	close(ch) // Signal the workers.
+	wg.Wait()
+}
+
+// Creates threads, and makes rate limiter calls in each thread,
+// randomly spaced within a duration.
+func (tc TestConfig) runTest() error {
+	var wg sync.WaitGroup
+	var allowed atomic.Int32
+	var denied atomic.Int32
+
+	rl := NewRateLimiter(tc.limit, tc.rate)
+	dur := tc.duration * time.Duration(90) / time.Duration(100) // Account for overhead
+	start := time.Now()
+
+	for i := 0; i < tc.threads; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Make random cuts within the maximum duration.
+			cuttab := make([]time.Time, tc.requests)
+			durs := make([]float64, tc.requests)
+			for j := 0; j < tc.requests; j++ {
+				durs[j] = rand.Float64() * dur.Seconds()
+			}
+
+			sort.Float64s(durs) // Sort the cut durations.
+
+			for j := 0; j < tc.requests; j++ {
+				// Order the waits by time.
+				cuttab[j] = start.Add(time.Duration(durs[j] * float64(time.Second)))
+			}
+
+			for j := 0; j < tc.requests; j++ {
+				// Sleep until the next time. All the times should fall
+				// within the max duration.
+				time.Sleep(time.Until(cuttab[j]))
+
+				if rl.Allow() {
+					allowed.Add(1)
+				} else {
+					denied.Add(1)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	test_dur := time.Since(start)
+	if test_dur > tc.duration {
+		return fmt.Errorf("test %v duration %v exceeded %v", tc, test_dur, tc.duration)
+	}
+
+	if allowed.Load()+denied.Load() != int32(tc.threads*tc.requests) {
+		return fmt.Errorf("test %v incorrect requests %v", tc, allowed.Load()+denied.Load())
+	}
+
+	// Calculate the number of rate limit intervals.
+	periods := int(test_dur / tc.rate)
+	if test_dur%tc.rate != 0 {
+		periods++
+	}
+
+	if int(allowed.Load()) > periods*tc.limit {
+		return fmt.Errorf("test %v failed with %v allowed for %v rate periods", tc, allowed.Load(), periods)
+	}
+
+	return nil
+}
+
+/*
+
+type callResponse struct {
+	ReqTime      time.Time
+	ResponseCode int
+}
 
 func TestRateLimiterSingle(t *testing.T) {
 	rl := NewRateLimiter(1, 50*time.Millisecond)
@@ -60,8 +192,9 @@ func TestRateLimiterMultithreaded(t *testing.T) {
 	}
 }
 
-// Simulate calls spaced out by an interval
-func simulateCalls(n int, dur time.Duration, rl *RateLimiter, ch chan<- bool) {
+// Simulate calls spaced out by an interval. Sends calls spaced out over a
+// duration. Returns the time each call was made, and the error response returned.
+func timedCaller(n int, dur time.Duration, rl *RateLimiter, ch chan<- callResponse) {
 
 	ticker := time.NewTicker(dur)
 	defer ticker.Stop()
@@ -76,3 +209,4 @@ func simulateCalls(n int, dur time.Duration, rl *RateLimiter, ch chan<- bool) {
 		}
 	}
 }
+*/
