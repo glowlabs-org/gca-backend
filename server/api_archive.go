@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // ArchiveHandler provides the POST /archive api endpoint. It returns
@@ -48,6 +49,12 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	// Add the pseudo file server.pubkey
 	if err := gcas.addPubKeyFile("server.pubkey", znw); err != nil {
 		http.Error(w, fmt.Sprintf("Error zipping server.pubkey: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Add a README
+	if err := gcas.addReadmeFile(znw); err != nil {
+		http.Error(w, fmt.Sprintf("Error adding README: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -132,6 +139,34 @@ func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
 
 	// Copy all the file contents
 	if _, err := io.CopyN(writer, file, 32); err != nil {
+		return err
+	}
+	return nil
+}
+
+const ReadmeContents = "This archive contains uninterpreted server files.\n" +
+	"These files are all contain publicly available\n" +
+	"information, and additional work is needed to stand\n" +
+	"up a new server using them.\n"
+
+func (gcas *GCAServer) addReadmeFile(znw *zip.Writer) error {
+
+	var buf bytes.Buffer
+
+	buf.WriteString(ReadmeContents)
+
+	writer, err := znw.CreateHeader(&zip.FileHeader{
+		Name:     "README",
+		Method:   zip.Deflate,
+		Modified: time.Now(),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Copy all the file contents
+	if _, err := io.Copy(writer, &buf); err != nil {
 		return err
 	}
 	return nil

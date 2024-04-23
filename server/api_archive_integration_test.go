@@ -57,6 +57,10 @@ func TestApiArchive(t *testing.T) {
 	}
 	dmap[pkf] = data[:32]
 
+	const rmf = "README"
+	fmap[rmf] = false
+	dmap[rmf] = []byte(ReadmeContents)
+
 	// Post the archive request
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort))
 	if err != nil {
