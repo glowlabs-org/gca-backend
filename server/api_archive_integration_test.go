@@ -5,9 +5,13 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -123,7 +127,7 @@ func TestApiArchive(t *testing.T) {
 	}
 }
 
-/*func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
+func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	// Create a populated test environment and start a new server.
 	gcas, _, err := ServerTestEnvironment(t.Name())
 	if err != nil {
@@ -131,54 +135,81 @@ func TestApiArchive(t *testing.T) {
 	}
 	defer gcas.Close()
 
-	// Have two goroutines send 4 times the limit for twice the time
-	ch := make(chan int, 8*apiArchiveLimit)
-	dur := 2 * apiArchiveRate / (4 * apiArchiveLimit)
+	time.Sleep(apiArchiveRate) // Ensure that the rate limiter has cleared
 
-	// Clear the rate limiter
-	ApiArchiveRateLimiter.Clear()
+	var allowed atomic.Int32
+	var denied atomic.Int32
+	var wg sync.WaitGroup
 
-	go callApi(4*apiArchiveLimit, dur, gcas, ch)
-	go callApi(4*apiArchiveLimit, dur, gcas, ch)
+	// Choose a multiple of the api duration
+	max_dur := time.Duration(3) * apiArchiveRate
 
-	reqs := 0
-	for i := 0; i < 8*apiArchiveLimit; i++ {
-		resp := <-ch
-		switch resp {
-		case http.StatusOK:
-			reqs++
-		case http.StatusTooManyRequests:
-		default:
-			t.Fatalf("Archive API call returned an invalid response %v", resp)
-		}
+	// Ensure the API is not called at the end of the duration
+	segment := max_dur / time.Duration(apiArchiveLimit+1)
+
+	start := time.Now()
+
+	const threads = 10
+
+	for i := 0; i < threads; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Randomly choose a point within each segment
+			durs := make([]float64, apiArchiveLimit)
+			for j := 0; j < apiArchiveLimit; j++ {
+				durs[j] = (float64(j) + rand.Float64()) * segment.Seconds()
+			}
+
+			slices.Sort(durs) // Make sure the times are in increasing order
+
+			cuttab := make([]time.Time, apiArchiveLimit)
+			for j := 0; j < apiArchiveLimit; j++ {
+				cuttab[j] = start.Add(time.Duration(durs[j] * float64(time.Second)))
+			}
+
+			for j := 0; j < apiArchiveLimit; j++ {
+				// Sleep until the next cut time.
+				time.Sleep(time.Until(cuttab[j]))
+
+				resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort))
+				if err != nil {
+					t.Fatal(err)
+				}
+				switch resp.StatusCode {
+				case http.StatusOK:
+					allowed.Add(1)
+				case http.StatusTooManyRequests:
+					denied.Add(1)
+				default:
+					t.Fatalf("Archive API call returned an invalid response %v", resp)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	test_dur := time.Since(start)
+
+	if test_dur > time.Duration(3)*apiArchiveRate {
+		t.Errorf("duration %v exceeded %v", test_dur, time.Duration(3)*apiArchiveRate)
 	}
 
-	// Expecting 2 times the limit got through
-	if reqs != 2*apiArchiveLimit {
-		t.Errorf("Archive API expected %v responses, got %v", 2*apiArchiveLimit, reqs)
+	if allowed.Load()+denied.Load() != int32(threads*apiArchiveLimit) {
+		t.Errorf("incorrect requests %v, expected %v", allowed.Load()+denied.Load(), threads*apiArchiveLimit)
+	}
+
+	// Calculate the number of rate limit intervals.
+	periods := int(test_dur / apiArchiveRate)
+	if test_dur%apiArchiveRate != 0 {
+		periods++
+	}
+
+	if int(allowed.Load()) > periods*apiArchiveLimit {
+		t.Errorf("%v allowed, expected %v", allowed.Load(), periods*apiArchiveLimit)
 	}
 }
-
-func callApi(n int, dur time.Duration, gcas *GCAServer, ch chan<- int) {
-	ticker := time.NewTicker(dur)
-	defer ticker.Stop()
-
-	count := 0
-
-	for _ = range ticker.C {
-		resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort), "", nil)
-		if err != nil {
-			ch <- -1
-		} else {
-			ch <- resp.StatusCode
-		}
-		count++
-		if count == n {
-			return
-		}
-	}
-}
-*/
 
 // TODO: To avoid cut and paste, should consolidate some of these helper routines.
 

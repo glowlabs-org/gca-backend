@@ -22,5 +22,5 @@ const (
 	WattTimeWeekDataUpdateFrequency = 1000 * time.Millisecond
 
 	apiArchiveLimit = 3
-	apiArchiveRate  = 24 * time.Millisecond
+	apiArchiveRate  = 60 * time.Millisecond
 )

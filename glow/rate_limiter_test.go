@@ -24,14 +24,15 @@ func TestRateLimiter(t *testing.T) {
 	limits := []int{1, 3, 10}
 	rate_ms := 24
 	threads := []int{1, 10, 20, 50}
-	durs_ms := []int{15, 24, 32, 48}
+	durs_ms := []int{15, 24, 32, 48, 60}
 
 	ch := make(chan TestConfig)
 
 	var wg sync.WaitGroup
 
-	// Parallelize the tests.
-	for i := 0; i < 5; i++ {
+	// Paralellize the tests to reduce to a managable time.
+	parallel := 3
+	for i := 0; i < parallel; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -63,14 +64,14 @@ func TestRateLimiter(t *testing.T) {
 }
 
 // Creates threads, and makes rate limiter calls in each thread,
-// randomly spaced within a duration.
+// with some random spacing within the test duration.
 func (tc TestConfig) runTest() error {
 	var wg sync.WaitGroup
 	var allowed atomic.Int32
 	var denied atomic.Int32
 
 	rl := NewRateLimiter(tc.limit, tc.rate)
-	dur := tc.duration * time.Duration(90) / time.Duration(100) // Account for overhead
+	segment := tc.duration / time.Duration(tc.limit+1) // Ensure API is not called at the end
 	start := time.Now()
 
 	for i := 0; i < tc.threads; i++ {
@@ -78,17 +79,17 @@ func (tc TestConfig) runTest() error {
 		go func() {
 			defer wg.Done()
 
-			// Make random cuts within the maximum duration.
-			cuttab := make([]time.Time, tc.requests)
+			// Choose a point within each segment
 			durs := make([]float64, tc.requests)
 			for j := 0; j < tc.requests; j++ {
-				durs[j] = rand.Float64() * dur.Seconds()
+				durs[j] = (float64(j) + rand.Float64()) * segment.Seconds()
 			}
 
-			sort.Float64s(durs) // Sort the cut durations.
+			sort.Float64s(durs) // Ensure increasing order
 
+			// Order by time
+			cuttab := make([]time.Time, tc.requests)
 			for j := 0; j < tc.requests; j++ {
-				// Order the waits by time.
 				cuttab[j] = start.Add(time.Duration(durs[j] * float64(time.Second)))
 			}
 
