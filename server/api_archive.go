@@ -38,18 +38,22 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	buffer := new(bytes.Buffer)
 	znw := zip.NewWriter(buffer)
 
+	// File ordering matters here. We are not locking the files, and relying on the file writes being
+	// append only, and happening in a single write. We must also archive files later which depend
+	// on earlier files.
+
+	// Add the pseudo file server.pubkey
+	if err := gcas.addPubKeyFile("server.pubkey", znw); err != nil {
+		http.Error(w, fmt.Sprintf("Error zipping server.pubkey: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	for _, name := range PublicFiles() {
 		err := gcas.addFile(name, znw)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error zipping file %v: %v", name, err), http.StatusInternalServerError)
 			return
 		}
-	}
-
-	// Add the pseudo file server.pubkey
-	if err := gcas.addPubKeyFile("server.pubkey", znw); err != nil {
-		http.Error(w, fmt.Sprintf("Error zipping server.pubkey: %v", err), http.StatusInternalServerError)
-		return
 	}
 
 	// Add a README
@@ -73,10 +77,6 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gcas *GCAServer) addFile(name string, zipw *zip.Writer) error {
-	// To avoid races with any components writing to the file, lock up here.
-	gcas.mu.Lock()
-	defer gcas.mu.Unlock()
-
 	path := filepath.Join(gcas.baseDir, name)
 
 	file, err := os.Open(path)
@@ -111,9 +111,6 @@ func (gcas *GCAServer) addFile(name string, zipw *zip.Writer) error {
 }
 
 func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
-	gcas.mu.Lock()
-	defer gcas.mu.Unlock()
-
 	path := filepath.Join(gcas.baseDir, "server.keys")
 
 	file, err := os.Open(path)

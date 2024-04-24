@@ -18,6 +18,8 @@ const (
 // Since Go does not support constant lists from mutable types, provide a
 // list of files which can be shared publically here. If new public files are
 // added to this server, this function should be modified to return them.
+// The order matters in this, because we want to archive files before other
+// files that depend on them.
 func PublicFiles() [5]string {
-	return [5]string{"gcaTempPubKey.dat", "gcaPubKey.dat", "equipment-authorizations.dat", "allDeviceStats.dat", "equipment-reports.dat"}
+	return [5]string{"gcaTempPubKey.dat", "gcaPubKey.dat", "allDeviceStats.dat", "equipment-authorizations.dat", "equipment-reports.dat"}
 }
