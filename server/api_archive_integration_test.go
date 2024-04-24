@@ -35,8 +35,8 @@ func TestApiArchive(t *testing.T) {
 	}
 	defer gcas.Close()
 
-	fmap := map[string]bool{}
-	dmap := map[string][]byte{}
+	fileMap := map[string]bool{}
+	dataMap := map[string][]byte{}
 
 	// Add the public files to the test.
 	for _, name := range PublicFiles() {
@@ -44,22 +44,22 @@ func TestApiArchive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmap[name] = false
-		dmap[name] = data
+		fileMap[name] = false
+		dataMap[name] = data
 	}
 
 	// Add the public key file
 	const pkf = "server.pubkey"
-	fmap[pkf] = false
+	fileMap[pkf] = false
 	data, err := readFile(dir, "server.keys") // server.pubkey should be the first 32 bytes from server.keys
 	if err != nil {
 		t.Fatal(err)
 	}
-	dmap[pkf] = data[:32]
+	dataMap[pkf] = data[:32]
 
 	const rmf = "README"
-	fmap[rmf] = false
-	dmap[rmf] = []byte(ReadmeContents)
+	fileMap[rmf] = false
+	dataMap[rmf] = []byte(ReadmeContents)
 
 	// Post the archive request
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/archive", gcas.httpPort))
@@ -74,9 +74,9 @@ func TestApiArchive(t *testing.T) {
 		t.Fatal(fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(body)))
 	}
 
-	rdat := bytes.NewReader(body)
+	reader := bytes.NewReader(body)
 
-	rzip, err := zip.NewReader(rdat, int64(len(body)))
+	rzip, err := zip.NewReader(reader, int64(len(body)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +84,8 @@ func TestApiArchive(t *testing.T) {
 	for _, zipf := range rzip.File {
 		// Make sure there is not an extra file in the zip contents,
 		// and keep track of the ones we find.
-		if _, ok := fmap[zipf.Name]; ok {
-			fmap[zipf.Name] = true
+		if _, ok := fileMap[zipf.Name]; ok {
+			fileMap[zipf.Name] = true
 		} else {
 			t.Fatal(fmt.Errorf("%v from zipfile is not a valid file", zipf.Name))
 		}
@@ -107,10 +107,10 @@ func TestApiArchive(t *testing.T) {
 			// Special case, must have the public key as the first 32 bytes,
 			// followed by 64 zeroes.
 
-			if len(data) != 96 || len(data) != len(dmap[zipf.Name]) {
+			if len(data) != 96 || len(data) != len(dataMap[zipf.Name]) {
 				t.Fatal(fmt.Errorf("%v from zipfile wrong length", zipf.Name))
 			}
-			if !bytes.Equal(data[:32], dmap[zipf.Name][:32]) {
+			if !bytes.Equal(data[:32], dataMap[zipf.Name][:32]) {
 				t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
 			}
 			zbuf := make([]byte, 64)
@@ -118,13 +118,13 @@ func TestApiArchive(t *testing.T) {
 				t.Fatal(fmt.Errorf("file %v zip contained private data contents", zipf.Name))
 			}
 		} else {
-			if !bytes.Equal(data, dmap[zipf.Name]) {
+			if !bytes.Equal(data, dataMap[zipf.Name]) {
 				t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
 			}
 		}
 	}
 
-	for f, found := range fmap {
+	for f, found := range fileMap {
 		if !found {
 			t.Fatal(fmt.Errorf("expected %v not found in zipfile", f))
 		}
@@ -146,10 +146,10 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Choose a multiple of the api duration
-	max_dur := time.Duration(3) * apiArchiveRate
+	maxDur := time.Duration(3) * apiArchiveRate
 
 	// Ensure the API is not called at the end of the duration
-	segment := max_dur / time.Duration(apiArchiveLimit+1)
+	segment := maxDur / time.Duration(apiArchiveLimit+1)
 
 	start := time.Now()
 
@@ -194,10 +194,10 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	}
 	wg.Wait()
 
-	test_dur := time.Since(start)
+	testDur := time.Since(start)
 
-	if test_dur > time.Duration(3)*apiArchiveRate {
-		t.Errorf("duration %v exceeded %v", test_dur, time.Duration(3)*apiArchiveRate)
+	if testDur > time.Duration(3)*apiArchiveRate {
+		t.Errorf("duration %v exceeded %v", testDur, time.Duration(3)*apiArchiveRate)
 	}
 
 	if allowed.Load()+denied.Load() != int32(threads*apiArchiveLimit) {
@@ -205,8 +205,8 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	}
 
 	// Calculate the number of rate limit intervals.
-	periods := int(test_dur / apiArchiveRate)
-	if test_dur%apiArchiveRate != 0 {
+	periods := int(testDur / apiArchiveRate)
+	if testDur%apiArchiveRate != 0 {
 		periods++
 	}
 

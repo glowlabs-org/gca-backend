@@ -71,7 +71,7 @@ func (tc TestConfig) runTest() error {
 	var denied atomic.Int32
 
 	rl := NewRateLimiter(tc.limit, tc.rate)
-	segment := tc.duration / time.Duration(tc.limit+1) // Ensure API is not called at the end
+	segment := tc.duration / time.Duration(tc.limit+1) // Leave some space at the end for timing.
 	start := time.Now()
 
 	for i := 0; i < tc.threads; i++ {
@@ -88,15 +88,15 @@ func (tc TestConfig) runTest() error {
 			sort.Float64s(durs) // Ensure increasing order
 
 			// Order by time
-			cuttab := make([]time.Time, tc.requests)
+			cutTab := make([]time.Time, tc.requests)
 			for j := 0; j < tc.requests; j++ {
-				cuttab[j] = start.Add(time.Duration(durs[j] * float64(time.Second)))
+				cutTab[j] = start.Add(time.Duration(durs[j] * float64(time.Second)))
 			}
 
 			for j := 0; j < tc.requests; j++ {
 				// Sleep until the next time. All the times should fall
 				// within the max duration.
-				time.Sleep(time.Until(cuttab[j]))
+				time.Sleep(time.Until(cutTab[j]))
 
 				if rl.Allow() {
 					allowed.Add(1)
@@ -109,9 +109,9 @@ func (tc TestConfig) runTest() error {
 
 	wg.Wait()
 
-	test_dur := time.Since(start)
-	if test_dur > tc.duration {
-		return fmt.Errorf("test %v duration %v exceeded %v", tc, test_dur, tc.duration)
+	testDur := time.Since(start)
+	if testDur > tc.duration {
+		return fmt.Errorf("test %v duration %v exceeded %v", tc, testDur, tc.duration)
 	}
 
 	if allowed.Load()+denied.Load() != int32(tc.threads*tc.requests) {
@@ -119,8 +119,8 @@ func (tc TestConfig) runTest() error {
 	}
 
 	// Calculate the number of rate limit intervals.
-	periods := int(test_dur / tc.rate)
-	if test_dur%tc.rate != 0 {
+	periods := int(testDur / tc.rate)
+	if testDur%tc.rate != 0 {
 		periods++
 	}
 
@@ -130,84 +130,3 @@ func (tc TestConfig) runTest() error {
 
 	return nil
 }
-
-/*
-
-type callResponse struct {
-	ReqTime      time.Time
-	ResponseCode int
-}
-
-func TestRateLimiterSingle(t *testing.T) {
-	rl := NewRateLimiter(1, 50*time.Millisecond)
-
-	ticker := time.NewTicker(20 * time.Millisecond)
-	defer ticker.Stop()
-
-	count := 0
-	allowed := 0
-	for _ = range ticker.C {
-		if rl.Allow() {
-			allowed++
-		}
-		count++
-		if count == 4 {
-			break
-		}
-	}
-
-	if allowed != 2 {
-		t.Errorf("Single test failed, wanted %v got %v", 2, allowed)
-	}
-}
-
-// Basic multithreaded RateLimiter test
-func TestRateLimiterMultithreaded(t *testing.T) {
-
-	maxcalls := 5
-	maxdur := 100 * time.Millisecond
-	testcalls := 19
-	testint := 15 * time.Millisecond
-
-	rl := NewRateLimiter(maxcalls, maxdur)
-
-	ch := make(chan bool, 2*testcalls)
-
-	go simulateCalls(testcalls, testint, rl, ch)
-	go simulateCalls(testcalls, testint, rl, ch)
-
-	var called int
-	var allowed int
-
-	for i := 0; i < 2*testcalls; i++ {
-		if <-ch {
-			called++
-			allowed++
-		} else {
-			called++
-		}
-	}
-
-	if allowed != 3*maxcalls {
-		t.Errorf("Wrong count, wanted %v got %v", 3*maxcalls, allowed)
-	}
-}
-
-// Simulate calls spaced out by an interval. Sends calls spaced out over a
-// duration. Returns the time each call was made, and the error response returned.
-func timedCaller(n int, dur time.Duration, rl *RateLimiter, ch chan<- callResponse) {
-
-	ticker := time.NewTicker(dur)
-	defer ticker.Stop()
-
-	count := 0
-
-	for _ = range ticker.C {
-		ch <- rl.Allow()
-		count++
-		if count == n {
-			return
-		}
-	}
-}
-*/
