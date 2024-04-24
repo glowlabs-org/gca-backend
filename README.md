@@ -151,3 +151,16 @@ The glow-monitor assumes that there will be at least 30 minutes of network
 uptime every day during the daylight, with at most 2 consecutive days of
 downtime. More downtime than that will result in missing power reports that
 under-represent a solar farms contributions.
+
+## File Writing and Archiving
+
+To ensure consistency of physical files stored on the server, all files
+should be written append-only, with data written using a single
+write call. This allows consistent read access for archiving without the
+need for file locking.
+
+The archive strategy is to return all public data as physical files,
+providing them in a zip archive. In case of updates during the archive
+process, files are archived in the following order to maintain
+consistency: server public keys, device stats, equipment authorization,
+equipment reports.

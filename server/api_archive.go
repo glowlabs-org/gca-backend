@@ -134,7 +134,7 @@ func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
 		return err
 	}
 
-	// Copy all the file contents
+	// Copy only the public key part of the file
 	if _, err := io.CopyN(writer, file, 32); err != nil {
 		return err
 	}
