@@ -142,9 +142,9 @@ func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
 }
 
 const ReadmeContents = "This archive contains uninterpreted server files.\n" +
-	"These files are all contain publicly available\n" +
-	"information, and additional work is needed to stand\n" +
-	"up a new server using them.\n"
+	"These files all contain publicly available information,\n" +
+	"and additional work is needed to stand up a new server\n" +
+	"using them.\n"
 
 func (gcas *GCAServer) addReadmeFile(znw *zip.Writer) error {
 
