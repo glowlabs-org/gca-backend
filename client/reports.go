@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -56,14 +57,16 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 	if EnergyFile[0] != '/' {
 		filePath = path.Join(c.staticBaseDir, EnergyFile)
 	}
-	file, err := os.Open(filePath)
+
+	// Read the file all at once, to avoid any potential issues if it
+	// is modified while being parsed.
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open monitoring file: %v", err)
+		return nil, fmt.Errorf("unable to read monitoring file: %v", err)
 	}
-	defer file.Close()
 
 	// Iterate over the CSV records
-	reader := csv.NewReader(file)
+	reader := csv.NewReader(strings.NewReader(string(data)))
 	var records []EnergyRecord
 	for {
 		record, err := reader.Read()
