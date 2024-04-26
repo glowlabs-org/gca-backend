@@ -32,7 +32,7 @@ const (
 	UDPSleepSyncTime = time.Millisecond
 
 	// Event log constants.
-	EventLogExpiry   = 2 * time.Second // enough for the integration test
+	EventLogExpiry   = 20 * time.Second // enough time for the tests to complete
 	EventLogMaxCount = 500
 )
 
