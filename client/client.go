@@ -74,6 +74,9 @@ type Client struct {
 	staticPubKey        glow.PublicKey
 	staticPrivKey       glow.PrivateKey
 
+	// Event log.
+	Log *glow.EventLog
+
 	// Sync primitives.
 	closed chan struct{}
 	mu     sync.Mutex
@@ -84,6 +87,7 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
+		Log:           glow.NewEventLog(glow.EventLogOptions{Expiry: EventLogExpiry, MaxCount: EventLogMaxCount}),
 		closed:        make(chan struct{}),
 	}
 

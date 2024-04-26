@@ -30,6 +30,10 @@ const (
 	// of traffic, and sending a ton of packets all at once during a sync
 	// operation is all but guaranteed to get them dropped.
 	UDPSleepSyncTime = time.Millisecond
+
+	// Event log constants.
+	EventLogExpiry   = 2 * time.Second // enough for the integration test
+	EventLogMaxCount = 50
 )
 
 // mimics the production version of randomTimeExtension()
