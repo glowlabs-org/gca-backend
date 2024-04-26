@@ -16,6 +16,7 @@ type event struct {
 	line string
 }
 
+// Options for the event log.
 type EventLogOptions struct {
 	Expiry   time.Duration // Older logs will be removed, 0 means never expire
 	MaxCount int           // Limit the number of logs to collect, 0 means unlimited
@@ -28,7 +29,7 @@ type EventLog struct {
 }
 
 // Create a new event log.
-// The default behavior is to expire in 48 hours, and keep 5000 logs.
+// The default behavior is to never expire, and keep unlimited logs.
 func NewEventLog(opts ...EventLogOptions) *EventLog {
 	var elo EventLogOptions
 
@@ -50,14 +51,16 @@ func (l *EventLog) Expire(now time.Time) {
 		return // Never expire.
 	}
 
-	old := now.Add(-l.Options.Expiry)
+	expireTime := now.Add(-l.Options.Expiry)
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// Remove from the list until we get to a
+	// log which is not expired.
 	for i := l.Logs.Front(); i != nil; {
 		ev := i.Value.(event)
-		if !ev.ts.Before(old) {
+		if !ev.ts.Before(expireTime) {
 			break
 		}
 		nxt := i.Next()
@@ -73,14 +76,15 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 	l.Expire(now)
 
 	nxt := event{
-		ts: time.Now(),
+		ts:   time.Now(),
+		line: fmt.Sprintf(format, a...),
 	}
-	nxt.line = fmt.Sprintf(format, a...)
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// If max count is exceeded, make space.
+	// If max count is exceeded, make space. Max count 0 means
+	// allow unlimited.
 	if l.Options.MaxCount > 0 && l.Logs.Len() == l.Options.MaxCount {
 		l.Logs.Remove(l.Logs.Front())
 	}
@@ -88,9 +92,8 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 	l.Logs.PushBack(nxt)
 }
 
-// Concatenate the logs into a string separated by newlines. Implements
-// the Stringer interface.
-func (l *EventLog) String() string {
+// Concatenate the logs into a string separated by newlines.
+func (l *EventLog) DumpLog() string {
 	var builder strings.Builder
 
 	l.mu.Lock()
@@ -99,7 +102,7 @@ func (l *EventLog) String() string {
 	for i := l.Logs.Front(); i != nil; i = i.Next() {
 		ev := i.Value.(event)
 
-		builder.WriteString(ev.ts.UTC().Format("2006-01-02 15:04:05 UTC"))
+		builder.WriteString(ev.ts.UTC().Format(time.RFC3339))
 		builder.WriteString(" ")
 		builder.WriteString(ev.line)
 		builder.WriteString("\n")

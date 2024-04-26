@@ -16,7 +16,7 @@ func TestEventLogExpiry(t *testing.T) {
 		t.Fatalf("Expected 2, got %v", l.Logs.Len())
 	}
 
-	s := l.String()
+	s := l.DumpLog()
 	if !strings.Contains(s, "alpha") || !strings.Contains(s, "bravo") {
 		t.Fatalf("Bad content")
 	}
@@ -29,7 +29,7 @@ func TestEventLogExpiry(t *testing.T) {
 		t.Fatalf("Expected 2, got %v", l.Logs.Len())
 	}
 
-	s = l.String()
+	s = l.DumpLog()
 	if !strings.Contains(s, "charlie") || !strings.Contains(s, "delta") {
 		t.Fatalf("Bad content")
 	}
@@ -45,7 +45,7 @@ func TestEventLogMaxCount(t *testing.T) {
 		t.Fatalf("Expected 2, got %v", l.Logs.Len())
 	}
 
-	s := l.String()
+	s := l.DumpLog()
 	if !strings.Contains(s, "alpha") || !strings.Contains(s, "bravo") {
 		t.Fatalf("Bad content")
 	}
@@ -57,7 +57,7 @@ func TestEventLogMaxCount(t *testing.T) {
 		t.Fatalf("Expected 2, got %v", l.Logs.Len())
 	}
 
-	s = l.String()
+	s = l.DumpLog()
 	if !strings.Contains(s, "charlie") || !strings.Contains(s, "delta") {
 		t.Fatalf("Bad content")
 	}

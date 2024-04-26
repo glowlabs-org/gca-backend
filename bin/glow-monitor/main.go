@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/glowlabs-org/gca-backend/client"
 )
@@ -33,15 +32,13 @@ func main() {
 		case syscall.SIGTERM:
 			done = true
 		case syscall.SIGUSR1:
-			// Print the event log to the terminal.
-			fmt.Println("Event Log Dump", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
-			fmt.Println(c.Log.String())
+			// Dump status to the terminal.
+			fmt.Printf("%v", c.DumpStatus())
 		case syscall.SIGUSR2:
-			// Write the event log to a file "event.log" in the client directory.
-			path := filepath.Join(baseDir, "event.log")
-			fmt.Println("Event Log Dump to file", path)
-			s := fmt.Sprintf("Event Log Dump %v\n%v", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"), c.Log.String())
-			os.WriteFile(path, []byte(s), 0644)
+			// Write the status to a file "status.txt" in the client directory. File will be
+			// created and/or truncated before writing.
+			path := filepath.Join(baseDir, "status.txt")
+			os.WriteFile(path, []byte(c.DumpStatus()), 0644)
 		}
 	}
 

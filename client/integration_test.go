@@ -629,5 +629,5 @@ func TestEquipmentHistory(t *testing.T) {
 
 	// Sanity test of the event logging.
 	path := filepath.Join(client.staticBaseDir, "event.log")
-	os.WriteFile(path, []byte(client.Log.String()), 0644)
+	os.WriteFile(path, []byte(client.Log.DumpLog()), 0644)
 }

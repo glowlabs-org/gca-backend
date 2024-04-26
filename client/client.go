@@ -48,13 +48,16 @@ package client
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
@@ -126,6 +129,38 @@ func NewClient(baseDir string) (*Client, error) {
 func (c *Client) Close() error {
 	close(c.closed)
 	return c.staticHistoryFile.Close()
+}
+
+// Helper to dump client status to a string. Returns general information,
+// followed by the event log.
+func (c *Client) DumpStatus() string {
+	var sb strings.Builder
+
+	now := time.Now()
+
+	sb.WriteString(fmt.Sprintf("UTC:    %v\n", now.UTC().Format(time.RFC3339)))
+	sb.WriteString(fmt.Sprintf("Local:  %v\n", now.Format(time.RFC3339)))
+
+	elog := c.Log.DumpLog()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	sb.WriteString("\nState\n----------\n")
+	sb.WriteString(fmt.Sprintf("pubKey:        %v\n", base64.StdEncoding.EncodeToString(c.staticPubKey[:])))
+	sb.WriteString(fmt.Sprintf("shortId:       %v\n", c.shortID))
+	sb.WriteString(fmt.Sprintf("gcaPubKey:     %v\n", base64.StdEncoding.EncodeToString(c.gcaPubKey[:])))
+	sb.WriteString(fmt.Sprintf("primaryServer: %v\n", base64.StdEncoding.EncodeToString(c.primaryServer[:])))
+
+	sb.WriteString("\nGCA Servers\n----------\n")
+	for key, serv := range c.gcaServers {
+		sb.WriteString(fmt.Sprintf("  pubKey: %v banned: %v\n", base64.StdEncoding.EncodeToString(key[:]), serv.Banned))
+	}
+
+	sb.WriteString("\nEvent Log\n----------\n")
+	sb.WriteString(fmt.Sprintf("%v", elog))
+
+	return sb.String()
 }
 
 // loadKeypair will load the client keys from disk. The GCA should have put
