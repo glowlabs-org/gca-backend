@@ -99,6 +99,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		// the file has a text error instead of a number.
 		var energy uint64
 		energyF64, err := strconv.ParseFloat(record[1], 64)
+		energyF64 *= -1
 		if err != nil {
 			// In the event of a parse error for the energy reading
 			// for this timestamp, set the value to '3' to indicate
