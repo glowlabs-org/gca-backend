@@ -147,14 +147,14 @@ func (c *Client) DumpStatus() string {
 	defer c.mu.Unlock()
 
 	sb.WriteString("\nState\n----------\n")
-	sb.WriteString(fmt.Sprintf("pubKey:        %v\n", base64.StdEncoding.EncodeToString(c.staticPubKey[:])))
+	sb.WriteString(fmt.Sprintf("pubKey:        %v\n", base64.URLEncoding.EncodeToString(c.staticPubKey[:])))
 	sb.WriteString(fmt.Sprintf("shortId:       %v\n", c.shortID))
-	sb.WriteString(fmt.Sprintf("gcaPubKey:     %v\n", base64.StdEncoding.EncodeToString(c.gcaPubKey[:])))
-	sb.WriteString(fmt.Sprintf("primaryServer: %v\n", base64.StdEncoding.EncodeToString(c.primaryServer[:])))
+	sb.WriteString(fmt.Sprintf("gcaPubKey:     %v\n", base64.URLEncoding.EncodeToString(c.gcaPubKey[:])))
+	sb.WriteString(fmt.Sprintf("primaryServer: %v\n", base64.URLEncoding.EncodeToString(c.primaryServer[:])))
 
 	sb.WriteString("\nGCA Servers\n----------\n")
 	for key, serv := range c.gcaServers {
-		sb.WriteString(fmt.Sprintf("  pubKey: %v banned: %v\n", base64.StdEncoding.EncodeToString(key[:]), serv.Banned))
+		sb.WriteString(fmt.Sprintf("pubKey:        %v banned: %v\n", base64.URLEncoding.EncodeToString(key[:]), serv.Banned))
 	}
 
 	sb.WriteString("\nEvent Log\n----------\n")

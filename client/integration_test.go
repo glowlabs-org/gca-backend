@@ -627,7 +627,7 @@ func TestEquipmentHistory(t *testing.T) {
 		}
 	}
 
-	// Sanity test of the event logging.
-	path := filepath.Join(client.staticBaseDir, "event.log")
-	os.WriteFile(path, []byte(client.Log.DumpLog()), 0644)
+	// Event logging output
+	path := filepath.Join(client.staticBaseDir, "status.txt")
+	os.WriteFile(path, []byte(client.DumpStatus()), 0644)
 }

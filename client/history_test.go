@@ -1,6 +1,8 @@
 package client
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -162,4 +164,8 @@ func TestClientHistory(t *testing.T) {
 	if amt != 510 {
 		t.Fatal("bad")
 	}
+
+	// Event logging output
+	path := filepath.Join(c.staticBaseDir, "status.txt")
+	os.WriteFile(path, []byte(c.DumpStatus()), 0644)
 }

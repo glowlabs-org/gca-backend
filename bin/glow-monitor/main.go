@@ -38,6 +38,7 @@ func main() {
 			// Write the status to a file "status.txt" in the client directory. File will be
 			// created and/or truncated before writing.
 			path := filepath.Join(baseDir, "status.txt")
+			fmt.Printf("Dumping server status to %v\n", path)
 			os.WriteFile(path, []byte(c.DumpStatus()), 0644)
 		}
 	}

@@ -33,7 +33,7 @@ const (
 
 	// Event log constants.
 	EventLogExpiry   = 2 * time.Second // enough for the integration test
-	EventLogMaxCount = 50
+	EventLogMaxCount = 500
 )
 
 // mimics the production version of randomTimeExtension()
