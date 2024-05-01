@@ -16,13 +16,12 @@ import (
 	"time"
 )
 
-const (
-	// The contents of a README file which will be inserted into the archive.
-	ReadmeContents = "This archive contains uninterpreted server files.\n" +
-		"These files all contain publicly available information,\n" +
-		"and additional work is needed to stand up a new server\n" +
-		"using them.\n"
-)
+// The contents of a README file which will be inserted into the archive.
+const ReadmeContents = `This archive contains uninterpreted server files.
+These files all contain publicly available information
+and additional work is needed to stand up a new server
+using them.
+`
 
 // ArchiveHandler provides the POST /archive api endpoint. It returns
 // uninterpreted file data intended to be used by an external service
