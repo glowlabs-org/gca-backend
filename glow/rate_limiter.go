@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// Rate limiter, to allow a maximum number of requests for
+// a time duration.
 type RateLimiter struct {
 	limit int           // Maximum number of requests allowed
 	rate  time.Duration // Request rate for max requests
@@ -14,7 +16,7 @@ type RateLimiter struct {
 	mu    sync.Mutex
 }
 
-// Creates a new RateLimiter with limit requests per rate allowed.
+// Create a new RateLimiter.
 func NewRateLimiter(limit int, rate time.Duration) *RateLimiter {
 	return &RateLimiter{
 		limit: limit,

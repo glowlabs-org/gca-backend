@@ -10,57 +10,46 @@ import (
 	"time"
 )
 
-// Test configuration.
+// Configuration for a single test run, specifying rate limiter
+// parameters, number of threads and requests, and duration of the
+// test.
 type TestConfig struct {
 	limit    int
 	rate     time.Duration
-	threads  int           // Number of threads to start.
+	threads  int           // Number of threads (requestors) to start.
 	requests int           // Requests to make per thread.
 	duration time.Duration // Maximum duration of the test.
 }
 
-func TestRateLimiter(t *testing.T) {
+// Test a matrix of test cases. The production limit should be the
+// middle point of the test cases. Corner case of interest is the single
+// limit case, as well as high limit, high thread count.
+func TestRateLimiterParallel(t *testing.T) {
 
 	limits := []int{1, 3, 10}
 	rate_ms := 24
-	threads := []int{1, 10, 20, 50}
+	threads := []int{1, 10, 20, 50, 100}
 	durs_ms := []int{15, 24, 32, 48, 60}
-
-	ch := make(chan TestConfig)
-
-	var wg sync.WaitGroup
-
-	// Paralellize the tests to reduce to a managable time.
-	parallel := 3
-	for i := 0; i < parallel; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for config := range ch { // Finished when empty and closed.
-
-				if err := config.runTest(); err != nil {
-					t.Errorf("Test failed: %v", err)
-				}
-			}
-		}()
-	}
 
 	for _, i := range limits {
 		for _, j := range threads {
 			for _, k := range durs_ms {
-				ch <- TestConfig{
+				tc := TestConfig{
 					limit:    i,
 					rate:     time.Duration(rate_ms) * time.Millisecond,
 					threads:  j,
 					requests: i, // Each thread sends the limit.
 					duration: time.Duration(k) * time.Millisecond,
 				}
+				t.Run(fmt.Sprintf("%v per %v threads: %v reqs: %v dur: %v", tc.limit, tc.rate, tc.threads, tc.requests, tc.duration), func(t *testing.T) {
+					t.Parallel()
+					if err := tc.runTest(); err != nil {
+						t.Errorf("Test failed: %v", err)
+					}
+				})
 			}
 		}
 	}
-
-	close(ch) // Signal the workers.
-	wg.Wait()
 }
 
 // Creates threads, and makes rate limiter calls in each thread,
@@ -109,11 +98,13 @@ func (tc TestConfig) runTest() error {
 
 	wg.Wait()
 
+	// Ensure the test completes within the specified duration.
 	testDur := time.Since(start)
 	if testDur > tc.duration {
 		return fmt.Errorf("test %v duration %v exceeded %v", tc, testDur, tc.duration)
 	}
 
+	// Ensure that correct number of requests were made.
 	if allowed.Load()+denied.Load() != int32(tc.threads*tc.requests) {
 		return fmt.Errorf("test %v incorrect requests %v", tc, allowed.Load()+denied.Load())
 	}
@@ -124,6 +115,7 @@ func (tc TestConfig) runTest() error {
 		periods++
 	}
 
+	// Verify rate limit.
 	if int(allowed.Load()) > periods*tc.limit {
 		return fmt.Errorf("test %v failed with %v allowed for %v rate periods", tc, allowed.Load(), periods)
 	}
