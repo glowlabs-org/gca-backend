@@ -18,18 +18,11 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-func readFile(dir, name string) ([]byte, error) {
-	path := filepath.Join(dir, name)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
+// This test creates a running server, populated with some report data, then
+// gets an archive and compares to the original file data.
 func TestApiArchive(t *testing.T) {
 	// Create a populated test environment and start a new server.
-	gcas, dir, err := ServerTestEnvironment(t.Name())
+	gcas, dir, err := ServerWithArchiveFiles(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +33,8 @@ func TestApiArchive(t *testing.T) {
 
 	// Add the public files to the test.
 	for _, name := range PublicFiles {
-		data, err := readFile(dir, name)
+		path := filepath.Join(dir, name)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -53,7 +47,8 @@ func TestApiArchive(t *testing.T) {
 	// This test verifies this value directly.
 	const pkf = "server.pubkey"
 	fileMap[pkf] = false
-	data, err := readFile(dir, "server.keys")
+	path := filepath.Join(dir, "server.keys")
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,24 +100,8 @@ func TestApiArchive(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if zipf.Name == "server.keys" {
-			// Special case, must have the public key as the first 32 bytes,
-			// followed by 64 zeroes.
-
-			if len(data) != 96 || len(data) != len(dataMap[zipf.Name]) {
-				t.Fatal(fmt.Errorf("%v from zipfile wrong length", zipf.Name))
-			}
-			if !bytes.Equal(data[:32], dataMap[zipf.Name][:32]) {
-				t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
-			}
-			zbuf := make([]byte, 64)
-			if !bytes.Equal(data[32:], zbuf) {
-				t.Fatal(fmt.Errorf("file %v zip contained private data contents", zipf.Name))
-			}
-		} else {
-			if !bytes.Equal(data, dataMap[zipf.Name]) {
-				t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
-			}
+		if !bytes.Equal(data, dataMap[zipf.Name]) {
+			t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
 		}
 	}
 
@@ -133,9 +112,10 @@ func TestApiArchive(t *testing.T) {
 	}
 }
 
+// Tests the rate limited API under multithreaded access.
 func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	// Create a populated test environment and start a new server.
-	gcas, _, err := ServerTestEnvironment(t.Name())
+	gcas, _, err := ServerWithArchiveFiles(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,11 +197,9 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 	}
 }
 
-// TODO: To avoid cut and paste, should consolidate some of these helper routines.
-
-// Create a server test environment with populated files.
+// Create a server environment with populated archive files.
 // Returns a running GCA server, and the test environment directory name.
-func ServerTestEnvironment(name string) (*GCAServer, string, error) {
+func ServerWithArchiveFiles(name string) (*GCAServer, string, error) {
 	gcas, dirname, _, gcaPrivKey, err := SetupTestEnvironment(name)
 	if err != nil {
 		return nil, "", err
