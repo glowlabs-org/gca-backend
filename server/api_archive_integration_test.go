@@ -39,7 +39,7 @@ func TestApiArchive(t *testing.T) {
 	dataMap := map[string][]byte{}
 
 	// Add the public files to the test.
-	for _, name := range PublicFiles() {
+	for _, name := range PublicFiles {
 		data, err := readFile(dir, name)
 		if err != nil {
 			t.Fatal(err)
@@ -48,10 +48,12 @@ func TestApiArchive(t *testing.T) {
 		dataMap[name] = data
 	}
 
-	// Add the public key file
+	// Add the public key file, and verify that
+	// server.pubkey contains the first 32 bytes from server.keys
+	// This test verifies this value directly.
 	const pkf = "server.pubkey"
 	fileMap[pkf] = false
-	data, err := readFile(dir, "server.keys") // server.pubkey should be the first 32 bytes from server.keys
+	data, err := readFile(dir, "server.keys")
 	if err != nil {
 		t.Fatal(err)
 	}

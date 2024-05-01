@@ -15,11 +15,8 @@ const (
 	MaxCapacityBuffer = 135
 )
 
-// Since Go does not support constant lists from mutable types, provide a
-// list of files which can be shared here. If new public files are
-// added to this server, this function should be modified to return them.
-// The order matters in this, because we want to archive files before other
-// files that depend on them.
-func PublicFiles() [5]string {
-	return [5]string{"gcaTempPubKey.dat", "gcaPubKey.dat", "allDeviceStats.dat", "equipment-authorizations.dat", "equipment-reports.dat"}
-}
+var (
+	// Change order of the public files: gca public key, equipment authorization, equipment reports, all device statistics.
+	// Files should be archived in reverse order.
+	PublicFiles = []string{"allDeviceStats.dat", "equipment-reports.dat", "equipment-authorizations.dat", "gcaPubKey.dat", "gcaTempPubKey.dat"}
+)

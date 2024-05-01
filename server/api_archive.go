@@ -16,6 +16,14 @@ import (
 	"time"
 )
 
+const (
+	// The contents of a README file which will be inserted into the archive.
+	ReadmeContents = "This archive contains uninterpreted server files.\n" +
+		"These files all contain publicly available information,\n" +
+		"and additional work is needed to stand up a new server\n" +
+		"using them.\n"
+)
+
 // ArchiveHandler provides the POST /archive api endpoint. It returns
 // uninterpreted file data intended to be used by an external service
 // to produce an archive.
@@ -39,21 +47,21 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	znw := zip.NewWriter(buffer)
 
 	// File ordering matters here. We are not locking the files, and relying on the file writes being
-	// append only, and happening in a single write. We must also archive files later which depend
-	// on earlier files.
+	// append only while happening in a single write. We must archive the files in reverse order from
+	// their dependency order.
 
-	// Add the pseudo file server.pubkey
-	if err := gcas.addPubKeyFile("server.pubkey", znw); err != nil {
-		http.Error(w, fmt.Sprintf("Error zipping server.pubkey: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	for _, name := range PublicFiles() {
+	for _, name := range PublicFiles {
 		err := gcas.addFile(name, znw)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error zipping file %v: %v", name, err), http.StatusInternalServerError)
 			return
 		}
+	}
+
+	// Add the pseudo file server.pubkey last, as the other files are signed by it.
+	if err := gcas.addPubKeyFile("server.pubkey", znw); err != nil {
+		http.Error(w, fmt.Sprintf("Error zipping server.pubkey: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// Add a README
@@ -76,6 +84,7 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Add a file to a zip archive, copying all the data in the file.
 func (gcas *GCAServer) addFile(name string, zipw *zip.Writer) error {
 	path := filepath.Join(gcas.baseDir, name)
 
@@ -110,7 +119,10 @@ func (gcas *GCAServer) addFile(name string, zipw *zip.Writer) error {
 	return nil
 }
 
+// Add a pseudo-file "server.pubkey" to a zip archive,
+// copying only the public key part of the data file "server.keys".
 func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
+
 	path := filepath.Join(gcas.baseDir, "server.keys")
 
 	file, err := os.Open(path)
@@ -124,28 +136,45 @@ func (gcas *GCAServer) addPubKeyFile(name string, znw *zip.Writer) error {
 		return err
 	}
 
+	// Read only the public key from the file, using the
+	// server API.
+	pub, _, err := gcas.loadGCAServerKeys()
+	if err != nil {
+		return err
+	}
+
+	reader := bytes.NewReader(pub[:])
+
+	// Read the first 32 bytes from the server.keys file
+	// and verify that we have the same public key data.
+
+	buf := make([]byte, 32)
+
+	if _, err := file.Read(buf); err != nil {
+		return err
+	}
+
+	if !bytes.Equal(pub[:], buf) {
+		return fmt.Errorf("public key values differ")
+	}
+
 	writer, err := znw.CreateHeader(&zip.FileHeader{
 		Name:     "server.pubkey",
 		Method:   zip.Deflate,
 		Modified: fileInfo.ModTime(),
 	})
-
 	if err != nil {
 		return err
 	}
 
-	// Copy only the public key part of the file
-	if _, err := io.CopyN(writer, file, 32); err != nil {
+	if _, err := io.Copy(writer, reader); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-const ReadmeContents = "This archive contains uninterpreted server files.\n" +
-	"These files all contain publicly available information,\n" +
-	"and additional work is needed to stand up a new server\n" +
-	"using them.\n"
-
+// Add a README pseudo-file to a zip archive.
 func (gcas *GCAServer) addReadmeFile(znw *zip.Writer) error {
 
 	var buf bytes.Buffer
@@ -157,7 +186,6 @@ func (gcas *GCAServer) addReadmeFile(znw *zip.Writer) error {
 		Method:   zip.Deflate,
 		Modified: time.Now(),
 	})
-
 	if err != nil {
 		return err
 	}
