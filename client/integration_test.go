@@ -44,7 +44,7 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(2 * sendReportTime)
+	time.Sleep(20 * sendReportTime)
 
 	// Check that the server got the report.
 	httpPort, _, _ := gcas.Ports()
