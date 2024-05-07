@@ -8,3 +8,4 @@ halki-app
 *.swo
 notes
 out.txt
+coverage.txt
