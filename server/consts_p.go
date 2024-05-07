@@ -17,6 +17,7 @@ const (
 	defaultLogLevel         = WARN
 	testMode                = false
 	wattTimeFrequency       = 2 * time.Minute
+	httpServerCtxTimeout    = 5 * time.Second
 
 	ReportMigrationFrequency        = 1 * time.Hour
 	WattTimeWeekDataUpdateFrequency = 24 * time.Hour
