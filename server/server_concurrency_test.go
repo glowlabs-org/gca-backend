@@ -8,6 +8,7 @@ package server
 // without setting off the race detector.
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	stopSignal := make(chan struct{})
+	var wg sync.WaitGroup
 
 	// Create a few threads that will be repeatedly submitting GCA keys
 	// with the wrong signature. Every try should fail.
@@ -51,7 +53,9 @@ func TestConcurrency(t *testing.T) {
 		badKey[0] += byte(i + 1)
 
 		// Create a goroutine to repeatedly submit the bad key .
+		wg.Add(1)
 		go func(key glow.PrivateKey) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -87,7 +91,9 @@ func TestConcurrency(t *testing.T) {
 		badKey[0] += byte(i + 1)
 
 		// Create a goroutine to repeatedly submit the bad key .
+		wg.Add(1)
 		go func(key glow.PrivateKey) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -130,7 +136,9 @@ func TestConcurrency(t *testing.T) {
 			Debt:       5e6,
 			Expiration: 15e6,
 		}
+		wg.Add(1)
 		go func(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -163,7 +171,9 @@ func TestConcurrency(t *testing.T) {
 	// correspond to any equipment, so that these requests will continue to
 	// produce errors even once the GCA key has been submitted.
 	for i := 0; i < 3; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -213,7 +223,9 @@ func TestConcurrency(t *testing.T) {
 	// fail.
 	for i := 0; i < 3; i++ {
 		// Create a goroutine to repeatedly submit the bad key .
+		wg.Add(1)
 		go func(key glow.PrivateKey) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -245,7 +257,9 @@ func TestConcurrency(t *testing.T) {
 	// equipment.
 	for i := 0; i < 3; i++ {
 		// Create a goroutine to repeatedly authorize new hardware.
+		wg.Add(1)
 		go func(key glow.PrivateKey) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -284,7 +298,9 @@ func TestConcurrency(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		wg.Add(1)
 		go func(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey, threadNum int) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			resends := 0
@@ -362,7 +378,9 @@ func TestConcurrency(t *testing.T) {
 				i++
 			}
 		}(ea, ePriv, i)
+		wg.Add(1)
 		go func(e glow.EquipmentAuthorization) {
+			defer wg.Done()
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -395,9 +413,10 @@ func TestConcurrency(t *testing.T) {
 	// to generate chaos.
 	time.Sleep(250 * time.Millisecond)
 
-	// Stop everything, and then wait 50 more milliseconds for good measure.
+	// Stop everything, and wait for all threads to exit
 	close(stopSignal)
-	time.Sleep(50 * time.Millisecond)
+	// Wait for all the threads to exit
+	wg.Wait()
 
 	err = gcas.Close()
 	if err != nil {

@@ -5,6 +5,7 @@ package server
 // them all down as well.
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"sync"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -234,6 +236,14 @@ func (server *GCAServer) Close() error {
 	if err != nil {
 		// Log the error if the shutdown fails.
 		server.logger.Errorf("HTTP server shutdown error: %v", err)
+
+		// Log additional information about this error
+		var buf bytes.Buffer
+		if p := pprof.Lookup("goroutine"); p != nil {
+			p.WriteTo(&buf, 1) // The second argument is debug level
+		}
+		fmt.Printf("http shutdown debug: %v", buf.String())
+
 		return fmt.Errorf("error shutting down the http server: %v", err)
 	}
 

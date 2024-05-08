@@ -17,7 +17,7 @@ const (
 	defaultLogLevel         = DEBUG
 	testMode                = true
 	wattTimeFrequency       = 20 * time.Millisecond
-	httpServerCtxTimeout    = 20 * time.Second // server concurrency test fails intermittantly with 5 second value
+	httpServerCtxTimeout    = 5 * time.Second
 
 	ReportMigrationFrequency        = 100 * time.Millisecond
 	WattTimeWeekDataUpdateFrequency = 1000 * time.Millisecond
