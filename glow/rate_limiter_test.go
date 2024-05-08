@@ -25,7 +25,6 @@ type TestConfig struct {
 // middle point of the test cases. Corner case of interest is the single
 // limit case, as well as high limit, high thread count.
 func TestRateLimiterParallel(t *testing.T) {
-
 	limits := []int{1, 3, 10}
 	rate_ms := 24
 	threads := []int{1, 10, 20, 50, 100}
