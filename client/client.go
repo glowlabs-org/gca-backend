@@ -78,7 +78,7 @@ type Client struct {
 	staticPrivKey       glow.PrivateKey
 
 	// Event log.
-	Log *glow.EventLog
+	EventLog *glow.EventLog
 
 	// Sync primitives.
 	closed chan struct{}
@@ -90,7 +90,7 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
-		Log:           glow.NewEventLog(glow.EventLogOptions{Expiry: EventLogExpiry, MaxCount: EventLogMaxCount}),
+		EventLog:      glow.NewEventLog(glow.EventLogOptions{Expiry: EventLogExpiry, MaxCount: EventLogMaxCount}),
 		closed:        make(chan struct{}),
 	}
 
@@ -141,7 +141,7 @@ func (c *Client) DumpStatus() string {
 	sb.WriteString(fmt.Sprintf("UTC:    %v\n", now.UTC().Format(time.RFC3339)))
 	sb.WriteString(fmt.Sprintf("Local:  %v\n", now.Format(time.RFC3339)))
 
-	elog := c.Log.DumpLog()
+	elog := c.EventLog.DumpLog()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
