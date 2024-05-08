@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -173,10 +172,6 @@ func TestPeriodicMonitoring(t *testing.T) {
 			t.Error("server has reports we didn't send", i, report.PowerOutput)
 		}
 	}
-
-	// Event logging output
-	path := filepath.Join(client.staticBaseDir, "status.txt")
-	os.WriteFile(path, []byte(client.DumpStatus()), 0644)
 }
 
 // TestAddingServers has a goal of spinning up multiple servers for a hardware
@@ -714,8 +709,4 @@ func TestAddingServers(t *testing.T) {
 	// client keeps receiving new reports, and then one of the GCAs comes
 	// back online. Testing this will require manually modifying the ports
 	// in memory.
-
-	// Event logging output
-	path := filepath.Join(c.staticBaseDir, "status.txt")
-	os.WriteFile(path, []byte(c.DumpStatus()), 0644)
 }

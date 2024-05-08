@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -626,8 +624,4 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Error("bad:", i, output)
 		}
 	}
-
-	// Event logging output
-	path := filepath.Join(client.staticBaseDir, "status.txt")
-	os.WriteFile(path, []byte(client.DumpStatus()), 0644)
 }
