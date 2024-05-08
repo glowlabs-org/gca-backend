@@ -17,7 +17,7 @@ func TestEventLogIntegration(t *testing.T) {
 	defer gcas.Close()
 	defer glow.SetCurrentTimeslot(0)
 
-	// send a report to the server
+	// Send a report to the server
 	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
 	if err != nil {
 		t.Fatal(err)

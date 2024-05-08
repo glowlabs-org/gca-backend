@@ -90,7 +90,7 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
-		EventLog:      glow.NewEventLog(glow.EventLogOptions{Expiry: EventLogExpiry, MaxCount: EventLogMaxCount}),
+		EventLog:      glow.NewEventLog(glow.EventLogOptions{Expiry: EventLogExpiry, LimitBytes: EventLogLimitBytes}),
 		closed:        make(chan struct{}),
 	}
 

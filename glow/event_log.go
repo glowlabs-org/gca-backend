@@ -18,27 +18,27 @@ type event struct {
 
 // Options for the event log.
 type EventLogOptions struct {
-	Expiry   time.Duration // Older logs will be removed, 0 means never expire
-	MaxCount int           // Limit the number of logs to collect, 0 means unlimited
+	Expiry     time.Duration // Older events will be removed. Default is no expiry.
+	LimitBytes int           // Limit the size of events to collect. Default is not to collect events.
 }
 
+// Event log.
 type EventLog struct {
-	Options EventLogOptions
-	Logs    *list.List
-	mu      sync.Mutex
+	Options   EventLogOptions
+	Logs      *list.List
+	sizeBytes int // Current size of events.
+	mu        sync.Mutex
 }
 
 // Create a new event log.
 // The default behavior is to never expire, and keep unlimited logs.
 func NewEventLog(opts ...EventLogOptions) *EventLog {
 	var elo EventLogOptions
-
 	if len(opts) == 0 {
 		elo = EventLogOptions{}
 	} else {
 		elo = opts[0]
 	}
-
 	return &EventLog{
 		Options: elo,
 		Logs:    list.New(),
@@ -50,9 +50,7 @@ func (l *EventLog) Expire(now time.Time) {
 	if l.Options.Expiry == 0 {
 		return // Never expire.
 	}
-
 	expireTime := now.Add(-l.Options.Expiry)
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -83,12 +81,20 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// If max count is exceeded, make space. Max count 0 means
-	// allow unlimited.
-	if l.Options.MaxCount > 0 && l.Logs.Len() == l.Options.MaxCount {
-		l.Logs.Remove(l.Logs.Front())
+	// Estimate the size of the event, and limit the size.
+	sz := 64 + len(nxt.line)
+	if sz > l.Options.LimitBytes {
+		return // We can't ever store this.
+	}
+	for sz+l.sizeBytes > l.Options.LimitBytes {
+		i := l.Logs.Front()
+		l.Logs.Remove(i)
+		ev := i.Value.(event)
+		l.sizeBytes -= 64 + len(ev.line)
 	}
 
+	// Store it.
+	l.sizeBytes += sz
 	l.Logs.PushBack(nxt)
 }
 

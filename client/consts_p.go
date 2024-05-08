@@ -36,8 +36,8 @@ const (
 	UDPSleepSyncTime = time.Second
 
 	// Event log constants.
-	EventLogExpiry   = 48 * time.Hour
-	EventLogMaxCount = 5000
+	EventLogExpiry     = 7 * 24 * time.Hour
+	EventLogLimitBytes = 10 * 1024 * 1024
 )
 
 // randomTimeExtension returns a random amount of time between 0 seconds and 4
