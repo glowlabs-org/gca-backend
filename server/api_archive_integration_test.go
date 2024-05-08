@@ -27,6 +27,10 @@ func TestApiArchive(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer gcas.Close()
+	// If the time was changed, we need to reset it after closing the server.
+	defer glow.SetCurrentTimeslot(0)
+
+	time.Sleep(200 * time.Millisecond) // timing delay to ensure that the server has completed any file changes
 
 	fileMap := map[string]bool{}
 	dataMap := map[string][]byte{}
@@ -118,6 +122,8 @@ func TestApiArchiveRateLimiterMultithreaded(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer gcas.Close()
+	// If the time was changed, we need to reset it after closing the server.
+	defer glow.SetCurrentTimeslot(0)
 
 	time.Sleep(apiArchiveRate) // Ensure that the rate limiter has cleared
 
@@ -202,8 +208,6 @@ func ServerWithArchiveFiles(name string) (*GCAServer, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	// Reset time after this API so that we don't mess up other tests.
-	defer glow.SetCurrentTimeslot(0)
 
 	// Generate a keypair for a device.
 	authPub, authPriv := glow.GenerateKeyPair()
