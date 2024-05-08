@@ -54,6 +54,7 @@ func TestApiArchive(t *testing.T) {
 	}
 	dataMap[pkf] = data[:32]
 
+	// Readme file.
 	const rmf = "README"
 	fileMap[rmf] = false
 	dataMap[rmf] = []byte(ReadmeContents)
@@ -71,13 +72,12 @@ func TestApiArchive(t *testing.T) {
 		t.Fatal(fmt.Errorf("expected status 200, but got %d: %s", resp.StatusCode, string(body)))
 	}
 
+	// Read back all the zip.
 	reader := bytes.NewReader(body)
-
 	rzip, err := zip.NewReader(reader, int64(len(body)))
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	for _, zipf := range rzip.File {
 		// Make sure there is not an extra file in the zip contents,
 		// and keep track of the ones we find.
@@ -88,23 +88,21 @@ func TestApiArchive(t *testing.T) {
 		}
 
 		// Check each file against the original data.
-
 		f, err := zipf.Open()
 		if err != nil {
 			t.Fatal(fmt.Errorf("%v from zipfile could not be opened: %v", zipf.Name, err))
 		}
 		defer f.Close()
-
 		data, err := io.ReadAll(f)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		if !bytes.Equal(data, dataMap[zipf.Name]) {
 			t.Fatal(fmt.Errorf("file %v data does not match original file", zipf.Name))
 		}
 	}
 
+	// Verify all files were in the zip.
 	for f, found := range fileMap {
 		if !found {
 			t.Fatal(fmt.Errorf("expected %v not found in zipfile", f))
@@ -204,8 +202,7 @@ func ServerWithArchiveFiles(name string) (*GCAServer, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	// This test is going to be messing with time, therefore defer a reset
-	// of the time.
+	// Reset time after this API so that we don't mess up other tests.
 	defer glow.SetCurrentTimeslot(0)
 
 	// Generate a keypair for a device.

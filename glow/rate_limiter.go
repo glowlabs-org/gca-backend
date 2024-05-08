@@ -30,10 +30,9 @@ func NewRateLimiter(limit int, rate time.Duration) *RateLimiter {
 func (r *RateLimiter) Allow() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	now := time.Now()
 
-	// expire requests
+	// Expire requests.
 	exp := now.Add(-r.rate)
 	idx := -1
 	for i, t := range r.reqs {
@@ -42,17 +41,16 @@ func (r *RateLimiter) Allow() bool {
 			break
 		}
 	}
-
 	if idx == -1 {
 		r.reqs = r.reqs[:0] // Clear the list since none of the entries were after the expiry time
 	} else {
 		r.reqs = r.reqs[idx:] // Retain starting at first index after the expiry time
 	}
 
+	// Enforce count limit.
 	if len(r.reqs) < r.limit {
 		r.reqs = append(r.reqs, now)
 		return true
 	}
-
 	return false
 }

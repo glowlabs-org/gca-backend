@@ -61,7 +61,6 @@ func (tc TestConfig) runTest() error {
 	rl := NewRateLimiter(tc.limit, tc.rate)
 	segment := tc.duration / time.Duration(tc.limit+1) // Leave some space at the end for timing.
 	start := time.Now()
-
 	for i := 0; i < tc.threads; i++ {
 		wg.Add(1)
 		go func() {
@@ -94,7 +93,6 @@ func (tc TestConfig) runTest() error {
 			}
 		}()
 	}
-
 	wg.Wait()
 
 	// Ensure the test completes within the specified duration.
@@ -118,6 +116,5 @@ func (tc TestConfig) runTest() error {
 	if int(allowed.Load()) > periods*tc.limit {
 		return fmt.Errorf("test %v failed with %v allowed for %v rate periods", tc, allowed.Load(), periods)
 	}
-
 	return nil
 }
