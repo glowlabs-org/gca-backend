@@ -247,6 +247,7 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 // totally ready to go, so the 'ready' channel is used to signal to startup
 // that it's okay to proceed.
 func (gcas *GCAServer) threadedMigrateReports(username, password string, ready chan struct{}) {
+	defer gcas.shutWg.Done()
 	readyClosed := false
 	for {
 		gcas.mu.Lock()
@@ -262,6 +263,7 @@ func (gcas *GCAServer) threadedMigrateReports(username, password string, ready c
 			// fine, even though action is only taken once a week.
 			select {
 			case <-gcas.quit:
+				gcas.logger.Info("migrate reports quit signal recieved")
 				return
 			case <-time.After(ReportMigrationFrequency):
 			}

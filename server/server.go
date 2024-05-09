@@ -98,6 +98,7 @@ type GCAServer struct {
 	udpPort        uint16         // The port that the UDP conn is listening on
 	tcpPort        uint16         // The port that the TCP listener is using
 	quit           chan bool      // A channel to initiate server shutdown
+	shutWg         sync.WaitGroup // Waiter for server shutdown
 	mu             sync.Mutex
 }
 
@@ -200,6 +201,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	}
 
 	// Start the background threads for various server functionalities
+	server.shutWg.Add(5)
 	go server.threadedLaunchUDPServer(udpReady)
 	go server.threadedMigrateReports(username, password, migrateReady)
 	go server.threadedListenForSyncRequests(tcpReady)
@@ -224,8 +226,11 @@ func (server *GCAServer) Close() error {
 		server.CheckInvariants()
 	}
 
-	// Signal to terminate the server
+	// Signal to terminate the server threads, and wait for them to exit
+	server.logger.Info("server quit signalled")
 	close(server.quit)
+	server.shutWg.Wait()
+	server.logger.Info("server quit wait completed")
 
 	// Shutdown the HTTP server gracefully
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -237,23 +242,6 @@ func (server *GCAServer) Close() error {
 		// Log the error if the shutdown fails.
 		server.logger.Errorf("HTTP server shutdown error: %v", err)
 		return fmt.Errorf("error shutting down the http server: %v", err)
-	}
-
-	// Close the TCP and UDP connection
-	server.mu.Lock()
-	var err1, err2 error
-	if server.udpConn != nil {
-		err1 = server.udpConn.Close()
-	}
-	if server.tcpListener != nil {
-		err2 = server.tcpListener.Close()
-	}
-	server.mu.Unlock()
-	if err1 != nil {
-		return fmt.Errorf("error closing the udp connection: %v", err1)
-	}
-	if err2 != nil {
-		return fmt.Errorf("error closing the tcp connection: %v", err2)
 	}
 
 	// Close the logger

@@ -222,6 +222,7 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 // WattTime period is 5 minutes, so we'll be grabbing the same datapoint pretty
 // regularly.
 func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
+	defer gcas.shutWg.Done()
 	// Infinite loop to keep fetching data from WattTime.
 	for {
 		// Soft sleep before collecting data. We sleep before instead
@@ -229,6 +230,7 @@ func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 		// iteration of the loop and the sleep will happen.
 		select {
 		case <-gcas.quit:
+			gcas.logger.Info("collect impact data quit signal recieved")
 			return
 		case <-time.After(wattTimeFrequency):
 		}
@@ -424,9 +426,11 @@ func staticGetWattTimeToken(username, password string) (string, error) {
 // threadedGetWattTimeWeekData wakes up periodically and refreshes the weekly
 // WattTime data.
 func (gcas *GCAServer) threadedGetWattTimeWeekData(username, password string) {
+	defer gcas.shutWg.Done()
 	for {
 		select {
 		case <-gcas.quit:
+			gcas.logger.Info("weekly data quit signal recieved")
 			return
 		case <-time.After(WattTimeWeekDataUpdateFrequency):
 		}

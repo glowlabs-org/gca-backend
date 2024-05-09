@@ -159,6 +159,7 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 // threadedLaunchUDPServer sets up and starts the UDP server for listening to
 // equipment reports.
 func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
+	defer server.shutWg.Done()
 	udpAddress := net.UDPAddr{
 		Port: udpPort,
 		IP:   net.ParseIP(serverIP),
@@ -176,30 +177,50 @@ func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
 	server.logger.Infof("UDP server launched on port %v", server.udpPort)
-	defer server.udpConn.Close()
+
+	// To manage messages without blocking, use a separate go routine
+	dataCh := make(chan []byte)
+	doneCh := make(chan bool)
+	go func() {
+		for {
+			// Read from the UDP socket
+			buffer := make([]byte, equipmentReportSize)
+			readBytes, _, err := server.udpConn.ReadFromUDP(buffer)
+
+			// Check for server quit
+			select {
+			case <-server.quit:
+				doneCh <- true
+				return
+			default:
+			}
+
+			if err != nil {
+				server.logger.Error("Failed to read from UDP socket: ", err)
+				continue
+			}
+			// Process the received packet if it has the correct length
+			if readBytes != equipmentReportSize {
+				server.logger.Warn("Received an incorrectly sized packet: expected ", equipmentReportSize, " bytes, got ", readBytes, " bytes")
+				continue
+			}
+			dataCh <- buffer
+		}
+	}()
 
 	// Continuously listen for incoming UDP packets
 	for {
 		select {
 		case <-server.quit:
+			server.logger.Info("udp server quit signal recieved")
+
+			// close the connection here, and wait for the read thread to exit
+			server.udpConn.Close()
+			<-doneCh
+
 			return
-		default:
-			// Wait for the next incoming packet
+		case buffer := <-dataCh:
+			go server.managedHandleEquipmentReport(buffer)
 		}
-
-		// Read from the UDP socket
-		buffer := make([]byte, equipmentReportSize)
-		readBytes, _, err := server.udpConn.ReadFromUDP(buffer)
-		if err != nil {
-			server.logger.Error("Failed to read from UDP socket: ", err)
-			continue
-		}
-
-		// Process the received packet if it has the correct length
-		if readBytes != equipmentReportSize {
-			server.logger.Warn("Received an incorrectly sized packet: expected ", equipmentReportSize, " bytes, got ", readBytes, " bytes")
-			continue
-		}
-		go server.managedHandleEquipmentReport(buffer)
 	}
 }

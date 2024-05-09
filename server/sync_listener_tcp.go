@@ -33,34 +33,56 @@ import (
 // queries that want to see which timeslots have reports for a given piece of
 // hardware.
 func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
+	defer gcas.shutWg.Done()
 	// Listen on TCP port
 	listener, err := net.Listen("tcp", serverIP+":"+strconv.Itoa(tcpPort))
 	if err != nil {
 		gcas.logger.Fatalf("Failed to start server: %s", err)
 	}
 	gcas.tcpListener = listener
-	defer listener.Close()
 	gcas.tcpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
 	close(tcpReady)
+
+	// To manage connections without blocking, use a separate go routine
+	connCh := make(chan net.Conn)
+	doneCh := make(chan bool)
+	go func() {
+		for {
+			// Wait for a connection
+			conn, err := listener.Accept()
+
+			// Check for server quit
+			select {
+			case <-gcas.quit:
+				doneCh <- true
+				return
+			default:
+				// Accepted connection
+			}
+
+			if err != nil {
+				gcas.logger.Infof("Failed to accept connection: %s", err)
+				continue
+			}
+			connCh <- conn
+		}
+	}()
 
 	for {
 		// Check for a shutdown signal.
 		select {
 		case <-gcas.quit:
+			gcas.logger.Info("tcp server quit signal recieved")
+
+			// close the listener here, and wait for the accept thread to exit
+			listener.Close()
+			<-doneCh
+
 			return
-		default:
-			// Wait for the next incoming request
+		case conn := <-connCh:
+			// Handle the connection in a new goroutine
+			go gcas.managedHandleSyncConn(conn)
 		}
-
-		// Wait for a connection
-		conn, err := listener.Accept()
-		if err != nil {
-			gcas.logger.Infof("Failed to accept connection: %s", err)
-			continue
-		}
-
-		// Handle the connection in a new goroutine
-		go gcas.managedHandleSyncConn(conn)
 	}
 }
 
