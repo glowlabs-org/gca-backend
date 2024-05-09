@@ -160,6 +160,6 @@ without the need for file locking.
 
 The archive strategy is to return all public data as files, providing
 them in a zip archive. In case of updates during the archive
-process, files are archived in the following order to maintain
-consistency: server public keys, device stats, equipment authorization,
-equipment reports.
+process, files must be archived in the reverse order to which they would
+be modified. The archive order is: all device stats, equipment reports,
+equipment authizations, gca public keys, and gca server public keys.
