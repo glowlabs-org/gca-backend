@@ -17,7 +17,7 @@ const (
 	defaultLogLevel         = DEBUG
 	testMode                = true
 	wattTimeFrequency       = 20 * time.Millisecond
-	httpServerCtxTimeout    = 5 * time.Second
+	httpServerCtxTimeout    = 1 * time.Second
 
 	ReportMigrationFrequency        = 100 * time.Millisecond
 	WattTimeWeekDataUpdateFrequency = 1000 * time.Millisecond

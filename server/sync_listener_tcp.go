@@ -56,7 +56,6 @@ func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 				doneCh <- true
 				return
 			default:
-				// Accepted connection
 			}
 
 			if err != nil {
