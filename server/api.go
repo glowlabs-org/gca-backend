@@ -29,7 +29,6 @@ func (gcas *GCAServer) launchAPI() {
 
 	// Launch the background thread that keeps the API running.
 	go func() {
-		defer gcas.httpWg.Done()
 		gcas.logger.Info("Starting HTTP server on port ", gcas.httpPort)
 		if err := gcas.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			gcas.logger.Fatal("Could not start HTTP server: ", err)

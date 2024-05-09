@@ -99,7 +99,6 @@ type GCAServer struct {
 	tcpPort        uint16         // The port that the TCP listener is using
 	quit           chan bool      // A channel to initiate server shutdown
 	shutWg         sync.WaitGroup // Waiter for server threads shutdown
-	httpWg         sync.WaitGroup // Waiter for http server shutdown
 	mu             sync.Mutex
 }
 
@@ -208,7 +207,6 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	go server.threadedListenForSyncRequests(tcpReady)
 	go server.threadedCollectImpactData(username, password)
 	go server.threadedGetWattTimeWeekData(username, password)
-	server.httpWg.Add(1)
 	server.launchAPI()
 
 	<-udpReady
