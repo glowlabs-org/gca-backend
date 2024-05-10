@@ -152,7 +152,7 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 		return
 	}
 
-	fmt.Println("got udp report:", report)
+	fmt.Println("*** got udp report:", report.ShortID, report.Timeslot, report.PowerOutput)
 
 	// Integrate and save the report.
 	server.integrateReport(report)
@@ -179,7 +179,8 @@ func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
 	server.logger.Infof("UDP server launched on port %v", server.udpPort)
-	fmt.Printf("UDP server launched on port %v\n", server.udpPort)
+
+	fmt.Println("*** udp server launched on port", server.udpPort)
 
 	// To manage messages without blocking, use a separate go routine
 	dataCh := make(chan []byte)

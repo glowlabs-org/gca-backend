@@ -1,6 +1,7 @@
 package glow
 
 import (
+	"fmt"
 	"net"
 )
 
@@ -13,6 +14,7 @@ func SendUDPReport(report []byte, location string) error {
 	}
 	defer conn.Close()
 
+	fmt.Println("*** sending SendUDPReport to", location)
 	_, err = conn.Write(report)
 	return err
 }

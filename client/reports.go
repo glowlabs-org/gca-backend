@@ -42,7 +42,7 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
-	fmt.Printf("sending report to %v: %v\n", location, eqr)
+	fmt.Println("*** client sending udp report to", gcas.Location, gcas.UdpPort)
 	glow.SendUDPReport(data, location)
 }
 
