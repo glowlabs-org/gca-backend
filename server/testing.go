@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
@@ -105,6 +106,9 @@ func SetupTestEnvironment(testName string) (gcas *GCAServer, dir string, gcaPubK
 	if err != nil {
 		return nil, "", glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to create gca server with temp key: %v", err)
 	}
+	// On slower hosts such as test runners, the UDP thread may not be reading messages soon enough,
+	// so add a short delay here.
+	time.Sleep(50 * time.Microsecond)
 	gcaPubKey, gcaPrivKey, err = server.submitGCAKey(tempPrivKey)
 	if err != nil {
 		return nil, "", glow.PublicKey{}, glow.PrivateKey{}, fmt.Errorf("unable to submit gca priv key: %v", err)
@@ -119,6 +123,9 @@ func SetupTestEnvironmentKnownGCA(testName string, gcaPublicKey glow.PublicKey, 
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to create gca server with temp key: %v", err)
 	}
+	// On slower hosts such as test runners, the UDP thread may not be reading messages soon enough,
+	// so add a short delay here.
+	time.Sleep(50 * time.Microsecond)
 	err = server.submitKnownGCAKey(tempPrivKey, gcaPublicKey, gcaPrivateKey)
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to submit gca priv key: %v", err)
