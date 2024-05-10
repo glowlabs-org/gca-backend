@@ -152,6 +152,8 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 		return
 	}
 
+	fmt.Println("got udp report:", report)
+
 	// Integrate and save the report.
 	server.integrateReport(report)
 }
