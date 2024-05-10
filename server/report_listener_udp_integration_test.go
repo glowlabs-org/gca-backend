@@ -16,7 +16,7 @@ import (
 //
 // NOTE: Because UDP is used as the protocol, this send may fail. It seems like
 // the test suite will occasionally fail to send the udp packet even over
-// localhost. Therefore this function doesn't do any checking itself to see
+// 127.0.0.1. Therefore this function doesn't do any checking itself to see
 // whether the report successfully arrived.
 func (gcas *GCAServer) sendEquipmentReport(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey) error {
 	// Generate a number between 2 and the capacity for the PowerOutput. We

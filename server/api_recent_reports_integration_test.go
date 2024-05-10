@@ -33,7 +33,7 @@ func TestRecentReportsIntegration(t *testing.T) {
 
 	// Perform a GET request to the recent-reports endpoint
 	pubkey := hex.EncodeToString(ea.PublicKey[:])
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%s", server.httpPort, pubkey))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%s", server.httpPort, pubkey))
 	if err != nil {
 		t.Fatalf("Failed to send GET request: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestRecentReportsIntegration(t *testing.T) {
 
 	// Perform a GET request with an invalid public key
 	invalidPublicKey := "invalidPublicKey"
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%s", server.httpPort, invalidPublicKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%s", server.httpPort, invalidPublicKey))
 	if err != nil {
 		t.Fatalf("Failed to send GET request: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestRecentReportsIntegration(t *testing.T) {
 
 	// Perform a GET request for the equipment with no reports
 	pubkey = hex.EncodeToString(ea.PublicKey[:])
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%s", server.httpPort, pubkey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%s", server.httpPort, pubkey))
 	if err != nil {
 		t.Fatalf("Failed to send GET request: %v", err)
 	}

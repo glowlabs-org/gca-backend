@@ -76,7 +76,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 
 	// Check whether the server got the reports.
 	httpPort, _, _ := gcas.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(2 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestAddingServers(t *testing.T) {
 
 	// Ensure that at least one of the servers got a report.
 	httpPort1, _, _ := gcas1.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.staticPubKey))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestAddingServers(t *testing.T) {
 		}
 	}
 	httpPort2, _, _ := gcas2.Ports()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestAddingServers(t *testing.T) {
 
 	// Check that the all-device-stats endpoint is listing out the client
 	// and the corresponding reports.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort2))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort2))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func TestAddingServers(t *testing.T) {
 	as := server.AuthorizedServer{
 		PublicKey: gcas3.PublicKey(),
 		Banned:    false,
-		Location:  "localhost",
+		Location:  "127.0.0.1",
 		HttpPort:  httpPort3,
 		TcpPort:   tcpPort3,
 		UdpPort:   udpPort3,
@@ -422,7 +422,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorized-servers", httpPort2), "application/json", bytes.NewBuffer(requestBody))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorized-servers", httpPort2), "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +474,7 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -535,7 +535,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to marshal the auth request")
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpPortA), "application/json", bytes.NewBuffer(jsonEA))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", httpPortA), "application/json", bytes.NewBuffer(jsonEA))
 	if err != nil {
 		t.Fatal("unable to authorize device on GCA server:", err)
 	}
@@ -551,7 +551,7 @@ func TestAddingServers(t *testing.T) {
 	as = server.AuthorizedServer{
 		PublicKey: gcasA.PublicKey(),
 		Banned:    false,
-		Location:  "localhost",
+		Location:  "127.0.0.1",
 		HttpPort:  httpPortA,
 		TcpPort:   tcpPortA,
 		UdpPort:   udpPortA,
@@ -570,7 +570,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/equipment-migrate", httpPort3), "application/json", bytes.NewBuffer(jsonEM))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/equipment-migrate", httpPort3), "application/json", bytes.NewBuffer(jsonEM))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,7 +612,7 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -650,7 +650,7 @@ func TestAddingServers(t *testing.T) {
 	}
 
 	// Check the old GCA, which should not be receiving reports anymore.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +690,7 @@ func TestAddingServers(t *testing.T) {
 	// of the test was written, we were in a hurry and didn't fully test
 	// the endpoint. This was the fastest way to get basic coverage.
 	var el server.EquipmentResponse
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/equipment", httpPort3))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/equipment", httpPort3))
 	if err != nil {
 		t.Fatal(err)
 	}
