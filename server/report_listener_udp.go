@@ -179,6 +179,7 @@ func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
 	server.logger.Infof("UDP server launched on port %v", server.udpPort)
+	fmt.Printf("UDP server launched on port %v\n", server.udpPort)
 
 	// To manage messages without blocking, use a separate go routine
 	dataCh := make(chan []byte)
