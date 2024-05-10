@@ -70,7 +70,7 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 		http, tcp, udp := server.Ports()
 		serverMap[server.PublicKey()] = GCAServer{
 			Banned:   false,
-			Location: "localhost",
+			Location: "127.0.0.1",
 			HttpPort: http,
 			TcpPort:  tcp,
 			UdpPort:  udp,
