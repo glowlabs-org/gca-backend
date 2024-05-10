@@ -89,6 +89,9 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
+		if i == 1 || i == 5 {
+			fmt.Println("report", i, report)
+		}
 		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("server does not seem to have the report", report.PowerOutput)
 		} else if i == 5 && report.PowerOutput != 3000 {
