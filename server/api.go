@@ -21,7 +21,7 @@ func (gcas *GCAServer) launchAPI() {
 	// Create a listener. In prod it's a specfic port, during testing it's
 	// ":0". Because we don't know what the port is during testing, we need
 	// to build the listener manually so that we can grab the port from it.
-	listener, err := net.Listen("tcp", httpPort)
+	listener, err := net.Listen("tcp", gcas.httpServer.Addr)
 	if err != nil {
 		panic("unable to launch gca api")
 	}
@@ -29,7 +29,7 @@ func (gcas *GCAServer) launchAPI() {
 
 	// Launch the background thread that keeps the API running.
 	go func() {
-		gcas.logger.Info("Starting HTTP server on port ", gcas.httpPort)
+		gcas.logger.Info("Starting HTTP server on ", gcas.httpServer.Addr)
 		if err := gcas.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			gcas.logger.Fatal("Could not start HTTP server: ", err)
 		}
