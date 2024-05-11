@@ -41,7 +41,6 @@ func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 	}
 	gcas.tcpListener = listener
 	gcas.tcpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
-	close(tcpReady)
 
 	// To manage connections without blocking, use a separate go routine
 	connCh := make(chan net.Conn)
@@ -67,6 +66,8 @@ func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 			connCh <- conn
 		}
 	}()
+
+	close(tcpReady)
 
 	for {
 		// Check for a shutdown signal.

@@ -75,8 +75,9 @@ type Client struct {
 	staticPrivKey       glow.PrivateKey
 
 	// Sync primitives.
-	closed chan struct{}
-	mu     sync.Mutex
+	closed   chan struct{}
+	closedWg sync.WaitGroup
+	mu       sync.Mutex
 }
 
 // NewClient will return a new client that is running smoothly.
@@ -112,6 +113,7 @@ func NewClient(baseDir string) (*Client, error) {
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
 	ready := make(chan struct{})
+	c.closedWg.Add(1)
 	go c.threadedSendReports(ready)
 	<-ready
 
@@ -121,6 +123,7 @@ func NewClient(baseDir string) (*Client, error) {
 // Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
 	close(c.closed)
+	c.closedWg.Wait()
 	return c.staticHistoryFile.Close()
 }
 

@@ -532,6 +532,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 // The thread needs to complete some initialization tasks before the client is
 // completely ready, that gets coordinated with a basic channel.
 func (c *Client) threadedSendReports(ready chan struct{}) {
+	defer c.closedWg.Done()
 	// Right at startup, we save all of the existing records. We don't
 	// bother sending them because we assume we already sent them, and if
 	// we haven't already sent them, the periodic synchronization will fix
