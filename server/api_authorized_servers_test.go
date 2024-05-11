@@ -36,7 +36,7 @@ func TestAuthorizeServers(t *testing.T) {
 	jsonBody, _ := json.Marshal(ea)
 
 	// Perform an HTTP POST request.
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}

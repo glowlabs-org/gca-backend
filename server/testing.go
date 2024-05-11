@@ -82,7 +82,7 @@ func (gcas *GCAServer) AuthorizeEquipment(ea glow.EquipmentAuthorization, gcaPri
 	if err != nil {
 		return fmt.Errorf("unable to marshal equipment authorization: %v", err)
 	}
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(j))
+	resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(j))
 	if err != nil {
 		return fmt.Errorf("failed to send request: %v", err)
 	}
@@ -182,7 +182,7 @@ func (gcas *GCAServer) submitKnownGCAKey(tempPrivKey glow.PrivateKey, publicKey 
 	}
 
 	// Create a new HTTP request to submit the GCA key.
-	req, err := http.NewRequest("POST", fmt.Sprintf("http://localhost:%v/api/v1/register-gca", gcas.httpPort), bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%v/api/v1/register-gca", gcas.httpPort), bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("error creating new http request: %v", err)
 	}
