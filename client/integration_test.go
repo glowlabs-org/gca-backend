@@ -48,7 +48,7 @@ func TestEquipmentHistory(t *testing.T) {
 
 	// Check that the server got the report.
 	httpPort, _, _ := gcas.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestEquipmentHistory(t *testing.T) {
 	}
 
 	// Check that the report is available in the history.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestEquipmentHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	httpPort, _, _ = gcas.Ports()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestEquipmentHistory(t *testing.T) {
 	// history.
 	glow.SetCurrentTimeslot(3500)
 	time.Sleep(2 * server.ReportMigrationFrequency)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestEquipmentHistory(t *testing.T) {
 	cSrv.UdpPort = udpPort
 	client.gcaServers[gcas.PublicKey()] = cSrv
 	client.mu.Unlock()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +231,7 @@ func TestEquipmentHistory(t *testing.T) {
 	}
 	time.Sleep(2 * sendReportTime)
 	// Check the recent reports
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestEquipmentHistory(t *testing.T) {
 		}
 	}
 	// Check that the old reports are still available in the old history.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestEquipmentHistory(t *testing.T) {
 		}
 	}
 	// Check that the new reports are available in the new history.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestEquipmentHistory(t *testing.T) {
 	// well, then check that all the reports are still available.
 	glow.SetCurrentTimeslot(3500 + 2016)
 	time.Sleep(2 * server.ReportMigrationFrequency)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Fatal("bad")
 		}
 	}
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +400,7 @@ func TestEquipmentHistory(t *testing.T) {
 	cSrv.UdpPort = udpPort
 	client.gcaServers[gcas.PublicKey()] = cSrv
 	client.mu.Unlock()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +426,7 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Fatal("bad")
 		}
 	}
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +464,7 @@ func TestEquipmentHistory(t *testing.T) {
 	}
 	time.Sleep(2 * sendReportTime)
 	// Check the recent reports
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -484,7 +484,7 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Error("server has reports we didn't send")
 		}
 	}
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=%d", httpPort, 2016*2))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=%d", httpPort, 2016*2))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -538,7 +538,7 @@ func TestEquipmentHistory(t *testing.T) {
 	cSrv.UdpPort = udpPort
 	client.gcaServers[gcas.PublicKey()] = cSrv
 	client.mu.Unlock()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +564,7 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Fatal("bad")
 		}
 	}
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=2016", httpPort))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,7 +594,7 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Error("bad:", i, output)
 		}
 	}
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=%d", httpPort, 2016*2))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=%d", httpPort, 2016*2))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,7 +36,7 @@ func (gcas *GCAServer) submitNewHardware(shortID uint32, gcaPrivKey glow.Private
 
 	// Convert the request to json and post it.
 	jsonBody, _ := json.Marshal(ea)
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", gcas.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return glow.EquipmentAuthorization{}, glow.PrivateKey{}, fmt.Errorf("unable to send http request to submit new hardware: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Convert the request body to JSON format.
 	jsonBody, _ := json.Marshal(ea)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	}
 
 	// Send a duplicate request. The server should ignore the request.
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(ea)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Convert the request body to JSON format.
 	jsonBody, _ = json.Marshal(ea)
 	// Perform an HTTP POST request to the authorize-equipment endpoint.
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", server.httpPort), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		t.Fatalf("Failed to send request: %v", err)
 	}

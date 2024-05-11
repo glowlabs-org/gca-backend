@@ -70,7 +70,7 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 		http, tcp, udp := server.Ports()
 		serverMap[server.PublicKey()] = GCAServer{
 			Banned:   false,
-			Location: "localhost",
+			Location: "127.0.0.1",
 			HttpPort: http,
 			TcpPort:  tcp,
 			UdpPort:  udp,
@@ -131,7 +131,7 @@ func SetupTestEnvironment(baseDir string, gcaPubkey glow.PublicKey, gcaPrivKey g
 	}
 	for _, server := range gcaServers {
 		httpX, _, _ := server.Ports()
-		resp, err := http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpX), "application/json", bytes.NewBuffer(jsonEA))
+		resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", httpX), "application/json", bytes.NewBuffer(jsonEA))
 		if err != nil {
 			return fmt.Errorf("unable to authorize device on GCA server: %v", err)
 		}
