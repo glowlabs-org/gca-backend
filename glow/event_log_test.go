@@ -37,7 +37,7 @@ func TestEventLogMaxSize(t *testing.T) {
 	if l.Logs.Len() != 0 {
 		t.Fatalf("Expected 0, got %v", l.Logs.Len())
 	}
-	l.Options.LimitBytes = 2*64 + 2*5 // Just enough for two events.
+	l.Options.LimitBytes = 2*8 + 2*5 // Just enough for two events.
 	l.Printf("12345")
 	l.Printf("67890")
 	if l.Logs.Len() != 2 {

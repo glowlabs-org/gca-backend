@@ -80,7 +80,7 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 	defer l.mu.Unlock()
 
 	// Estimate the size of the event, and limit the size.
-	sz := 64 + len(nxt.line)
+	sz := 8 + len(nxt.line)
 	if sz > l.Options.LimitBytes {
 		return // We can't ever store this.
 	}
@@ -90,7 +90,7 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 		i := l.Logs.Front()
 		l.Logs.Remove(i)
 		ev := i.Value.(event)
-		l.sizeBytes -= 64 + len(ev.line)
+		l.sizeBytes -= 8 + len(ev.line)
 	}
 	l.sizeBytes += sz
 	l.Logs.PushBack(nxt)
