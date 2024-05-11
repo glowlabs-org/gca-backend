@@ -23,6 +23,7 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -33,7 +34,7 @@ import (
 // hardware.
 func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 	// Listen on TCP port
-	listener, err := net.Listen("tcp", tcpPort)
+	listener, err := net.Listen("tcp", serverIP+":"+strconv.Itoa(tcpPort))
 	if err != nil {
 		gcas.logger.Fatalf("Failed to start server: %s", err)
 	}

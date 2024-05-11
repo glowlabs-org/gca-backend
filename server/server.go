@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -137,7 +138,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		logger:              logger,
 		mux:                 mux,
 		httpServer: &http.Server{
-			Addr:    httpPort,
+			Addr:    serverIP + ":" + strconv.Itoa(httpPort),
 			Handler: mux,
 		},
 		quit:                  make(chan bool),
