@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Event.
 type event struct {
 	ts   time.Time
 	line string
@@ -25,8 +26,8 @@ type EventLogOptions struct {
 // Event log.
 type EventLog struct {
 	Options   EventLogOptions
-	Logs      *list.List
-	sizeBytes int // Current size of events.
+	Logs      *list.List // List of events
+	sizeBytes int        // Current size of events
 	mu        sync.Mutex
 }
 
@@ -70,14 +71,11 @@ func (l *EventLog) Expire(now time.Time) {
 // Add a timestamped event to the log.
 func (l *EventLog) Printf(format string, a ...interface{}) {
 	now := time.Now()
-
 	l.Expire(now)
-
 	nxt := event{
 		ts:   time.Now(),
 		line: fmt.Sprintf(format, a...),
 	}
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -86,14 +84,14 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 	if sz > l.Options.LimitBytes {
 		return // We can't ever store this.
 	}
+
+	// While there is not enough space, remove logs oldest to newest.
 	for sz+l.sizeBytes > l.Options.LimitBytes {
 		i := l.Logs.Front()
 		l.Logs.Remove(i)
 		ev := i.Value.(event)
 		l.sizeBytes -= 64 + len(ev.line)
 	}
-
-	// Store it.
 	l.sizeBytes += sz
 	l.Logs.PushBack(nxt)
 }
@@ -101,18 +99,14 @@ func (l *EventLog) Printf(format string, a ...interface{}) {
 // Concatenate the logs into a string separated by newlines.
 func (l *EventLog) DumpLog() string {
 	var builder strings.Builder
-
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
 	for i := l.Logs.Front(); i != nil; i = i.Next() {
 		ev := i.Value.(event)
-
 		builder.WriteString(ev.ts.UTC().Format(time.RFC3339))
 		builder.WriteString(" ")
 		builder.WriteString(ev.line)
 		builder.WriteString("\n")
 	}
-
 	return builder.String()
 }
