@@ -156,40 +156,44 @@ func (server *GCAServer) managedHandleEquipmentReport(rawData []byte) {
 	server.integrateReport(report)
 }
 
-// threadedLaunchUDPServer sets up and starts the UDP server for listening to
-// equipment reports.
-func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
+// launchUDPServer will create a udp server that listens for reports from
+// clients.
+func (server *GCAServer) launchUDPServer() {
+	// Create the udpConn
 	udpAddress := net.UDPAddr{
 		Port: udpPort,
 		IP:   net.ParseIP(serverIP),
 	}
-
-	var err error
-	server.udpConn, err = net.ListenUDP("udp", &udpAddress)
-	addr, ok := server.udpConn.LocalAddr().(*net.UDPAddr)
+	udpConn, err := net.ListenUDP("udp", &udpAddress)
+	addr, ok := udpConn.LocalAddr().(*net.UDPAddr)
 	if !ok {
 		panic("bad type on udpConn")
 	}
 	server.udpPort = uint16(addr.Port)
-	close(udpReady)
 	if err != nil {
 		server.logger.Fatal("UDP server launch failed: ", err)
 	}
 	server.logger.Infof("UDP server launched on port %v", server.udpPort)
-	defer server.udpConn.Close()
+	server.tg.OnStop(func() error {
+		return udpConn.Close()
+	})
 
-	// Continuously listen for incoming UDP packets
+	server.tg.Launch(func() {
+		server.threadedListenUDP(udpConn)
+	})
+}
+
+// threadedListenUDP manages the infinite loop that listens for UDP packets.
+func (server *GCAServer) threadedListenUDP(udpConn *net.UDPConn) {
 	for {
-		select {
-		case <-server.quit:
+		// Check whether the server has been stopped.
+		if server.tg.IsStopped() {
 			return
-		default:
-			// Wait for the next incoming packet
 		}
 
 		// Read from the UDP socket
 		buffer := make([]byte, equipmentReportSize)
-		readBytes, _, err := server.udpConn.ReadFromUDP(buffer)
+		readBytes, _, err := udpConn.ReadFromUDP(buffer)
 		if err != nil {
 			server.logger.Error("Failed to read from UDP socket: ", err)
 			continue
@@ -200,6 +204,8 @@ func (server *GCAServer) threadedLaunchUDPServer(udpReady chan struct{}) {
 			server.logger.Warn("Received an incorrectly sized packet: expected ", equipmentReportSize, " bytes, got ", readBytes, " bytes")
 			continue
 		}
-		go server.managedHandleEquipmentReport(buffer)
+		server.tg.Launch(func() {
+			server.managedHandleEquipmentReport(buffer)
+		})
 	}
 }
