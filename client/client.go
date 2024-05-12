@@ -57,6 +57,7 @@ import (
 	"sync"
 
 	"github.com/glowlabs-org/gca-backend/glow"
+	"github.com/glowlabs-org/threadgroup"
 )
 
 // The stateful object for the client.
@@ -75,8 +76,8 @@ type Client struct {
 	staticPrivKey       glow.PrivateKey
 
 	// Sync primitives.
-	closed chan struct{}
 	mu     sync.Mutex
+	tg     threadgroup.ThreadGroup
 }
 
 // NewClient will return a new client that is running smoothly.
@@ -84,7 +85,6 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
-		closed:        make(chan struct{}),
 	}
 
 	// Load the persist data for the client.
@@ -111,17 +111,14 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
-	ready := make(chan struct{})
-	go c.threadedSendReports(ready)
-	<-ready
+	c.launchSendReports()
 
 	return c, nil
 }
 
 // Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
-	close(c.closed)
-	return c.staticHistoryFile.Close()
+	return c.tg.Stop()
 }
 
 // loadKeypair will load the client keys from disk. The GCA should have put
