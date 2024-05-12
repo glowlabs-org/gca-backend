@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
@@ -233,78 +234,78 @@ func (gcas *GCAServer) saveEquipment(ea glow.EquipmentAuthorization) (bool, erro
 	return false, fmt.Errorf("duplicate authorization received, banning equipment")
 }
 
-// launchMigrateReporst will launch a background thread that will infrequently
-// migrate the reports between weeks.
-func (gcas *GCAServer) launchMigrateReports(username, password string) {
-	// At startup, the equipment reports may need to be migrated multiple
-	// times. Loop and perform the migration repeatedly until the current
-	// time and the reports offset are within 4000 timeslots. This needs to
-	// block startup, because other routines depend on the equipment
-	// reports being up to date.
+// threadedMigrateReports will infrequently update the equipment reports so
+// that the reports are always for the current week and the previous.
+//
+// Right at startup there's a situation where it may have been multiple weeks
+// since the server was last running. This means that the
+// equipmentReportsOffset of the server may need to be updated multiple times
+// in a row. To allow this, the loop will keep running until 'ero' is below
+// 3200.
+//
+// We don't want any of the other processes kicking off until the ero is
+// totally ready to go, so the 'ready' channel is used to signal to startup
+// that it's okay to proceed.
+func (gcas *GCAServer) threadedMigrateReports(username, password string, ready chan struct{}) {
+	readyClosed := false
 	for {
 		gcas.mu.Lock()
 		ero := gcas.equipmentReportsOffset
 		gcas.mu.Unlock()
 		now := glow.CurrentTimeslot()
 		if int64(now)-int64(ero) < 4000 {
-			break
-		}
-		gcas.migrateReports(username, password)
-	}
-
-	// Launch a background thread that will keep updating the equipment
-	// reports.
-	gcas.tg.Launch(func() {
-		for {
-			gcas.mu.Lock()
-			ero := gcas.equipmentReportsOffset
-			gcas.mu.Unlock()
-			now := glow.CurrentTimeslot()
-			if int64(now)-int64(ero) > 3200 {
-				gcas.migrateReports(username, password)
+			if !readyClosed {
+				readyClosed = true
+				close(ready)
 			}
-			if !gcas.tg.Sleep(ReportMigrationFrequency) {
+			// This loop is pretty lightweight so every 3 seconds seems
+			// fine, even though action is only taken once a week.
+			select {
+			case <-gcas.quit:
 				return
+			case <-time.After(ReportMigrationFrequency):
 			}
 		}
-	})
-}
 
-// migrateReports will perform a migration function on the reports.
-func (gcas *GCAServer) migrateReports(username, password string) {
-	// Fetch all of the moer values for the week.
-	err := gcas.managedGetWattTimeWeekData(username, password)
-	if err != nil {
-		// All we can do is log the error, we still need to rotate the
-		// time and save the data.
-		gcas.logger.Errorf("unable to fetch WattTime week data: %v", err)
+		// We only update if we are progressed most of the way through
+		// the second week.
+		if int64(now)-int64(ero) > 3200 {
+			// Fetch all of the moer values for the week.
+			err := gcas.managedGetWattTimeWeekData(username, password)
+			if err != nil {
+				gcas.logger.Errorf("unable to fetch WattTime week data: %v", err)
+				// All we can do is log the error, we still
+				// need to rotate the time and save the data.
+				// No control flow is used here.
+			}
+			// Save the device stats.
+			gcas.mu.Lock()
+			stats, err := gcas.buildDeviceStats(gcas.equipmentReportsOffset)
+			if err != nil {
+				panic("unable to build device stats: " + err.Error())
+			}
+			gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, stats)
+			err = gcas.saveAllDeviceStats(stats)
+			if err != nil {
+				panic("failed to save all device stats: " + err.Error())
+			}
+			// Copy the last half of every report into the first
+			// half, then blank out the last half.
+			for _, report := range gcas.equipmentReports {
+				var blankReports [2016]glow.EquipmentReport
+				copy(report[:2016], report[2016:])
+				copy(report[2016:], blankReports[:])
+			}
+			// Repeat for the impact values.
+			for _, rates := range gcas.equipmentImpactRate {
+				var blankRates [2016]float64
+				copy(rates[:2016], rates[2016:])
+				copy(rates[2016:], blankRates[:])
+			}
+			// Update the reports offset.
+			gcas.equipmentReportsOffset += 2016
+			gcas.logger.Info("completed an equipment reports migration")
+			gcas.mu.Unlock()
+		}
 	}
-	// Save the device stats.
-	gcas.mu.Lock()
-	stats, err := gcas.buildDeviceStats(gcas.equipmentReportsOffset)
-	if err != nil {
-		panic("unable to build device stats: " + err.Error())
-	}
-	gcas.equipmentStatsHistory = append(gcas.equipmentStatsHistory, stats)
-	err = gcas.saveAllDeviceStats(stats)
-	if err != nil {
-		panic("failed to save all device stats: " + err.Error())
-	}
-	// Copy the last half of every report into the first
-	// half, then blank out the last half.
-	for _, report := range gcas.equipmentReports {
-		var blankReports [2016]glow.EquipmentReport
-		copy(report[:2016], report[2016:])
-		copy(report[2016:], blankReports[:])
-	}
-	// Repeat for the impact values.
-	for _, rates := range gcas.equipmentImpactRate {
-		var blankRates [2016]float64
-		copy(rates[:2016], rates[2016:])
-		copy(rates[2016:], blankRates[:])
-	}
-	// Update the reports offset.
-	gcas.equipmentReportsOffset += 2016
-	gcas.logger.Info("completed an equipment reports migration")
-	gcas.mu.Unlock()
 }

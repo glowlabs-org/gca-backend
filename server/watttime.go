@@ -224,8 +224,13 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 	// Infinite loop to keep fetching data from WattTime.
 	for {
-		if !gcas.tg.Sleep(wattTimeFrequency) {
+		// Soft sleep before collecting data. We sleep before instead
+		// of after so that any errors can just 'continue' to the next
+		// iteration of the loop and the sleep will happen.
+		select {
+		case <-gcas.quit:
 			return
+		case <-time.After(wattTimeFrequency):
 		}
 
 		err := gcas.managedGetWattTimeIndexData(username, password)
@@ -420,8 +425,10 @@ func staticGetWattTimeToken(username, password string) (string, error) {
 // WattTime data.
 func (gcas *GCAServer) threadedGetWattTimeWeekData(username, password string) {
 	for {
-		if !gcas.tg.Sleep(WattTimeWeekDataUpdateFrequency) {
+		select {
+		case <-gcas.quit:
 			return
+		case <-time.After(WattTimeWeekDataUpdateFrequency):
 		}
 
 		// This API is called during startup, so it is safe to sleep before calling it here. The

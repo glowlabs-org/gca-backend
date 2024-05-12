@@ -29,31 +29,27 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-// launchListenForSyncRequests creates a TCP listener that will listen for
+// threadedListenForSyncRequests creates a TCP listener that will listen for
 // queries that want to see which timeslots have reports for a given piece of
 // hardware.
-func (gcas *GCAServer) launchListenForSyncRequests() {
+func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
 	// Listen on TCP port
 	listener, err := net.Listen("tcp", serverIP+":"+strconv.Itoa(tcpPort))
 	if err != nil {
-		gcas.logger.Fatalf("Failed to create tcp listener: %s", err)
+		gcas.logger.Fatalf("Failed to start server: %s", err)
 	}
+	gcas.tcpListener = listener
+	defer listener.Close()
 	gcas.tcpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
-	gcas.tg.OnStop(func() error {
-		return listener.Close()
-	})
+	close(tcpReady)
 
-	gcas.tg.Launch(func() {
-		gcas.threadedListenForSyncRequests(listener)
-	})
-}
-
-// Background thread to listen on TCP for sync requests.
-func (gcas *GCAServer) threadedListenForSyncRequests(listener net.Listener) {
 	for {
-		// Check whether the gcas has been stopped.
-		if gcas.tg.IsStopped() {
+		// Check for a shutdown signal.
+		select {
+		case <-gcas.quit:
 			return
+		default:
+			// Wait for the next incoming request
 		}
 
 		// Wait for a connection
@@ -64,13 +60,7 @@ func (gcas *GCAServer) threadedListenForSyncRequests(listener net.Listener) {
 		}
 
 		// Handle the connection in a new goroutine
-		err = gcas.tg.Launch(func() {
-			gcas.managedHandleSyncConn(conn)
-		})
-		if err != nil {
-			conn.Close()
-			return
-		}
+		go gcas.managedHandleSyncConn(conn)
 	}
 }
 
