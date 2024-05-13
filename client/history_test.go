@@ -7,12 +7,16 @@ import (
 )
 
 func TestClientHistory(t *testing.T) {
-	c, _, _, err := FullClientTestEnvironment(t.Name())
+	c, gcas, _, err := FullClientTestEnvironment(t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		err := c.Close()
+		if err != nil {
+			t.Error(err)
+		}
+		err = gcas.Close()
 		if err != nil {
 			t.Error(err)
 		}
@@ -109,12 +113,16 @@ func TestClientHistory(t *testing.T) {
 	defer func() {
 		glow.SetCurrentTimeslot(0)
 	}()
-	c2, _, _, err := FullClientTestEnvironment(t.Name() + "_c2")
+	c2, gcas2, _, err := FullClientTestEnvironment(t.Name() + "_c2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		err := c2.Close()
+		if err != nil {
+			t.Error(err)
+		}
+		err = gcas2.Close()
 		if err != nil {
 			t.Error(err)
 		}

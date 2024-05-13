@@ -624,4 +624,8 @@ func TestEquipmentHistory(t *testing.T) {
 			t.Error("bad:", i, output)
 		}
 	}
+	err = gcas.Close()
+	if err != nil {
+		t.Error(err)
+	}
 }

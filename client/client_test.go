@@ -206,4 +206,8 @@ func TestBasicClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = gcas.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

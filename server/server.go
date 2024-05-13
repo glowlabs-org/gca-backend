@@ -123,6 +123,16 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		equipmentReports:    make(map[uint32]*[4032]glow.EquipmentReport),
 		recentReports:       make([]glow.EquipmentReport, 0, maxRecentReports),
 	}
+	// Create a background thread that will print out the name of the
+	// server if the server hasn't been shut down after 60 seconds.
+	if testMode {
+		go func() {
+			time.Sleep(time.Second * 120)
+			if !server.tg.IsStopped() {
+				panic("server lived for longer than 60 seconds: "+baseDir)
+			}
+		}()
+	}
 
 	// Create the logger and provision its shutdown.
 	loggerPath := filepath.Join(baseDir, "server.log")

@@ -55,6 +55,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 	"github.com/glowlabs-org/threadgroup"
@@ -85,6 +86,14 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
+	}
+	if testMode {
+		go func() {
+			time.Sleep(time.Second * 120)
+			if !c.tg.IsStopped() {
+				panic("client was not closed during testing: "+baseDir)
+			}
+		}()
 	}
 
 	// Load the persist data for the client.

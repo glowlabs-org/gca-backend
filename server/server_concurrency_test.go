@@ -42,6 +42,7 @@ func TestConcurrency(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var wg sync.WaitGroup
 	stopSignal := make(chan struct{})
 
 	// Create a few threads that will be repeatedly submitting GCA keys
@@ -53,6 +54,9 @@ func TestConcurrency(t *testing.T) {
 
 		// Create a goroutine to repeatedly submit the bad key .
 		go func(key glow.PrivateKey) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -89,6 +93,9 @@ func TestConcurrency(t *testing.T) {
 
 		// Create a goroutine to repeatedly submit the bad key .
 		go func(key glow.PrivateKey) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -132,6 +139,9 @@ func TestConcurrency(t *testing.T) {
 			Expiration: 15e6,
 		}
 		go func(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -165,6 +175,9 @@ func TestConcurrency(t *testing.T) {
 	// produce errors even once the GCA key has been submitted.
 	for i := 0; i < 3; i++ {
 		go func() {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -215,6 +228,9 @@ func TestConcurrency(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		// Create a goroutine to repeatedly submit the bad key .
 		go func(key glow.PrivateKey) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -247,6 +263,9 @@ func TestConcurrency(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		// Create a goroutine to repeatedly authorize new hardware.
 		go func(key glow.PrivateKey) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -278,7 +297,6 @@ func TestConcurrency(t *testing.T) {
 	// Create a few threads that will use the same authorized equipment to
 	// submit reports. This is the first place where we will be actually
 	// advancing the flow of time.
-	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
 		// Create authorized equipment to be making reports.
 		shortID := atomic.AddUint32(&atomicShortID, 1)
@@ -403,7 +421,7 @@ func TestConcurrency(t *testing.T) {
 	// to generate chaos.
 	time.Sleep(250 * time.Millisecond)
 
-	// Stop everything, and then wait 50 more milliseconds for good measure.
+	// Stop everything and wait for all the threads to clean up.
 	close(stopSignal)
 	wg.Wait()
 
