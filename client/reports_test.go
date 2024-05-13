@@ -14,6 +14,12 @@ import (
 	"github.com/glowlabs-org/gca-backend/server"
 )
 
+// TODO: We need to add more testing around negative values and floating point
+// values in the energy data file. We know from live data in the field that the
+// floating point values are handled gracefully, however the test suite should
+// cover them anyway to ensure there are no regressions from potential future
+// updates.
+
 // updateMonitorFile is an apparatus that allows the monitor file to be changed
 // during testing, simulating a new reading being taken.
 func updateMonitorFile(dir string, newTimeslots []uint32, newReadings []uint64) error {
@@ -25,7 +31,10 @@ func updateMonitorFile(dir string, newTimeslots []uint32, newReadings []uint64) 
 	newFileDataStr := "timestamp,energy (mWh)"
 	for i := 0; i < len(newTimeslots); i++ {
 		if newReadings[i] != 34404 {
-			newFileDataStr += fmt.Sprintf("\n%v,%v", int64(newTimeslots[i]*300)+glow.GenesisTime, newReadings[i])
+			// The reading needs to be cast to an int64 so that
+			// underflowed inputs end up in the file as negative
+			// values.
+			newFileDataStr += fmt.Sprintf("\n%v,%v", int64(newTimeslots[i]*300)+glow.GenesisTime, int64(newReadings[i]))
 		} else {
 			newFileDataStr += fmt.Sprintf("\n%v,random error here", int64(newTimeslots[i]*300)+glow.GenesisTime)
 		}
@@ -53,6 +62,10 @@ func TestPeriodicMonitoring(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+		err = gcas.Close()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	// Update the monitoring file so that there is data to read.
@@ -67,7 +80,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 
 	// Check whether the server got the reports.
 	httpPort, _, _ := gcas.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,9 +93,9 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Fatal("server does not seem to have expected report", report.PowerOutput)
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			t.Fatal("server has reports we didn't send")
@@ -111,7 +124,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(2 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,12 +136,12 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 2 {
-			t.Error("server did not get error report")
+		} else if i == 6 && report.PowerOutput != 3 {
+			t.Error("server did not get error report:", report.PowerOutput)
 		} else if i != 1 && i != 5 && i != 6 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send", i, report.PowerOutput)
 		}
@@ -139,7 +152,7 @@ func TestPeriodicMonitoring(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Verify the server had the same reports as before.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort, client.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,13 +164,13 @@ func TestPeriodicMonitoring(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("server does not seem to have the report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 2 && report.PowerOutput != 99 {
+		} else if i == 2 && report.PowerOutput != 100 {
 			t.Error("server does not seem to have expected report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 2 {
+		} else if i == 6 && report.PowerOutput != 3 {
 			t.Error("server did not get error report")
 		} else if i != 1 && i != 2 && i != 5 && i != 6 && report.PowerOutput != 0 {
 			t.Error("server has reports we didn't send", i, report.PowerOutput)
@@ -206,7 +219,7 @@ func TestAddingServers(t *testing.T) {
 
 	// Ensure that at least one of the servers got a report.
 	httpPort1, _, _ := gcas1.Ports()
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.staticPubKey))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort1, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,16 +233,16 @@ func TestAddingServers(t *testing.T) {
 	}
 	gcas1HasReports := true
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			gcas1HasReports = false
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			gcas1HasReports = false
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			gcas1HasReports = false
 		}
 	}
 	httpPort2, _, _ := gcas2.Ports()
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,9 +255,9 @@ func TestAddingServers(t *testing.T) {
 	}
 	gcas2HasReports := true
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			gcas2HasReports = false
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			gcas2HasReports = false
 		} else if i != 1 && i != 5 && report.PowerOutput != 0 {
 			gcas2HasReports = false
@@ -278,7 +291,7 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,11 +307,11 @@ func TestAddingServers(t *testing.T) {
 			// Reports 2 and 5 may or may not have been sent.
 			continue
 		}
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Fatal("expected power report", report.PowerOutput)
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Fatal("expected power report")
 		} else if i != 1 && i != 5 && i != 2 && i != 6 && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
@@ -307,7 +320,7 @@ func TestAddingServers(t *testing.T) {
 
 	// Check that the all-device-stats endpoint is listing out the client
 	// and the corresponding reports.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort2))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/all-device-stats?timeslot_offset=0", httpPort2))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +373,7 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort2, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,15 +385,15 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Fatal("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Fatal("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Fatal("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Fatal("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Fatal("expected power report")
 		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
 			t.Fatal("expected no power report")
@@ -400,7 +413,7 @@ func TestAddingServers(t *testing.T) {
 	as := server.AuthorizedServer{
 		PublicKey: gcas3.PublicKey(),
 		Banned:    false,
-		Location:  "localhost",
+		Location:  "127.0.0.1",
 		HttpPort:  httpPort3,
 		TcpPort:   tcpPort3,
 		UdpPort:   udpPort3,
@@ -413,7 +426,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorized-servers", httpPort2), "application/json", bytes.NewBuffer(requestBody))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorized-servers", httpPort2), "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,13 +469,16 @@ func TestAddingServers(t *testing.T) {
 	}
 	time.Sleep(35 * sendReportTime)
 
-	// Add some new data that can be reported.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{8}, []uint64{1800})
+	// Add some new data that can be reported. This new data includes a
+	// negative value.
+	negUint := uint64(1)
+	negUint -= 50 // The final value needs to be more than 24 below 0.
+	err = updateMonitorFile(c.staticBaseDir, []uint32{8, 9}, []uint64{1800, negUint})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,23 +490,25 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report", report.PowerOutput)
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report", report.PowerOutput)
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
+		} else if i == 9 && report.PowerOutput != negUint {
+			t.Error("expected negative power report", report.PowerOutput)
+		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
 		}
 	}
@@ -521,7 +539,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal("unable to marshal the auth request")
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/authorize-equipment", httpPortA), "application/json", bytes.NewBuffer(jsonEA))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/authorize-equipment", httpPortA), "application/json", bytes.NewBuffer(jsonEA))
 	if err != nil {
 		t.Fatal("unable to authorize device on GCA server:", err)
 	}
@@ -537,7 +555,7 @@ func TestAddingServers(t *testing.T) {
 	as = server.AuthorizedServer{
 		PublicKey: gcasA.PublicKey(),
 		Banned:    false,
-		Location:  "localhost",
+		Location:  "127.0.0.1",
 		HttpPort:  httpPortA,
 		TcpPort:   tcpPortA,
 		UdpPort:   udpPortA,
@@ -556,7 +574,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err = http.Post(fmt.Sprintf("http://localhost:%v/api/v1/equipment-migrate", httpPort3), "application/json", bytes.NewBuffer(jsonEM))
+	resp, err = http.Post(fmt.Sprintf("http://127.0.0.1:%v/api/v1/equipment-migrate", httpPort3), "application/json", bytes.NewBuffer(jsonEM))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,12 +611,12 @@ func TestAddingServers(t *testing.T) {
 	time.Sleep(35 * sendReportTime)
 
 	// Update the monitor file as well for good measure.
-	err = updateMonitorFile(c.staticBaseDir, []uint32{9}, []uint64{800})
+	err = updateMonitorFile(c.staticBaseDir, []uint32{10}, []uint64{800})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(2 * sendReportTime)
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPortA, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -610,31 +628,33 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if i == 9 && report.PowerOutput != 799 {
-			t.Error("expected power report")
-		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
+		} else if i == 10 && report.PowerOutput != 800 {
+			t.Error("expected power report", report.PowerOutput)
+		} else if i == 9 && report.PowerOutput != negUint {
+			t.Error("expected negative power report")
+		} else if (i < 1 || i > 10) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
 		}
 	}
 
 	// Check the old GCA, which should not be receiving reports anymore.
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -646,23 +666,25 @@ func TestAddingServers(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, report := range response.Reports {
-		if i == 1 && report.PowerOutput != 499 {
+		if i == 1 && report.PowerOutput != 500 {
 			t.Error("expected power report")
-		} else if i == 2 && report.PowerOutput != 549 {
+		} else if i == 2 && report.PowerOutput != 550 {
 			t.Error("expected power report")
-		} else if i == 3 && report.PowerOutput != 54 {
+		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report")
-		} else if i == 4 && report.PowerOutput != 58 {
+		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report")
-		} else if i == 5 && report.PowerOutput != 2999 {
+		} else if i == 5 && report.PowerOutput != 3000 {
 			t.Error("expected power report")
-		} else if i == 6 && report.PowerOutput != 3499 {
+		} else if i == 6 && report.PowerOutput != 3500 {
 			t.Error("expected power report")
-		} else if i == 7 && report.PowerOutput != 1199 {
+		} else if i == 7 && report.PowerOutput != 1200 {
 			t.Error("expected power report")
-		} else if i == 8 && report.PowerOutput != 1799 {
+		} else if i == 8 && report.PowerOutput != 1800 {
 			t.Error("expected power report")
-		} else if (i < 1 || i > 8) && report.PowerOutput != 0 {
+		} else if i == 9 && report.PowerOutput != negUint {
+			t.Error("expected negative power report")
+		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
 			t.Error("expected no power report")
 		}
 	}
@@ -672,7 +694,7 @@ func TestAddingServers(t *testing.T) {
 	// of the test was written, we were in a hurry and didn't fully test
 	// the endpoint. This was the fastest way to get basic coverage.
 	var el server.EquipmentResponse
-	resp, err = http.Get(fmt.Sprintf("http://localhost:%v/api/v1/equipment", httpPort3))
+	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/equipment", httpPort3))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -691,4 +713,17 @@ func TestAddingServers(t *testing.T) {
 	// client keeps receiving new reports, and then one of the GCAs comes
 	// back online. Testing this will require manually modifying the ports
 	// in memory.
+
+	err = c.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gcas3.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gcasA.Close()
+	if err != nil {
+		t.Error(err)
+	}
 }

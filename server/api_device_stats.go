@@ -25,8 +25,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
@@ -172,6 +174,29 @@ func DeserializeStreamAllDeviceStats(b []byte) (AllDeviceStats, int, error) {
 	}, i, nil
 }
 
+// MarshalJSON will encode underflowed uint64 values as negative values when it
+// reports in JSON.
+//
+// NOTE: Code was written by GPT 4, but it appears to function correctly.
+func (ds DeviceStats) MarshalJSON() ([]byte, error) {
+    // Convert PowerOutputs from uint64 to int64
+    powerOutputsAsInt := make([]int64, len(ds.PowerOutputs))
+    for i, val := range ds.PowerOutputs {
+        powerOutputsAsInt[i] = int64(val)
+    }
+
+    // Use an anonymous struct to leverage the default JSON marshaling
+    // for types that don't need custom handling
+    type Alias DeviceStats
+    return json.Marshal(&struct {
+        PowerOutputs []int64 `json:"PowerOutputs"`
+        *Alias
+    }{
+        PowerOutputs: powerOutputsAsInt,
+        Alias:        (*Alias)(&ds),
+    })
+}
+
 // AllDeviceStatsHandler will return the statistics on all of the devices for
 // the requested week.
 func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request) {
@@ -195,7 +220,11 @@ func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request
 	}
 	tso := uint32(tsoU64)
 	if tso%2016 != 0 {
-		http.Error(w, "invalid timeslot_offset, must be a multiple of 2016", http.StatusBadRequest)
+		down := tso / 2016
+		down *= 2016
+		up := down + 2016
+		s := fmt.Sprintf("invalid timeslot_offset, must be multiple of 2016 - nearby numbers are %d and %d", down, up)
+		http.Error(w, s, http.StatusBadRequest)
 		return
 	}
 
@@ -213,6 +242,31 @@ func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			http.Error(w, "unable to build stats for the provided timeslot: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+	}
+
+	// Check for a special query parameter that's asking for negative
+	// numbers. If there is a request for negative numbers, run through the
+	// ads and randomly set some values to be negative.
+	wantNegStr := r.URL.Query().Get("insert_false_negatives")
+	if wantNegStr == "true" {
+		rand.Seed(time.Now().UnixNano())
+		for i := 0; i < len(stats.Devices); i++ {
+			for j := 0; j < len(stats.Devices[i].PowerOutputs); j++ {
+				// Skip 98% of values.
+				if rand.Intn(50) != 1 {
+					continue
+				}
+				// Skip anything that's a sentinel value.
+				if stats.Devices[i].PowerOutputs[j] < 24 {
+					continue
+				}
+				// Skip anything that's already negative.
+				if stats.Devices[i].PowerOutputs[j] > 1e18 {
+					continue
+				}
+				stats.Devices[i].PowerOutputs[j] = uint64(-1 * float64(stats.Devices[i].PowerOutputs[j]))
+			}
 		}
 	}
 

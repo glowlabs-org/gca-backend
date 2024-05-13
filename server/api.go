@@ -21,17 +21,25 @@ func (gcas *GCAServer) launchAPI() {
 	// Create a listener. In prod it's a specfic port, during testing it's
 	// ":0". Because we don't know what the port is during testing, we need
 	// to build the listener manually so that we can grab the port from it.
-	listener, err := net.Listen("tcp", httpPort)
+	listener, err := net.Listen("tcp", gcas.httpServer.Addr)
 	if err != nil {
 		panic("unable to launch gca api")
 	}
 	gcas.httpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
 
-	// Launch the background thread that keeps the API running.
-	go func() {
-		gcas.logger.Info("Starting HTTP server on port ", gcas.httpPort)
+	// Launch the background thread that keeps the API running. The
+	// listener gets handed off to the httpServer, which will be
+	// responsible for closing the listener, therefore the listener does
+	// not need to be closed here. If the Launch fails, the listener will
+	// never get attached to the httpServer, which means we will have to
+	// close it manually.
+	err = gcas.tg.Launch(func() {
+		gcas.logger.Info("Starting HTTP server on ", gcas.httpServer.Addr)
 		if err := gcas.httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			gcas.logger.Fatal("Could not start HTTP server: ", err)
 		}
-	}()
+	})
+	if err != nil {
+		listener.Close()
+	}
 }

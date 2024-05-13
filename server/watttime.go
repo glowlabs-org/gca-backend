@@ -224,13 +224,8 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 	// Infinite loop to keep fetching data from WattTime.
 	for {
-		// Soft sleep before collecting data. We sleep before instead
-		// of after so that any errors can just 'continue' to the next
-		// iteration of the loop and the sleep will happen.
-		select {
-		case <-gcas.quit:
+		if !gcas.tg.Sleep(wattTimeFrequency) {
 			return
-		case <-time.After(wattTimeFrequency):
 		}
 
 		err := gcas.managedGetWattTimeIndexData(username, password)
@@ -277,6 +272,7 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 		moer, date, err := getWattTimeIndex(token, lats[i], longs[i])
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
+			gcas.logger.Errorf("lat: %v, long: %v", lats[i], longs[i])
 			continue
 		}
 		timeslot, err := glow.UnixToTimeslot(date)
@@ -307,6 +303,11 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 // managedGetWattTimeWeekData will grab all of the data for the latest week and
 // fill out the impact rates as much as possible.
 func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) error {
+	// Disable this during testing, as the testing does not have WattTime access.
+	if testMode {
+		return nil
+	}
+
 	// Get a new auth token. They expire relatively quickly so it's better
 	// to get a new token every time this function is called.
 	token, err := staticGetWattTimeToken(username, password)
@@ -341,6 +342,7 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 		moers, dates, err := getWattTimeData(token, lats[i], longs[i], startTime)
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
+			gcas.logger.Errorf("lat: %v, long: %v, startTime: %v", lats[i], longs[i], startTime)
 			continue
 		}
 
@@ -412,4 +414,21 @@ func staticGetWattTimeToken(username, password string) (string, error) {
 	}
 
 	return tokenResponse.Token, nil
+}
+
+// threadedGetWattTimeWeekData wakes up periodically and refreshes the weekly
+// WattTime data.
+func (gcas *GCAServer) threadedGetWattTimeWeekData(username, password string) {
+	for {
+		if !gcas.tg.Sleep(WattTimeWeekDataUpdateFrequency) {
+			return
+		}
+
+		// This API is called during startup, so it is safe to sleep before calling it here. The
+		// intention is to call it periodically, most likely once per day.
+		err := gcas.managedGetWattTimeWeekData(username, password)
+		if err != nil {
+			gcas.logger.Errorf("Threaded call unable to get WattTime data for the most recent week: %v", err)
+		}
+	}
 }

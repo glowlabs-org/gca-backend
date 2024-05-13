@@ -19,7 +19,7 @@ import (
 // fails for any reason, it returns an error.
 func (gcas *GCAServer) requestEquipmentBitfield(shortID uint32) (timeslotOffset uint32, bitfield [504]byte, err error) {
 	// Dial the server
-	conn, err := net.Dial("tcp", "localhost:"+fmt.Sprintf("%v", gcas.tcpPort))
+	conn, err := net.Dial("tcp", "127.0.0.1:"+fmt.Sprintf("%v", gcas.tcpPort))
 	if err != nil {
 		return 0, [504]byte{}, fmt.Errorf("unable to call net.Dail: %v", err)
 	}
@@ -114,6 +114,7 @@ func TestTCPListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(450 * time.Millisecond) // Make sure the reports have time to be processed.
 	offset, bitfield, err := gcas.requestEquipmentBitfield(0)
 	if err != nil {
 		t.Fatal(err)
@@ -147,6 +148,7 @@ func TestTCPListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(450 * time.Millisecond) // Make sure the reports have time to be processed.
 	offset, bitfield, err = gcas.requestEquipmentBitfield(0)
 	if err != nil {
 		t.Fatal(err)

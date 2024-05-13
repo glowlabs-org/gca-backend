@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -56,69 +57,82 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 	if EnergyFile[0] != '/' {
 		filePath = path.Join(c.staticBaseDir, EnergyFile)
 	}
-	file, err := os.Open(filePath)
+
+	// Read the file all at once, to avoid any potential issues if it
+	// is modified while being parsed.
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open monitoring file: %v", err)
+		return nil, fmt.Errorf("unable to read monitoring file: %v", err)
 	}
-	defer file.Close()
 
 	// Iterate over the CSV records
-	reader := csv.NewReader(file)
+	reader := csv.NewReader(strings.NewReader(string(data)))
 	var records []EnergyRecord
 	for {
 		record, err := reader.Read()
 		if err != nil {
-			break // Stop at EOF or on error
+			// Stop at EOF or on error. An error here means we
+			// couldn't read a timestamp, which means we don't know
+			// what timestamp to tell the server for having errors.
+			// Whether it's an EOF or a real error, the best move
+			// is to break.
+			break
 		}
 
 		timestamp, err := strconv.ParseInt(record[0], 10, 64)
 		if err != nil {
-			continue // Skip records with invalid timestamps
+			// If the timestamp can't be read, we don't know what
+			// timestamp to submit to the server as having an
+			// error, we just ignore the read in this case.
+			continue
 		}
 		timeslot, err := glow.UnixToTimeslot(timestamp)
 		if err != nil {
+			// If the timeslot can't be determined, we don't know
+			// what timeslot to submit to the server as having an
+			// error, we just ignore the read in this case.
 			continue
 		}
+
+		// Parse the value. If the value is not parsed correctly, it's
+		// probably because the firmware version is wrong or because
+		// the file has a text error instead of a number.
+		var energy uint64
 		energyF64, err := strconv.ParseFloat(record[1], 64)
 		if err != nil {
-			energyF64 = 0
-		}
-		energy := uint64(energyF64)
-
-		// Round the energy down so that we never over-estiamte the amount of
-		// power that has been produced.
-		if energy != 0 {
-			energy = energy - 1
-		}
-
-		// 0-23 are reserved sentinel values, so any reading from the
-		// meter that comes in lower than that is considered to be a
-		// reading of 0. The sentinel value for a 0 reading is actually
-		// '2'. This is because prior versions had already reserved '1'
-		// for 'invalid / banned', and '0' is the default value if no
-		// report has been submitted at all.
-		//
-		// A '0' in the final structure means that no report was
-		// submitted. We use a value of '2' to mean zero so that we can
-		// tell the difference between a 0 report and a report that was
-		// never submitted because the device was offline or otherwise
-		// unable to get readings for the timeslot.
-		if energy < 24 {
+			// In the event of a parse error for the energy reading
+			// for this timestamp, set the value to '3' to indicate
+			// that there was a parse error.
+			energy = 3
+		} else if energyF64 > -24 && energyF64 < 24 {
+			// If the energy value read successfully but it read
+			// below an absolute value of 24, set the value to '2'
+			// to indicate that there was a reading that
+			// effectively counts as 0 power. We use '2' as the 'no
+			// power' sentinel because '0' is the number that
+			// appears if no report is submitted at all, and we
+			// want to distinguish between no report submitted at
+			// all and a blank report being submitted.
+			//
+			// Note that the sentinel value '1' is already reserve
+			// to indicate that the gca server has banned a
+			// timeslot.
 			energy = 2
 		} else {
-			// The EnergyMultiplier is the adjustment that needs to
-			// be made to the hardware reading based on the delta
-			// between the current transformer
-			energy = energy * EnergyMultiplier / 1e3
+			// NOTE: 'energy' might be a negative number, which will cast
+			// as an underflowed uint64. To the best of my knowledge, there
+			// is nothing wrong with that, but all downstream applications
+			// will have to accept the numbers and know to convert them to
+			// their respective negative values.
+			//
+			// The EnergyMultiplier needs to be applied in advance
+			// of performing the underflow conversion, otherwise
+			// the multiplier will be multiplying a giant uint64 by
+			// 4 rather than multiplying a negative number by 4.
+			energy = uint64(EnergyMultiplier * energyF64 / 1e3)
 		}
 
 		// Append the data to the records slice
-		//
-		// There's a multiplication here: 6667/1000 - effectively
-		// multiplying the output of the device by 6.667x. This is
-		// because we swapped out the hardware for a CT that produces
-		// 6.667x less current than what the firmware was designed for,
-		// so there has to be adjustments.
 		records = append(records, EnergyRecord{
 			Timeslot: timeslot,
 			Energy:   energy,
@@ -339,10 +353,8 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 		}
 
 		// Sleep for a tick.
-		select {
-		case <-c.closed:
+		if !c.tg.Sleep(sendReportTime) {
 			return false
-		case <-time.After(sendReportTime):
 		}
 
 		// Pick a new random primary server. The steps are:
@@ -493,27 +505,24 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 			if err != nil || powerOutput < 2 {
 				continue
 			}
+			// Because we now handle negative numbers, the uint32
+			// needs to be cast to an int32 before being upscaled
+			// to a uint64.
 			record := EnergyRecord{
 				Timeslot: i + timeslotOffset,
-				Energy:   uint64(powerOutput),
+				Energy:   uint64(int32(powerOutput)),
 			}
 			c.staticSendReport(gcas, record)
+			time.Sleep(UDPSleepSyncTime)
 		}
 	}
 
 	return true
 }
 
-// threadedSendReports will periodically check for new readings in the energy
-// file, and if a new reading is found, a report will be created and sent to
-// the primary server. The report is sent over UDP, and no short-term attempt
-// is made to confirm that the report reached its destination. There is a
-// separate synchronization process that occurs at much larger intervals, which
-// will re-send any reports that failed to be delivered on their first attempt.
-//
-// The thread needs to complete some initialization tasks before the client is
-// completely ready, that gets coordinated with a basic channel.
-func (c *Client) threadedSendReports(ready chan struct{}) {
+// launchSendReports will create the infinite loop that sends reports to the
+// server.
+func (c *Client) launchSendReports() {
 	// Right at startup, we save all of the existing records. We don't
 	// bother sending them because we assume we already sent them, and if
 	// we haven't already sent them, the periodic synchronization will fix
@@ -528,6 +537,21 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 	// messes up somehow we would rather ignore the error.
 	if err == nil {
 		for _, record := range records {
+			// Downcasting a uint64 to a uint32 is a pretty
+			// questionable choice, in hindsight I'm not sure why I
+			// thought that was okay. But it's not something worth
+			// fixing at the moment, so we just have to be careful
+			// in the rest of the code to make sure that we upscale
+			// it again properly when the value is loaded.
+			//
+			// Since we now generate negative numbers by
+			// underflowing the reading, this means that the uint32
+			// needs to be cast to an int32 before being recast to
+			// a uint64.
+			//
+			// Downcasting an underflowed uint64 to a uint32
+			// results in an underflow of the same value in the
+			// uint32, so nothing special is needed here.
 			err := c.staticSaveReading(record.Timeslot, uint32(record.Energy))
 			if err != nil {
 				continue
@@ -537,9 +561,18 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 			}
 		}
 	}
+	c.tg.Launch(func() {
+		c.threadedSendReports(latestRecord)
+	})
+}
 
-	// go c.threadedSyncWithServer(latestRecord)
-
+// threadedSendReports will periodically check for new readings in the energy
+// file, and if a new reading is found, a report will be created and sent to
+// the primary server. The report is sent over UDP, and no short-term attempt
+// is made to confirm that the report reached its destination. There is a
+// separate synchronization process that occurs at much larger intervals, which
+// will re-send any reports that failed to be delivered on their first attempt.
+func (c *Client) threadedSendReports(latestRecord uint32) {
 	// Infinite loop to send reports. We start ticks at 30 so that the
 	// catchup function will run about 2.5 hours after boot. We don't want
 	// to run it immediately after boot because if some process causes the
@@ -561,13 +594,10 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 	// rather let TCP handle the ordering than implement that ourselves.
 	ticks := 30
 	syncStatus := uint64(1)
-	close(ready)
 	for {
 		// Check if the server has shut down.
-		select {
-		case <-c.closed:
+		if c.tg.IsStopped() {
 			return
-		default:
 		}
 
 		// Grab the gca server for use when sending the report.
@@ -620,10 +650,8 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 		// hopefully preventing the server from being in a situation
 		// where all of the hardware is sending it data in the same 3
 		// seconds followed by 5 minutes of absolutely no activity.
-		select {
-		case <-c.closed:
+		if !c.tg.Sleep(sendReportTime + randomTimeExtension()) {
 			return
-		case <-time.After(sendReportTime + randomTimeExtension()):
 		}
 
 		// Once every 60 iterations a server sync is performed. That's
@@ -631,14 +659,14 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 		ticks++
 		if ticks >= 60 || atomic.LoadUint64(&syncStatus) == 0 {
 			ticks = 0
-			go func() {
+			c.tg.Launch(func() {
 				success := c.threadedSyncWithServer(latestRecord)
 				if success {
 					atomic.StoreUint64(&syncStatus, 1)
 				} else {
 					atomic.StoreUint64(&syncStatus, 0)
 				}
-			}()
+			})
 		}
 	}
 }
