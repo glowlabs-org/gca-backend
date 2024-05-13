@@ -16,6 +16,7 @@ const (
 	udpPort                 = 0
 	defaultLogLevel         = DEBUG
 	testMode                = true
+	serverShutdownTime      = 5 * time.Second
 	wattTimeFrequency       = 20 * time.Millisecond
 
 	ReportMigrationFrequency        = 100 * time.Millisecond

@@ -88,12 +88,16 @@ func NewClient(baseDir string) (*Client, error) {
 		staticBaseDir: baseDir,
 	}
 	if testMode {
-		go func() {
-			time.Sleep(time.Second * 120)
-			if !c.tg.IsStopped() {
+		// Create a background thread that will panic if the client is
+		// open for more than 120 seconds. This is helps detect
+		// unclosed clients during testing. Run the test suite with
+		// -count=100 so that each test is alive long enough to figure
+		// out if a client isn't closed.
+		c.tg.Launch(func() {
+			if c.tg.Sleep(time.Second * 120) {
 				panic("client was not closed during testing: "+baseDir)
 			}
-		}()
+		})
 	}
 
 	// Load the persist data for the client.

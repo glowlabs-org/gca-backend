@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/server"
 )
@@ -45,7 +46,22 @@ func main() {
 	// Goroutine that waits for an Interrupt or SIGTERM signal.
 	// It will call Close() on the GCAServer instance and then exit the program.
 	go func() {
-		<-c               // Block until a signal is received.
+		// Block until a signal is received.
+		<-c
+
+		// Begin shutdown. Count in the terminal how long shutdown is
+		// taking. The goroutine that counts how long shutdown is
+		// taking will automatically be killed when os.Exit is called,
+		// there's no need to clean up that loop.
+		fmt.Println("Close signal received, shutting down server. ETA 90 seconds.")
+		go func() {
+			times := 0
+			for {
+				time.Sleep(time.Second * 5)
+				times++
+				fmt.Println(times*5, "seconds")
+			}
+		}()
 		gcaServer.Close() // Close the GCAServer.
 		fmt.Println()     // Print a newline for cleaner terminal output.
 		os.Exit(0)        // Exit the program with a successful status code.
