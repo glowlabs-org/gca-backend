@@ -8,6 +8,7 @@ package server
 // without setting off the race detector.
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -277,6 +278,7 @@ func TestConcurrency(t *testing.T) {
 	// Create a few threads that will use the same authorized equipment to
 	// submit reports. This is the first place where we will be actually
 	// advancing the flow of time.
+	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
 		// Create authorized equipment to be making reports.
 		shortID := atomic.AddUint32(&atomicShortID, 1)
@@ -285,6 +287,9 @@ func TestConcurrency(t *testing.T) {
 			t.Fatal(err)
 		}
 		go func(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey, threadNum int) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			resends := 0
@@ -363,6 +368,9 @@ func TestConcurrency(t *testing.T) {
 			}
 		}(ea, ePriv, i)
 		go func(e glow.EquipmentAuthorization) {
+			wg.Add(1)
+			defer wg.Done()
+
 			// Try until the stop signal is sent.
 			i := 0
 			for {
@@ -397,7 +405,7 @@ func TestConcurrency(t *testing.T) {
 
 	// Stop everything, and then wait 50 more milliseconds for good measure.
 	close(stopSignal)
-	time.Sleep(50 * time.Millisecond)
+	wg.Wait()
 
 	err = gcas.Close()
 	if err != nil {
