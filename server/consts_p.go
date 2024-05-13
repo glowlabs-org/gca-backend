@@ -16,6 +16,7 @@ const (
 	udpPort                 = 35045
 	defaultLogLevel         = WARN
 	testMode                = false
+	serverShutdownTime      = 90 * time.Second
 	wattTimeFrequency       = 2 * time.Minute
 
 	ReportMigrationFrequency        = 1 * time.Hour

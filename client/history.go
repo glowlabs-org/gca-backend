@@ -26,6 +26,9 @@ func (c *Client) loadHistory() error {
 		return fmt.Errorf("unable to open history file: %v", err)
 	}
 	c.staticHistoryFile = f
+	c.tg.AfterStop(func() error {
+		return f.Close()
+	})
 
 	// Read the offset bytes.
 	var offsetBytes [4]byte

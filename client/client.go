@@ -55,8 +55,10 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
+	"github.com/glowlabs-org/threadgroup"
 )
 
 // The stateful object for the client.
@@ -75,8 +77,8 @@ type Client struct {
 	staticPrivKey       glow.PrivateKey
 
 	// Sync primitives.
-	closed chan struct{}
 	mu     sync.Mutex
+	tg     threadgroup.ThreadGroup
 }
 
 // NewClient will return a new client that is running smoothly.
@@ -84,7 +86,18 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
-		closed:        make(chan struct{}),
+	}
+	if testMode {
+		// Create a background thread that will panic if the client is
+		// open for more than 120 seconds. This is helps detect
+		// unclosed clients during testing. Run the test suite with
+		// -count=100 so that each test is alive long enough to figure
+		// out if a client isn't closed.
+		c.tg.Launch(func() {
+			if c.tg.Sleep(time.Second * 120) {
+				panic("client was not closed during testing: "+baseDir)
+			}
+		})
 	}
 
 	// Load the persist data for the client.
@@ -111,17 +124,14 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
-	ready := make(chan struct{})
-	go c.threadedSendReports(ready)
-	<-ready
+	c.launchSendReports()
 
 	return c, nil
 }
 
 // Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
-	close(c.closed)
-	return c.staticHistoryFile.Close()
+	return c.tg.Stop()
 }
 
 // loadKeypair will load the client keys from disk. The GCA should have put
