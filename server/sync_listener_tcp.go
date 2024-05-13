@@ -59,7 +59,11 @@ func (gcas *GCAServer) threadedListenForSyncRequests(listener net.Listener) {
 		// Wait for a connection
 		conn, err := listener.Accept()
 		if err != nil {
-			gcas.logger.Infof("Failed to accept connection: %s", err)
+			// No need to log an error if the error is because of
+			// shutdown.
+			if !gcas.tg.IsStopped() {
+				gcas.logger.Infof("Failed to accept connection: %s", err)
+			}
 			continue
 		}
 

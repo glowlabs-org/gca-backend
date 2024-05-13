@@ -195,7 +195,11 @@ func (server *GCAServer) threadedListenUDP(udpConn *net.UDPConn) {
 		buffer := make([]byte, equipmentReportSize)
 		readBytes, _, err := udpConn.ReadFromUDP(buffer)
 		if err != nil {
-			server.logger.Error("Failed to read from UDP socket: ", err)
+			// No need to log an error if the error is because of
+			// shutdown.
+			if !server.tg.IsStopped() {
+				server.logger.Error("Failed to read from UDP socket: ", err)
+			}
 			continue
 		}
 
