@@ -62,6 +62,10 @@ func TestPeriodicMonitoring(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+		err = gcas.Close()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	// Update the monitoring file so that there is data to read.
@@ -709,4 +713,17 @@ func TestAddingServers(t *testing.T) {
 	// client keeps receiving new reports, and then one of the GCAs comes
 	// back online. Testing this will require manually modifying the ports
 	// in memory.
+
+	err = c.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gcas3.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	err = gcasA.Close()
+	if err != nil {
+		t.Error(err)
+	}
 }

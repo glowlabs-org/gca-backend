@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
@@ -123,6 +125,15 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		equipmentReports:    make(map[uint32]*[4032]glow.EquipmentReport),
 		recentReports:       make([]glow.EquipmentReport, 0, maxRecentReports),
 	}
+	if testMode {
+		// Create a background thread that will print out the name of the
+		// server if the server hasn't been shut down after 120 seconds.
+		server.tg.Launch(func() {
+			if server.tg.Sleep(time.Second * 120) {
+				panic("server lived for longer than 120 seconds: "+baseDir)
+			}
+		})
+	}
 
 	// Create the logger and provision its shutdown.
 	loggerPath := filepath.Join(baseDir, "server.log")
@@ -140,11 +151,31 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	server.httpServer = &http.Server{
 		Addr: serverIP + ":" + strconv.Itoa(httpPort),
 		Handler: server.mux,
+		ReadTimeout: serverShutdownTime / 2,
 	}
 	server.tg.OnStop(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		// There's an error in one of the tests where the server
+		// occasionally does not shut down in time. To help catch the
+		// issue, during test mode a full stack trace will get dumped
+		// if shutdown takes too long.
+		var stopped atomic.Bool
+		stopped.Store(false)
+		if testMode {
+			go func() {
+				time.Sleep(time.Second * 3)
+				if !stopped.Load() {
+					buf := make([]byte, 200e6)
+					n := runtime.Stack(buf, true)
+					os.Stdout.Write(buf[:n])
+				}
+			}()
+		}
+
+		// Send the signal ordering the server to shut down.
+		ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTime)
 		defer cancel()
 		err := server.httpServer.Shutdown(ctx)
+		stopped.Store(true)
 		if err != nil {
 			server.logger.Errorf("HTTP server shutdown error: %v", err)
 			return fmt.Errorf("error shutting down the http server: %v", err)

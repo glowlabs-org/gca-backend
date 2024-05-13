@@ -34,6 +34,9 @@ const (
 	// of traffic, and sending a ton of packets all at once during a sync
 	// operation is all but guaranteed to get them dropped.
 	UDPSleepSyncTime = time.Second
+
+	// Indicate that this is not a testing build of the client.
+	testMode = false
 )
 
 // randomTimeExtension returns a random amount of time between 0 seconds and 4
