@@ -29,38 +29,52 @@ import (
 	"github.com/glowlabs-org/gca-backend/glow"
 )
 
-// threadedListenForSyncRequests creates a TCP listener that will listen for
+// launchListenForSyncRequests creates a TCP listener that will listen for
 // queries that want to see which timeslots have reports for a given piece of
 // hardware.
-func (gcas *GCAServer) threadedListenForSyncRequests(tcpReady chan struct{}) {
+func (gcas *GCAServer) launchListenForSyncRequests() {
 	// Listen on TCP port
 	listener, err := net.Listen("tcp", serverIP+":"+strconv.Itoa(tcpPort))
 	if err != nil {
-		gcas.logger.Fatalf("Failed to start server: %s", err)
+		gcas.logger.Fatalf("Failed to create tcp listener: %s", err)
 	}
-	gcas.tcpListener = listener
-	defer listener.Close()
 	gcas.tcpPort = uint16(listener.Addr().(*net.TCPAddr).Port)
-	close(tcpReady)
+	gcas.tg.OnStop(func() error {
+		return listener.Close()
+	})
 
+	gcas.tg.Launch(func() {
+		gcas.threadedListenForSyncRequests(listener)
+	})
+}
+
+// Background thread to listen on TCP for sync requests.
+func (gcas *GCAServer) threadedListenForSyncRequests(listener net.Listener) {
 	for {
-		// Check for a shutdown signal.
-		select {
-		case <-gcas.quit:
+		// Check whether the gcas has been stopped.
+		if gcas.tg.IsStopped() {
 			return
-		default:
-			// Wait for the next incoming request
 		}
 
 		// Wait for a connection
 		conn, err := listener.Accept()
 		if err != nil {
-			gcas.logger.Infof("Failed to accept connection: %s", err)
+			// No need to log an error if the error is because of
+			// shutdown.
+			if !gcas.tg.IsStopped() {
+				gcas.logger.Infof("Failed to accept connection: %s", err)
+			}
 			continue
 		}
 
 		// Handle the connection in a new goroutine
-		go gcas.managedHandleSyncConn(conn)
+		err = gcas.tg.Launch(func() {
+			gcas.managedHandleSyncConn(conn)
+		})
+		if err != nil {
+			conn.Close()
+			return
+		}
 	}
 }
 

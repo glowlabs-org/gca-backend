@@ -114,6 +114,7 @@ func TestTCPListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(450 * time.Millisecond) // Make sure the reports have time to be processed.
 	offset, bitfield, err := gcas.requestEquipmentBitfield(0)
 	if err != nil {
 		t.Fatal(err)
@@ -147,6 +148,7 @@ func TestTCPListener(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(450 * time.Millisecond) // Make sure the reports have time to be processed.
 	offset, bitfield, err = gcas.requestEquipmentBitfield(0)
 	if err != nil {
 		t.Fatal(err)
