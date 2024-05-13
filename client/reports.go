@@ -381,10 +381,8 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 		}
 
 		// Sleep for a tick.
-		select {
-		case <-c.closed:
+		if !c.tg.Sleep(sendReportTime) {
 			return false
-		case <-time.After(sendReportTime):
 		}
 
 		// Pick a new random primary server. The steps are:
@@ -552,16 +550,9 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 	return true
 }
 
-// threadedSendReports will periodically check for new readings in the energy
-// file, and if a new reading is found, a report will be created and sent to
-// the primary server. The report is sent over UDP, and no short-term attempt
-// is made to confirm that the report reached its destination. There is a
-// separate synchronization process that occurs at much larger intervals, which
-// will re-send any reports that failed to be delivered on their first attempt.
-//
-// The thread needs to complete some initialization tasks before the client is
-// completely ready, that gets coordinated with a basic channel.
-func (c *Client) threadedSendReports(ready chan struct{}) {
+// launchSendReports will create the infinite loop that sends reports to the
+// server.
+func (c *Client) launchSendReports() {
 	// Right at startup, we save all of the existing records. We don't
 	// bother sending them because we assume we already sent them, and if
 	// we haven't already sent them, the periodic synchronization will fix
@@ -600,7 +591,18 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 			}
 		}
 	}
+	c.tg.Launch(func() {
+		c.threadedSendReports(latestRecord)
+	})
+}
 
+// threadedSendReports will periodically check for new readings in the energy
+// file, and if a new reading is found, a report will be created and sent to
+// the primary server. The report is sent over UDP, and no short-term attempt
+// is made to confirm that the report reached its destination. There is a
+// separate synchronization process that occurs at much larger intervals, which
+// will re-send any reports that failed to be delivered on their first attempt.
+func (c *Client) threadedSendReports(latestRecord uint32) {
 	// Infinite loop to send reports. We start ticks at 30 so that the
 	// catchup function will run about 2.5 hours after boot. We don't want
 	// to run it immediately after boot because if some process causes the
@@ -622,13 +624,10 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 	// rather let TCP handle the ordering than implement that ourselves.
 	ticks := 30
 	syncStatus := uint64(1)
-	close(ready)
 	for {
 		// Check if the server has shut down.
-		select {
-		case <-c.closed:
+		if c.tg.IsStopped() {
 			return
-		default:
 		}
 
 		// Grab the gca server for use when sending the report.
@@ -681,10 +680,8 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 		// hopefully preventing the server from being in a situation
 		// where all of the hardware is sending it data in the same 3
 		// seconds followed by 5 minutes of absolutely no activity.
-		select {
-		case <-c.closed:
+		if !c.tg.Sleep(sendReportTime + randomTimeExtension()) {
 			return
-		case <-time.After(sendReportTime + randomTimeExtension()):
 		}
 
 		// Once every 60 iterations a server sync is performed. That's
@@ -692,14 +689,14 @@ func (c *Client) threadedSendReports(ready chan struct{}) {
 		ticks++
 		if ticks >= 60 || atomic.LoadUint64(&syncStatus) == 0 {
 			ticks = 0
-			go func() {
+			c.tg.Launch(func() {
 				success := c.threadedSyncWithServer(latestRecord)
 				if success {
 					atomic.StoreUint64(&syncStatus, 1)
 				} else {
 					atomic.StoreUint64(&syncStatus, 0)
 				}
-			}()
+			})
 		}
 	}
 }

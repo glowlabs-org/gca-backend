@@ -8,15 +8,17 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/glowlabs-org/gca-backend/glow"
+	"github.com/glowlabs-org/threadgroup"
 )
 
 // TODO: Every GET endpoint from the server needs to be signed by the server
@@ -93,12 +95,10 @@ type GCAServer struct {
 	httpPort       uint16         // Records the port that is being used to serve the api
 	mux            *http.ServeMux // Routing for HTTP requests
 	skipInvariants bool           // If set to true, 'CheckInvariants()' will not run on Close()
-	tcpListener    net.Listener   // handles incoming sync requests over tcp
-	udpConn        *net.UDPConn   // UDP connection for listening to equipment reports
 	udpPort        uint16         // The port that the UDP conn is listening on
 	tcpPort        uint16         // The port that the TCP listener is using
-	quit           chan bool      // A channel to initiate server shutdown
 	mu             sync.Mutex
+	tg             threadgroup.ThreadGroup
 }
 
 // NewGCAServer initializes a new instance of GCAServer and returns either
@@ -114,14 +114,6 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		}
 	}
 
-	// Initialize the HTTP routing and logging functionalities
-	mux := http.NewServeMux()
-	loggerPath := filepath.Join(baseDir, "server.log")
-	logger, err := NewLogger(defaultLogLevel, loggerPath)
-	if err != nil {
-		return nil, fmt.Errorf("Logger initialization failed: %v", err)
-	}
-
 	// Initialize GCAServer with the necessary fields
 	server := &GCAServer{
 		baseDir:             baseDir,
@@ -132,14 +124,64 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		equipmentMigrations: make(map[glow.PublicKey]EquipmentMigration),
 		equipmentReports:    make(map[uint32]*[4032]glow.EquipmentReport),
 		recentReports:       make([]glow.EquipmentReport, 0, maxRecentReports),
-		logger:              logger,
-		mux:                 mux,
-		httpServer: &http.Server{
-			Addr:    serverIP + ":" + strconv.Itoa(httpPort),
-			Handler: mux,
-		},
-		quit: make(chan bool),
 	}
+	if testMode {
+		// Create a background thread that will print out the name of the
+		// server if the server hasn't been shut down after 120 seconds.
+		server.tg.Launch(func() {
+			if server.tg.Sleep(time.Second * 120) {
+				panic("server lived for longer than 120 seconds: "+baseDir)
+			}
+		})
+	}
+
+	// Create the logger and provision its shutdown.
+	loggerPath := filepath.Join(baseDir, "server.log")
+	logger, err := NewLogger(defaultLogLevel, loggerPath)
+	if err != nil {
+		return nil, fmt.Errorf("Logger initialization failed: %v", err)
+	}
+	server.tg.AfterStop(func() error {
+		return logger.Close()
+	})
+	server.logger = logger
+
+	// Create the http server and provision its shutdown.
+	server.mux = http.NewServeMux()
+	server.httpServer = &http.Server{
+		Addr: serverIP + ":" + strconv.Itoa(httpPort),
+		Handler: server.mux,
+		ReadTimeout: serverShutdownTime / 2,
+	}
+	server.tg.OnStop(func() error {
+		// There's an error in one of the tests where the server
+		// occasionally does not shut down in time. To help catch the
+		// issue, during test mode a full stack trace will get dumped
+		// if shutdown takes too long.
+		var stopped atomic.Bool
+		stopped.Store(false)
+		if testMode {
+			go func() {
+				time.Sleep(time.Second * 3)
+				if !stopped.Load() {
+					buf := make([]byte, 200e6)
+					n := runtime.Stack(buf, true)
+					os.Stdout.Write(buf[:n])
+				}
+			}()
+		}
+
+		// Send the signal ordering the server to shut down.
+		ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTime)
+		defer cancel()
+		err := server.httpServer.Shutdown(ctx)
+		stopped.Store(true)
+		if err != nil {
+			server.logger.Errorf("HTTP server shutdown error: %v", err)
+			return fmt.Errorf("error shutting down the http server: %v", err)
+		}
+		return nil
+	})
 
 	// Load the GCA Server keys.
 	server.staticPublicKey, server.staticPrivateKey, err = server.loadGCAServerKeys()
@@ -174,9 +216,6 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// which will permanently archive our data and prevent it from being
 	// used again.
 
-	udpReady := make(chan struct{})
-	migrateReady := make(chan struct{})
-	tcpReady := make(chan struct{})
 
 	// Load the watttime credentials.
 	wtUsernamePath := filepath.Join(server.baseDir, "watttime_data", "username")
@@ -191,25 +230,28 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	}
 
 	// Immediately grab all of the data for the most recent week to catch
-	// up on anything that was missed.
-	err = server.managedGetWattTimeWeekData(username, password)
-	if err != nil {
-		// This is unfortunate, but this is not cause to abort startup,
-		// so we'll just log an error.
-		server.logger.Errorf("Unable to get WattTime data for the most recent week: %v", err)
-	}
+	// up on anything that was missed. This runs in a background thread to
+	// avoid blocking startup.
+	server.tg.Launch(func() {
+		err = server.managedGetWattTimeWeekData(username, password)
+		if err != nil {
+			// This is unfortunate, but this is not cause to abort startup,
+			// so we'll just log an error.
+			server.logger.Errorf("Unable to get WattTime data for the most recent week: %v", err)
+		}
+	})
 
-	// Start the background threads for various server functionalities
-	go server.threadedLaunchUDPServer(udpReady)
-	go server.threadedMigrateReports(username, password, migrateReady)
-	go server.threadedListenForSyncRequests(tcpReady)
-	go server.threadedCollectImpactData(username, password)
-	go server.threadedGetWattTimeWeekData(username, password)
+	// Start the background threads for various server functionalities.
+	server.launchUDPServer()
+	server.launchMigrateReports(username, password)
+	server.launchListenForSyncRequests()
+	server.tg.Launch(func() {
+		server.threadedCollectImpactData(username, password)
+	})
+	server.tg.Launch(func() {
+		server.threadedGetWattTimeWeekData(username, password)
+	})
 	server.launchAPI()
-
-	<-udpReady
-	<-migrateReady
-	<-tcpReady
 
 	// Return the initialized server
 	return server, nil
@@ -223,45 +265,7 @@ func (server *GCAServer) Close() error {
 	if !server.skipInvariants {
 		server.CheckInvariants()
 	}
-
-	// Signal to terminate the server
-	close(server.quit)
-
-	// Shutdown the HTTP server gracefully
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Initiate the shutdown.
-	err := server.httpServer.Shutdown(ctx)
-	if err != nil {
-		// Log the error if the shutdown fails.
-		server.logger.Errorf("HTTP server shutdown error: %v", err)
-		return fmt.Errorf("error shutting down the http server: %v", err)
-	}
-
-	// Close the TCP and UDP connection
-	server.mu.Lock()
-	var err1, err2 error
-	if server.udpConn != nil {
-		err1 = server.udpConn.Close()
-	}
-	if server.tcpListener != nil {
-		err2 = server.tcpListener.Close()
-	}
-	server.mu.Unlock()
-	if err1 != nil {
-		return fmt.Errorf("error closing the udp connection: %v", err1)
-	}
-	if err2 != nil {
-		return fmt.Errorf("error closing the tcp connection: %v", err2)
-	}
-
-	// Close the logger
-	err = server.logger.Close()
-	if err != nil {
-		return fmt.Errorf("error closing the logger: %v", err)
-	}
-	return nil
+	return server.tg.Stop()
 }
 
 // loadGCAServerKeys will load the keys for the GCA server from disk, creating

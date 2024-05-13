@@ -34,6 +34,9 @@ const (
 	// Event log constants.
 	EventLogExpiry     = 20 * time.Second // enough time for the tests to complete
 	EventLogLimitBytes = 1024
+
+	// Indicate that this is a testing build of the client.
+	testMode = true
 )
 
 // mimics the production version of randomTimeExtension()

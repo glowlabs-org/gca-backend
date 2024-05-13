@@ -38,6 +38,9 @@ const (
 	// Event log constants.
 	EventLogExpiry     = 7 * 24 * time.Hour
 	EventLogLimitBytes = 10 * 1024 * 1024
+
+	// Indicate that this is not a testing build of the client.
+	testMode = false
 )
 
 // randomTimeExtension returns a random amount of time between 0 seconds and 4
