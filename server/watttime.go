@@ -11,8 +11,8 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -23,7 +23,7 @@ import (
 // loadWattTimeCredentials is a helper function to load one of
 // the watttime credential files from disk.
 func loadWattTimeCredentials(filename string) (string, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return "", fmt.Errorf("unable to read watttime credentials: %v", err)
 	}
@@ -56,7 +56,7 @@ func getBalancingAuthority(token string, latitude, longitude float64) (string, e
 
 	// Check for non-200 status code
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
 	}
 
 	// Parse the JSON response
@@ -82,7 +82,7 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	url := "https://api2.watttime.org/v2/index"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get index: %v", err)
+		return 0, 0, fmt.Errorf("unable to get watttime index: %v", err)
 	}
 
 	// Set the parameters
@@ -96,12 +96,12 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// Make the API request
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to make api request")
+		return 0, 0, fmt.Errorf("unable to make watttime api request")
 	}
 	defer resp.Body.Close()
 	// Check for non-200 status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, 0, fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+		return 0, 0, fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
 	}
 
 	// Parse the JSON respose.
@@ -112,17 +112,17 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	var ir indexResponse
 	err = json.NewDecoder(resp.Body).Decode(&ir)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to parse api response: %v", err)
+		return 0, 0, fmt.Errorf("unable to parse watttime api response: %v", err)
 	}
 	// Parse the string time.
 	t, err := time.Parse("2006-01-02T15:04:05Z", ir.Point_time)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to parse response time: %v", err)
+		return 0, 0, fmt.Errorf("unable to parse watttime response time: %v", err)
 	}
 	// Parse the string float.
 	moer, err := strconv.ParseFloat(ir.Moer, 64)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to parse response moer: %v", err)
+		return 0, 0, fmt.Errorf("unable to parse watttime response moer: %v", err)
 	}
 	// Convert the moer to grams per megawatt hour. Moer is provided in
 	// pounds per megawatt hour. We multiply by 453.59237 to get from
@@ -161,7 +161,7 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 	url := "https://api2.watttime.org/v2/data"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get index: %v", err)
+		return nil, nil, fmt.Errorf("unable to get watttime index: %v", err)
 	}
 
 	// Set the parameters
@@ -178,12 +178,12 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 	// Make the API request
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to make api request")
+		return nil, nil, fmt.Errorf("unable to make watttime api request")
 	}
 	defer resp.Body.Close()
 	// Check for non-200 status code
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+		return nil, nil, fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
 	}
 
 	// Parse the JSON respose.
@@ -194,7 +194,7 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 	var irs []indexResponse
 	err = json.NewDecoder(resp.Body).Decode(&irs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to parse api response: %v", err)
+		return nil, nil, fmt.Errorf("unable to parse watttime api response: %v", err)
 	}
 
 	// Build the return values.
@@ -204,7 +204,7 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 		// Parse the string time.
 		t, err := time.Parse("2006-01-02T15:04:05Z", ir.Point_time)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Unable to parse response time: %v", err)
+			return nil, nil, fmt.Errorf("unable to parse watttime response time: %v", err)
 		}
 		// Convert the moer to grams per megawatt hour. Moer is
 		// provided in pounds per megawatt hour by the WattTime API. We
@@ -230,7 +230,7 @@ func (gcas *GCAServer) threadedCollectImpactData(username, password string) {
 
 		err := gcas.managedGetWattTimeIndexData(username, password)
 		if err != nil {
-			gcas.logger.Errorf("unable to complete WattTime data update: %v", err)
+			gcas.logger.Errorf("unable to complete watttime data update: %v", err)
 			continue
 		}
 	}
@@ -272,13 +272,13 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 		moer, date, err := getWattTimeIndex(token, lats[i], longs[i])
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
-			gcas.logger.Errorf("lat: %v, long: %v", lats[i], longs[i])
+			gcas.logger.Errorf("watttime lat: %v, long: %v", lats[i], longs[i])
 			continue
 		}
 		timeslot, err := glow.UnixToTimeslot(date)
 		if err != nil {
 			gcas.logger.Errorf("watttime returned data at an invalid timeslot: %v", err)
-			gcas.logger.Errorf("time: %v, genesis time: %v", date, glow.GenesisTime)
+			gcas.logger.Errorf("watttime time: %v, genesis time: %v", date, glow.GenesisTime)
 			continue
 		}
 
@@ -342,7 +342,7 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 		moers, dates, err := getWattTimeData(token, lats[i], longs[i], startTime)
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
-			gcas.logger.Errorf("lat: %v, long: %v, startTime: %v", lats[i], longs[i], startTime)
+			gcas.logger.Errorf("watttime lat: %v, long: %v, startTime: %v", lats[i], longs[i], startTime)
 			continue
 		}
 
@@ -360,7 +360,7 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 			timeslot, err := glow.UnixToTimeslot(date)
 			if err != nil {
 				gcas.logger.Errorf("watttime returned data at an invalid timeslot: %v", err)
-				gcas.logger.Errorf("time: %v, genesis time: %v", date, glow.GenesisTime)
+				gcas.logger.Errorf("watttime time: %v, genesis time: %v", date, glow.GenesisTime)
 				continue
 			}
 
@@ -402,9 +402,9 @@ func staticGetWattTimeToken(username, password string) (string, error) {
 	// Check for non-200 status code and handle specific errors
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == 403 {
-			return "", fmt.Errorf("authentication failed: invalid credentials")
+			return "", fmt.Errorf("watttime authentication failed: invalid credentials")
 		}
-		return "", fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
 	}
 
 	var tokenResponse WattTimeTokenResponse
@@ -428,7 +428,7 @@ func (gcas *GCAServer) threadedGetWattTimeWeekData(username, password string) {
 		// intention is to call it periodically, most likely once per day.
 		err := gcas.managedGetWattTimeWeekData(username, password)
 		if err != nil {
-			gcas.logger.Errorf("Threaded call unable to get WattTime data for the most recent week: %v", err)
+			gcas.logger.Errorf("threaded call unable to get watttime data for the most recent week: %v", err)
 		}
 	}
 }

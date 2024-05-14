@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -200,14 +200,14 @@ func fetchAndSaveHistoricalBAData(token, ba string) error {
 	}
 
 	// Read the response body
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
 	// Save the ZIP file
 	zipPath := filepath.Join(dataPath, ba+"_historical.zip")
-	if err := ioutil.WriteFile(zipPath, body, 0644); err != nil {
+	if err := os.WriteFile(zipPath, body, 0644); err != nil {
 		return err
 	}
 
@@ -265,11 +265,18 @@ func loadMOERData(ba string) (map[string]map[string][]float64, error) {
 	folderPath := filepath.Join("watttime_data", ba)
 	moerData := make(map[string]map[string][]float64)
 
-	files, err := ioutil.ReadDir(folderPath)
+	entries, err := os.ReadDir(folderPath)
+	files := make([]fs.FileInfo, 0, len(entries))
 	if err != nil {
 		return nil, err
 	}
-
+	for _, entry := range entries {
+		fi, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, fi)
+	}
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".csv") {
 			filePath := filepath.Join(folderPath, file.Name())
