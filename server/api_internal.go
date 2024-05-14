@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Internal API to test the WattTime historical data query. For a lattitude and longitude, returns a range of point values
+// Internal API to test the WattTime historical data query. For a latitude and longitude, returns a range of point values
 // returned from the WattTime API. For testing purposes, the start time will be current time minus
 // one week, and the ending time 15 minutes after that.
 func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +74,7 @@ func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, 
 	}
 }
 
-// Internal API to test the WattTime signal index query. For a lattitude and longitude, returns a time point.
+// Internal API to test the WattTime signal index query. For a latitude and longitude, returns a time point.
 func (gcas *GCAServer) InternalWattTimeSignalIndexHandler(w http.ResponseWriter, r *http.Request) {
 	if !gcas.allowIntApis {
 		http.Error(w, "Not implemented in production", http.StatusNotImplemented)
