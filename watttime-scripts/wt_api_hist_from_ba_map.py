@@ -20,7 +20,7 @@ def load_credentials(filename):
         return f.read().strip()
 
 def get_token(username, password):
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
@@ -35,7 +35,7 @@ def list_regions_from_ba_maps(token):
     lmap = []
     for feat in mapdat['features']:
         coord = feat['geometry']['coordinates'][0][0][0]
-        print(f"{feat['properties']['abbrev']:21} {feat['properties']['name']} ({coord[1]} {coord[0]})") # print lat long coordinates from the polygon
+        print(f"{feat['properties']['region']:21} {feat['properties']['region_full_name']} ({coord[1]} {coord[0]})") # print lat long coordinates from the polygon
 
 if __name__ == "__main__":
     # Load API credentials

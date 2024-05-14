@@ -6,6 +6,6 @@ with open('username', 'r') as f:
 with open('password', 'r') as f:
     password = f.read().strip()
 
-password_url = 'https://api2.watttime.org/v2/password/?username=${username}'
+password_url = 'https://api.watttime.org/password/?username=${username}'
 rsp = requests.get(password_url)
 print(rsp.json())

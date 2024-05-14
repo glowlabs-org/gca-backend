@@ -11,7 +11,7 @@ def load_credentials(filename):
         return f.read().strip()
 
 def get_token(username, password):
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     if response.status_code == 200:
         return response.json()['token']
@@ -25,10 +25,11 @@ def save_ba_maps():
     password = load_credentials('password')
     token = get_token(username, password)
     
-    maps_url = 'https://api2.watttime.org/v2/maps'
+    maps_url = 'https://api.watttime.org/v3/maps'
     headers = {'Authorization': 'Bearer {}'.format(token)}
+    params = {'signal_type': 'co2_moer'}
     
-    response = requests.get(maps_url, headers=headers)
+    response = requests.get(maps_url, headers=headers, params=params)
     
     if response.status_code != 200:
         sys.exit(f"Failed to get maps, status code: {response.status_code}")

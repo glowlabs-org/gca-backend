@@ -7,7 +7,7 @@ with open('username', 'r') as f:
 with open('password', 'r') as f:
     password = f.read().strip()
 
-register_url = 'https://api2.watttime.org/v2/register'
+register_url = 'https://api.watttime.org/register'
 params = {'username': username,
          'password': password,
          'email': 'david@${username}.org',

@@ -38,7 +38,7 @@ def get_ba_by_coords(gdf, latitude, longitude):
     # Use the .contains method of the geometry to check if the point is within any of the BAs
     for _, row in gdf.iterrows():
         if row['geometry'].contains(point):
-            return row['abbrev']
+            return row['region']
     
     return None  # If no BA contains the point
 

@@ -1,63 +1,11 @@
 import requests
 from requests.auth import HTTPBasicAuth
 import sys
-from datetime import datetime
 import json
-import zipfile
 from os import path
 import os
-
-# Function to load credentials from a file
-def load_credentials(filename):
-    """
-    Load credentials from a given file.
-
-    Parameters:
-        filename (str): The name of the file containing the credential.
-
-    Returns:
-        str: The credential read from the file.
-    """
-    with open(filename, 'r') as f:
-        return f.read().strip()
-
-# Function to get token for WattTime API
-def get_token(username, password):
-    """
-    Fetch the authorization token from WattTime API.
-
-    Parameters:
-        username (str): The username for the API.
-        password (str): The password for the API.
-
-    Returns:
-        str: The authorization token.
-    """
-    login_url = 'https://api2.watttime.org/v2/login'
-    response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
-    return response.json()['token']
-
-def get_balancing_authority(token, latitude, longitude):
-    # Define the URL and headers for the API request
-    region_url = 'https://api2.watttime.org/v2/ba-from-loc'
-    headers = {'Authorization': 'Bearer {}'.format(token)}
-    params = {'latitude': latitude, 'longitude': longitude}
-
-    # Make the API request
-    response = requests.get(region_url, headers=headers, params=params)
-
-    # Check if the API call was successful
-    if response.status_code == 200:
-        return response.json()['abbrev']
-    elif response.status_code == 404:  # Location not supported
-        print("Got 404")
-        return None
-    elif response.status_code == 403:  # Location not supported
-        print("Got 403")
-        return None
-    else:
-        print(f"Unexpected error: {response.content}")
-        sys.exit("An unexpected error occurred while fetching the balancing authority.")
+import calendar
+from wt_api_historical_data import load_credentials, get_token, get_historical_data
 
 def fetch_and_save_historical_data(token, ba):
     """
@@ -70,50 +18,40 @@ def fetch_and_save_historical_data(token, ba):
     Returns:
         None
     """
+
     data_path = path.join("data", ba)
-    if path.exists(data_path):
-        print(f"Data for {ba} already exists locally.")
-    else:
-        # Construct historical data URL and headers
-        historical_url = 'https://api2.watttime.org/v2/historical'
-        headers = {'Authorization': f'Bearer {token}'}
-        params = {'ba': ba}
-        
-        # Fetch historical data
-        rsp = requests.get(historical_url, headers=headers, params=params)
-        
-        # Create a directory for the balancing authority
-        if not os.path.exists(data_path):
-            os.mkdir(data_path)
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
 
-        metadata = {
-            "generation_time": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }
+    for month in range(1, 13):
+        _, last = calendar.monthrange(2023, month)
+        # CAISO_NORTH_2022-05_MOER.json
+        fname = f"{ba}_2023-{month:02}_MOER.json"
+        # "2023-08-01T00:00:00Z"
+        start = f"2023-{month:02}-01T00:00:00Z"
+        end = f"2023-{month:02}-{last:02}T23:59:59Z"
+        file_path = path.join(data_path, fname)
+        if path.exists(file_path):
+            pass
+        else:
+            print(f"generating {file_path}")
+            dat = get_historical_data(token, ba, start, end)
+            if dat is not None:
+                with open(file_path, "w") as f:
+                    json.dump(dat, f)
+            else:
+                sys.exit(f"error downloading data")
+            
 
-        metapath = os.path.join(data_path, "meta.json")
-        with open(metapath, 'w') as f:
-            json.dump(metadata, f, indent=2)
-
-        # Save the zip file
-        zip_path = path.join("data", ba, f'{ba}_historical.zip')
-        with open(zip_path, 'wb') as fp:
-            fp.write(rsp.content)
-        
-        # Extract the zip file
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(data_path)
-        
-        print(f"Wrote and unzipped historical data for {ba} to the directory: {data_path}")
+    print(f"Generated 2023 historical data for {ba} to the directory: {data_path}")
 
 if __name__ == "__main__":
     # Command line: latitude longitude
     if len(sys.argv) < 3:
-        print('No coordinates on command line, using Coit Tower (CAISO_NORTH)')
-        latitude = 37.803
-        longitude = -122.406
+        print('No region on command line, using CAISO_NORTH')
+        ba = "CAISO_NORTH"
     else:
-        latitude = sys.argv[1]
-        longitude = sys.argv[2]
+        ba = sys.argv[1]
 
     # Load username and password
     username = load_credentials('username')
@@ -123,7 +61,6 @@ if __name__ == "__main__":
     token = get_token(username, password)
     
     # Fetch and print region information
-    print(f"latitude {latitude} longitude {longitude}")
-    ba = get_balancing_authority(token, latitude, longitude)
+    print(f"region {ba}")
 
     fetch_and_save_historical_data(token, ba)

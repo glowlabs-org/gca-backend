@@ -28,7 +28,7 @@ def get_token(username, password):
     Returns:
         str: The authorization token.
     """
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
@@ -45,9 +45,9 @@ def get_region_info(token, latitude, longitude):
     Returns:
         str: The API response as a string.
     """
-    region_url = 'https://api2.watttime.org/v2/ba-from-loc'
+    region_url = 'https://api.watttime.org/v3/region-from-loc'
     headers = {'Authorization': 'Bearer {}'.format(token)}
-    params = {'latitude': latitude, 'longitude': longitude}
+    params = {'latitude': latitude, 'longitude': longitude, 'signal_type': 'co2_moer'}
     response = requests.get(region_url, headers=headers, params=params)
     return response.text
 

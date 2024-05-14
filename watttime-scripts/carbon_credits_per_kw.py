@@ -14,6 +14,8 @@ def prompt_for_coordinates():
     longitude = float(input("Please enter the longitude: "))
     return latitude, longitude
 
+# fetch nasa All Sky Surface Shortwave Downward Irradiance (ALLSKY_SFC_SW_DWN) data for 2023
+# https://power.larc.nasa.gov/docs/gallery/solar-irradiance/
 def fetch_nasa_data(latitude, longitude):
     # Construct API endpoint and parameters
     url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
@@ -36,22 +38,22 @@ def load_credentials(filename):
         return f.read().strip()
 
 def get_token(username, password):
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
 def get_balancing_authority(token, latitude, longitude):
     # Define the URL and headers for the API request
-    region_url = 'https://api2.watttime.org/v2/ba-from-loc'
+    region_url = 'https://api.watttime.org/v3/region-from-loc'
     headers = {'Authorization': 'Bearer {}'.format(token)}
-    params = {'latitude': latitude, 'longitude': longitude}
+    params = {'latitude': latitude, 'longitude': longitude, 'signal_type': 'co2_moer'}
 
     # Make the API request
     response = requests.get(region_url, headers=headers, params=params)
 
     # Check if the API call was successful
     if response.status_code == 200:
-        return response.json()['abbrev']
+        return response.json()['region']
     elif response.status_code == 404:  # Location not supported
         print("Got 404")
         return None
@@ -61,13 +63,13 @@ def get_balancing_authority(token, latitude, longitude):
     else:
         print(f"Unexpected error: {response.content}")
         sys.exit("An unexpected error occurred while fetching the balancing authority.")
-        
-def load_csv_files(ba):
+
+def load_json_files(region):
     """
-    Load CSV files in a folder with a specific prefix and return the MOER values organized by year and hour.
+    Load json files in a folder with a specific prefix and return the MOER values organized by year and hour.
     
     Args:
-        folder_path (str): The path to the folder containing the CSV files.
+        folder_path (str): The path to the folder containing the files.
     
     Returns:
         dict: A nested dictionary containing the MOER values organized by year and hour.
@@ -76,19 +78,18 @@ def load_csv_files(ba):
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     prefix = f"{ba}_2023"
     for filename in os.listdir(folder_path):
-        if filename.startswith(prefix) and filename.endswith('.csv'):
+        if filename.startswith(prefix) and filename.endswith('.json'):
             filepath = os.path.join(folder_path, filename)
-            with open(filepath, 'r') as csvfile:
-                reader = csv.reader(csvfile)
-                next(reader)  # Skip the header
-                for row in reader:
-                    timestamp, moer = row[0], float(row[1])
+            with open(filepath, 'r') as f:
+                dat = json.load(f)
+                for row in dat["data"]:
+                    timestamp, moer = row["point_time"], float(row["value"])
                     year, rest = timestamp.split('-', 1)
                     day, time = rest.split('T')
                     hour = time.split(':')[0]
                     data[year][day][hour].append(moer)
     return data
-    
+
 def calculate_carbon_credits(nasa_data, moer_data):
     total_kwh = 0
     total_hours = 0
@@ -201,6 +202,6 @@ if __name__ == "__main__":
     
     # Fetch NASA data and calculate average sunlight
     nasa_data = fetch_nasa_data(latitude, longitude)
-    moer_data = load_csv_files(ba)
+    moer_data = load_json_files(ba)
     combo_print = calculate_carbon_credits(nasa_data, moer_data)
     combo_print = calculate_carbon_credits_b(nasa_data, moer_data)

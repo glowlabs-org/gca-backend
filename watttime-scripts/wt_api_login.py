@@ -10,6 +10,6 @@ with open('username', 'r') as f:
 with open('password', 'r') as f:
     password = f.read().strip()
 
-login_url = 'https://api2.watttime.org/v2/login'
+login_url = 'https://api.watttime.org/login'
 rsp = requests.get(login_url, auth=HTTPBasicAuth(username, password))
 print(rsp.json())

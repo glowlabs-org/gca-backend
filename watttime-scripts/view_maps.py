@@ -13,7 +13,8 @@ def plot_boundaries():
     fig, ax = plt.subplots(figsize=(15, 15))  # You can adjust the size as needed
     gdf.boundary.plot(ax=ax, edgecolor='blue', linewidth=1)
     ax.set_title('Balancing Authority Boundaries')
-    plt.show()
+    plt.savefig('data/ba_boundaries.png', bbox_inches='tight', dpi=600)
+    #plt.show()
 
 # Run the function
 plot_boundaries()
