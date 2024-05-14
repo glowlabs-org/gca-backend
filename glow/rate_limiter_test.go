@@ -59,7 +59,9 @@ func (tc TestConfig) runTest() error {
 	var denied atomic.Int32
 
 	rl := NewRateLimiter(tc.limit, tc.rate)
-	segment := tc.duration / time.Duration(tc.limit+1) // Leave some space at the end for timing.
+	// To ensure we don't overrun the total duration for smaller test
+	// values, make the segment duration smaller.
+	segment := tc.duration / time.Duration(tc.limit+2)
 	start := time.Now()
 	for i := 0; i < tc.threads; i++ {
 		wg.Add(1)
