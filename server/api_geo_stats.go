@@ -36,7 +36,7 @@ type GeoStatsResponse struct {
 }
 
 // GeoStatsHandler will respond to a call to the /geo-stats api endpoint.
-func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
+func (gcas *GCAServer) GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET calls.
 	if r.Method != http.MethodGet {
 		http.Error(w, "Only GET method is allowed", http.StatusMethodNotAllowed)
@@ -53,8 +53,8 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load WattTime credentials and then get the auth token.
-	wtUsernamePath := filepath.Join("watttime_data", "username")
-	wtPasswordPath := filepath.Join("watttime_data", "password")
+	wtUsernamePath := filepath.Join(gcas.baseDir, "watttime_data", "username")
+	wtPasswordPath := filepath.Join(gcas.baseDir, "watttime_data", "password")
 	username, err := loadWattTimeCredentials(wtUsernamePath)
 	if err != nil {
 		http.Error(w, "Error in loading watttime username", http.StatusInternalServerError)
@@ -88,7 +88,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Get all of the historical data for this BA. It's a very expensive operation,
 	// but only if the historical data is not cached locally already. Luckily, most
 	// of the historical data is already cached locally.
-	err = fetchAndSaveHistoricalBAData(token, ba)
+	err = fetchAndSaveHistoricalBAData(token, ba, gcas.baseDir)
 	if err != nil {
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
@@ -96,7 +96,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Load the historical data from disk. The previous call to fetch the data saves
 	// it to disk if the data is not already saved.
-	baData, err := loadMOERData(ba)
+	baData, err := loadMOERData(ba, gcas.baseDir)
 	if err != nil {
 		http.Error(w, "Error loading balancing authority historical data", http.StatusInternalServerError)
 		return
@@ -163,8 +163,8 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 
 // fetchAndSaveHistoricalBAData fetches historical data for the given balancing
 // authority and saves it locally.
-func fetchAndSaveHistoricalBAData(token, ba string) error {
-	dataPath := filepath.Join("watttime_data", ba)
+func fetchAndSaveHistoricalBAData(token, ba, baseDir string) error {
+	dataPath := filepath.Join(baseDir, "watttime_data", ba)
 	if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
 		// Data already exists
 		log.Println("Data for", ba, "already exists locally.")
@@ -261,8 +261,8 @@ type MOERData struct {
 }
 
 // loadMOERData loads MOER data from CSV files for the specified balancing authority.
-func loadMOERData(ba string) (map[string]map[string][]float64, error) {
-	folderPath := filepath.Join("watttime_data", ba)
+func loadMOERData(ba, baseDir string) (map[string]map[string][]float64, error) {
+	folderPath := filepath.Join(baseDir, "watttime_data", ba)
 	moerData := make(map[string]map[string][]float64)
 
 	entries, err := os.ReadDir(folderPath)
