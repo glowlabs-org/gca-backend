@@ -35,6 +35,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Bench test enables internal APIs, and sets the logging level to Info.
+	if len(os.Args) == 2 && os.Args[1] == "--bench-test" {
+		gcaServer.EnableBenchTestMode()
+	}
+
 	// Create a channel to listen for operating system signals.
 	// The channel c is buffered with a size of 1.
 	c := make(chan os.Signal, 1)

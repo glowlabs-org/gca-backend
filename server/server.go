@@ -97,8 +97,16 @@ type GCAServer struct {
 	skipInvariants bool           // If set to true, 'CheckInvariants()' will not run on Close()
 	udpPort        uint16         // The port that the UDP conn is listening on
 	tcpPort        uint16         // The port that the TCP listener is using
+	allowIntApis   bool           // Enables bench testing the server with production settings
 	mu             sync.Mutex
 	tg             threadgroup.ThreadGroup
+}
+
+// Enable bench test mode. Allows internal APIs and sets the server log level higher.
+func (gcas *GCAServer) EnableBenchTestMode() {
+	gcas.allowIntApis = true
+	gcas.logger.level = INFO
+	gcas.logger.Info("Bench test mode enabled")
 }
 
 // NewGCAServer initializes a new instance of GCAServer and returns either
@@ -130,7 +138,7 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 		// server if the server hasn't been shut down after 120 seconds.
 		server.tg.Launch(func() {
 			if server.tg.Sleep(time.Second * 120) {
-				panic("server lived for longer than 120 seconds: "+baseDir)
+				panic("server lived for longer than 120 seconds: " + baseDir)
 			}
 		})
 	}
@@ -149,8 +157,8 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// Create the http server and provision its shutdown.
 	server.mux = http.NewServeMux()
 	server.httpServer = &http.Server{
-		Addr: serverIP + ":" + strconv.Itoa(httpPort),
-		Handler: server.mux,
+		Addr:        serverIP + ":" + strconv.Itoa(httpPort),
+		Handler:     server.mux,
 		ReadTimeout: serverShutdownTime / 2,
 	}
 	server.tg.OnStop(func() error {
@@ -215,7 +223,6 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// equipmentReports before starting the threadedMigrateReports loop
 	// which will permanently archive our data and prevent it from being
 	// used again.
-
 
 	// Load the watttime credentials.
 	wtUsernamePath := filepath.Join(server.baseDir, "watttime_data", "username")

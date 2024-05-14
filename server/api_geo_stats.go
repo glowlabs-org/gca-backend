@@ -16,18 +16,6 @@ import (
 	"strings"
 )
 
-// Define a struct to receive the information from the call to get
-// a token from WattTime.
-type WattTimeTokenResponse struct {
-	Token string `json:"token"`
-}
-
-// Define a struct to receive the information from a call to get
-// the balancing authority from WattTime
-type BalancingAuthorityResponse struct {
-	Abbrev string `json:"abbrev"`
-}
-
 // Define a struct that contains the response data for the call to
 // the GeoStatsHandler.
 type GeoStatsResponse struct {

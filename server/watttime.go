@@ -9,8 +9,10 @@ package server
 // don't have that at the moment.
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,6 +21,24 @@ import (
 
 	"github.com/glowlabs-org/gca-backend/glow"
 )
+
+// Define a struct to receive the information from the call to get
+// a token from WattTime.
+type WattTimeTokenResponse struct {
+	Token string `json:"token"`
+}
+
+// Define a struct to receive the information from a call to get
+// the balancing authority from WattTime
+type BalancingAuthorityResponse struct {
+	Abbrev string `json:"region"`
+}
+
+// WattTime API generic data point type.
+type DataPoint struct {
+	PointTime string  `json:"point_time"`
+	Value     float64 `json:"value"`
+}
 
 // loadWattTimeCredentials is a helper function to load one of
 // the watttime credential files from disk.
@@ -34,7 +54,7 @@ func loadWattTimeCredentials(filename string) (string, error) {
 // with a specific location
 func getBalancingAuthority(token string, latitude, longitude float64) (string, error) {
 	client := &http.Client{}
-	regionURL := "https://api2.watttime.org/v2/ba-from-loc"
+	regionURL := "https://api.watttime.org/v3/region-from-loc"
 	req, err := http.NewRequest("GET", regionURL, nil)
 	if err != nil {
 		return "", err
@@ -45,6 +65,7 @@ func getBalancingAuthority(token string, latitude, longitude float64) (string, e
 	q := req.URL.Query()
 	q.Add("latitude", strconv.FormatFloat(latitude, 'f', 6, 64))
 	q.Add("longitude", strconv.FormatFloat(longitude, 'f', 6, 64))
+	q.Add("signal_type", "co2_moer")
 	req.URL.RawQuery = q.Encode()
 
 	// Make the API request
@@ -77,9 +98,15 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 		return latitude + longitude + 200 + float64(time.Now().UnixNano()%250), glow.TimeslotToUnix(glow.CurrentTimeslot()), nil
 	}
 
+	// Get the region associated with these coordinates
+	region, err := getBalancingAuthority(token, latitude, longitude)
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to get watttime region: %v", err)
+	}
+
 	// Create the base url
 	client := &http.Client{}
-	url := "https://api2.watttime.org/v2/index"
+	url := "https://api.watttime.org/v3/signal-index"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return 0, 0, fmt.Errorf("unable to get watttime index: %v", err)
@@ -88,9 +115,8 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// Set the parameters
 	req.Header.Set("Authorization", "Bearer "+token)
 	q := req.URL.Query()
-	q.Add("latitude", strconv.FormatFloat(latitude, 'f', 6, 64))
-	q.Add("longitude", strconv.FormatFloat(longitude, 'f', 6, 64))
-	q.Add("style", "moer")
+	q.Add("region", region)
+	q.Add("signal_type", "co2_moer")
 	req.URL.RawQuery = q.Encode()
 
 	// Make the API request
@@ -104,26 +130,26 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 		return 0, 0, fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
 	}
 
-	// Parse the JSON respose.
-	type indexResponse struct {
-		Point_time string
-		Moer       string
+	// Parse the JSON response.
+	type jsonResponse struct {
+		Data []DataPoint `json:"data"`
 	}
-	var ir indexResponse
-	err = json.NewDecoder(resp.Body).Decode(&ir)
+	var jr jsonResponse
+	err = json.NewDecoder(resp.Body).Decode(&jr)
 	if err != nil {
 		return 0, 0, fmt.Errorf("unable to parse watttime api response: %v", err)
 	}
+	// WattTime API should have a single point in the response
+	if len(jr.Data) != 1 {
+		return 0, 0, fmt.Errorf("invalid api return: %v data items", len(jr.Data))
+	}
 	// Parse the string time.
-	t, err := time.Parse("2006-01-02T15:04:05Z", ir.Point_time)
+	t, err := time.Parse("2006-01-02T15:04:05+00:00", jr.Data[0].PointTime)
 	if err != nil {
 		return 0, 0, fmt.Errorf("unable to parse watttime response time: %v", err)
 	}
-	// Parse the string float.
-	moer, err := strconv.ParseFloat(ir.Moer, 64)
-	if err != nil {
-		return 0, 0, fmt.Errorf("unable to parse watttime response moer: %v", err)
-	}
+	moer := jr.Data[0].Value
+
 	// Convert the moer to grams per megawatt hour. Moer is provided in
 	// pounds per megawatt hour. We multiply by 453.59237 to get from
 	// pounds per megawatt hour to grams per megawatt hour.
@@ -131,17 +157,59 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	return moer, t.Unix(), nil
 }
 
+// getWattTimeHistoricalDataRaw returns uninterpreted WattTime historical data for a given
+// region and time range.
+func getWattTimeHistoricalDataRaw(token, region string, startTime, endTime int64) ([]byte, error) {
+	// Convert the times to ISO 8601.
+	startTimeT := time.Unix(startTime, 0)
+	startTimeISO := startTimeT.Format("2006-01-02T15:04:05Z")
+	endTimeT := time.Unix(endTime, 0)
+	endTimeISO := endTimeT.Format("2006-01-02T15:04:05Z")
+
+	// Create the base url
+	client := &http.Client{}
+	url := "https://api.watttime.org/v3/historical"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get watttime index: %v", err)
+	}
+
+	// Set the parameters
+	req.Header.Set("Authorization", "Bearer "+token)
+	q := req.URL.Query()
+	q.Add("region", region)
+	q.Add("start", startTimeISO)
+	q.Add("end", endTimeISO)
+	q.Add("signal_type", "co2_moer")
+	req.URL.RawQuery = q.Encode()
+
+	// Make the API request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to make watttime api request")
+	}
+	defer resp.Body.Close()
+	// Check for non-200 status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
+	}
+	rb, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("watttime API read failed: %v", err)
+	}
+	return rb, nil
+}
+
 // getWattTimeData returns the MOER values for the provided lat+long from the
 // provided time to 1 week later.
 func getWattTimeData(token string, latitude float64, longitude float64, startTime int64) ([]float64, []int64, error) {
 	// Determine what data range can be requested. If the end time is
 	// within 5 days of the current time, WattTime will be asked for the
-	// full set of data that it has. In the WattTime API, omitting the end
-	// time will result in all data being collected up to the present.
-	idealEndTime := startTime + 604800 // number of seconds in a week
-	useEndTime := true
-	if idealEndTime+432000 > time.Now().Unix() {
-		useEndTime = false
+	// full set of data that it has. In the WattTime API v3 the end time is
+	// required and will be set to current time in this case.
+	endTime := startTime + 604800 // Ideal end time, number of seconds in a week.
+	if endTime+432000 > time.Now().Unix() {
+		endTime = time.Now().Unix()
 	}
 
 	// During testing we return blank values, that way it doesn't interfere
@@ -150,59 +218,33 @@ func getWattTimeData(token string, latitude float64, longitude float64, startTim
 		return nil, nil, nil
 	}
 
-	// Convert the times to ISO 8601.
-	startTimeT := time.Unix(startTime, 0)
-	startTimeISO := startTimeT.Format("2006-01-02T15:04:05Z")
-	endTimeT := time.Unix(idealEndTime, 0)
-	endTimeISO := endTimeT.Format("2006-01-02T15:04:05Z")
-
-	// Create the base url
-	client := &http.Client{}
-	url := "https://api2.watttime.org/v2/data"
-	req, err := http.NewRequest("GET", url, nil)
+	// Get the region and historical data
+	region, err := getBalancingAuthority(token, latitude, longitude)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to get watttime index: %v", err)
+		return nil, nil, fmt.Errorf("unable to get watttime region: %v", err)
 	}
-
-	// Set the parameters
-	req.Header.Set("Authorization", "Bearer "+token)
-	q := req.URL.Query()
-	q.Add("latitude", strconv.FormatFloat(latitude, 'f', 6, 64))
-	q.Add("longitude", strconv.FormatFloat(longitude, 'f', 6, 64))
-	q.Add("starttime", startTimeISO)
-	if useEndTime {
-		q.Add("endtime", endTimeISO)
-	}
-	req.URL.RawQuery = q.Encode()
-
-	// Make the API request
-	resp, err := client.Do(req)
+	raw, err := getWattTimeHistoricalDataRaw(token, region, startTime, endTime)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to make watttime api request")
+		return nil, nil, fmt.Errorf("unable to get watttime historical data: %v", err)
 	}
-	defer resp.Body.Close()
-	// Check for non-200 status code
-	if resp.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
-	}
+	br := bytes.NewReader(raw)
 
 	// Parse the JSON respose.
-	type indexResponse struct {
-		Point_time string
-		Value      float64
+	type jsonResponse struct {
+		Data []DataPoint `json:"data"`
 	}
-	var irs []indexResponse
-	err = json.NewDecoder(resp.Body).Decode(&irs)
+	var jr jsonResponse
+	err = json.NewDecoder(br).Decode(&jr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse watttime api response: %v", err)
+		return nil, nil, fmt.Errorf("unable to parse watttime api data: %v", err)
 	}
 
 	// Build the return values.
 	var moers []float64
 	var dates []int64
-	for _, ir := range irs {
+	for _, ir := range jr.Data {
 		// Parse the string time.
-		t, err := time.Parse("2006-01-02T15:04:05Z", ir.Point_time)
+		t, err := time.Parse("2006-01-02T15:04:05Z", ir.PointTime)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to parse watttime response time: %v", err)
 		}
@@ -387,7 +429,7 @@ func staticGetWattTimeToken(username, password string) (string, error) {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api2.watttime.org/v2/login", nil)
+	req, err := http.NewRequest("GET", "https://api.watttime.org/login", nil)
 	if err != nil {
 		return "", err
 	}
