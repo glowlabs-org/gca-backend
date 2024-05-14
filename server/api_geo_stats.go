@@ -144,8 +144,8 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 	params.Add("community", "RE")
 	params.Add("longitude", strconv.FormatFloat(longitude, 'f', -1, 64))
 	params.Add("latitude", strconv.FormatFloat(latitude, 'f', -1, 64))
-	params.Add("start", "20220101")
-	params.Add("end", "20221231")
+	params.Add("start", "20230101")
+	params.Add("end", "20231231")
 	params.Add("format", "json")
 	// Construct the final URL with encoded query parameters
 	finalURL := baseURL + "?" + params.Encode()
@@ -328,7 +328,7 @@ func readMOERCSV(filePath string) (map[string]map[string][]float64, error) {
 		year := parts[0][:4] // Extract YYYY
 		day := parts[0][5:]  // Extract MM-DD
 		hour := parts[1][:2] // Extract TT
-		if year != "2022" {
+		if year != "2023" {
 			continue
 		}
 
