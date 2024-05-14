@@ -41,7 +41,7 @@ func NewArchive() *zipArchiveWriter {
 // Close the archive writer and return a buffer to its contents.
 func (arc *zipArchiveWriter) Close() (*bytes.Buffer, error) {
 	if err := arc.znw.Close(); err != nil {
-		return nil, nil
+		return nil, err
 	}
 	return arc.buffer, nil
 }
@@ -80,12 +80,12 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	arc := NewArchive()
 
 	// File ordering matters here. We are not locking the files, and relying on the file writes being
-	// append only while happening in a single write. We must archive the files in reverse order from
+	// append-only while happening in a single write. We must archive the files in reverse order from
 	// their dependency order.
-	for _, name := range PublicFiles {
-		err := gcas.addFile(name, arc)
+	for _, pf := range PublicFiles {
+		err := gcas.addFile(pf, arc)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error zipping file %v: %v", name, err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Error zipping file %v: %v", pf, err), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -103,10 +103,12 @@ func (gcas *GCAServer) ArchiveHandler(w http.ResponseWriter, r *http.Request) {
 	buf, err := arc.Close()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("Content-Type", "application/zip")
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		http.Error(w, "Failed to write archive response", http.StatusInternalServerError)
+		return
 	}
 }
 
