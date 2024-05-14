@@ -124,7 +124,7 @@ func (gcas *GCAServer) InternalWattTimeSignalIndexHandler(w http.ResponseWriter,
 	}
 	t := time.Unix(epoch, 0)
 	jr := jsonResponse{
-		Time: t.Local().Format("2006-01-02 15:04:05"),
+		Time: t.Local().Format("2006-01-02 15:04:05 MST"),
 		Moer: moer,
 	}
 	res, err := json.Marshal(jr)
