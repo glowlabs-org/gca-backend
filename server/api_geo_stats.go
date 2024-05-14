@@ -185,7 +185,7 @@ func (gcas *GCAServer) fetchAndSaveHistoricalBAData(token, ba string) error {
 			return err
 		}
 	}
-	gcas.logger.Info("Wrote historical data for ", ba, "to the directory: ", dataPath)
+	gcas.logger.Info("Wrote historical data for ", ba, " to the directory: ", dataPath)
 	return nil
 }
 
