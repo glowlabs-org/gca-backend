@@ -81,3 +81,67 @@ func TestCISettings(t *testing.T) {
 		}
 	}
 }
+
+func TestCISettingsMalformed(t *testing.T) {
+	name := t.Name()
+	gcas, _, gcaPubkey, gcaPrivKey, err := server.SetupTestEnvironment(name + "_server1")
+	if err != nil {
+		t.Errorf("unable to set up the test environment for a server: %v", err)
+	}
+	defer gcas.Close()
+	clientDir := glow.GenerateTestDir(name + "_client1")
+	err = SetupTestEnvironment(clientDir, gcaPubkey, gcaPrivKey, []*server.GCAServer{gcas})
+	if err != nil {
+		t.Errorf("unable to set up the client test environment: %v", err)
+	}
+	// create a malformed ct settings file
+	ctPath := path.Join(clientDir, CTSettingsFile)
+	ctf, err := os.Create(ctPath)
+	if err != nil {
+		t.Errorf("could not open ct settings file: %v", err)
+	}
+	ctContent := "-2000\nwhoops\n"
+	_, err = ctf.WriteString(ctContent)
+	if err != nil {
+		ctf.Close()
+		t.Errorf("unable to write ct settings file: %v", err)
+	}
+	// try to start the client
+	client, err := NewClient(clientDir)
+	if err == nil {
+		client.Close()
+		t.Errorf("client read the malformed ct settings file")
+	}
+}
+
+func TestCISettingsMissingValue(t *testing.T) {
+	name := t.Name()
+	gcas, _, gcaPubkey, gcaPrivKey, err := server.SetupTestEnvironment(name + "_server1")
+	if err != nil {
+		t.Errorf("unable to set up the test environment for a server: %v", err)
+	}
+	defer gcas.Close()
+	clientDir := glow.GenerateTestDir(name + "_client1")
+	err = SetupTestEnvironment(clientDir, gcaPubkey, gcaPrivKey, []*server.GCAServer{gcas})
+	if err != nil {
+		t.Errorf("unable to set up the client test environment: %v", err)
+	}
+	// create a malformed ct settings file
+	ctPath := path.Join(clientDir, CTSettingsFile)
+	ctf, err := os.Create(ctPath)
+	if err != nil {
+		t.Errorf("could not open ct settings file: %v", err)
+	}
+	ctContent := "-2000\n"
+	_, err = ctf.WriteString(ctContent)
+	if err != nil {
+		ctf.Close()
+		t.Errorf("unable to write ct settings file: %v", err)
+	}
+	// try to start the client
+	client, err := NewClient(clientDir)
+	if err == nil {
+		client.Close()
+		t.Errorf("client read the missing value ct settings file")
+	}
+}
