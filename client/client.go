@@ -51,7 +51,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -156,7 +155,7 @@ func (c *Client) Close() error {
 // this case anyway.
 func (c *Client) loadKeypair() error {
 	path := filepath.Join(c.staticBaseDir, ClientKeyFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
 	}
@@ -173,7 +172,7 @@ func (c *Client) loadKeypair() error {
 // to the GCA.
 func (c *Client) loadGCAPub() error {
 	path := filepath.Join(c.staticBaseDir, GCAPubKeyFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
 	}
@@ -189,7 +188,7 @@ func (c *Client) loadGCAPub() error {
 // themselves, so the client only needs to send to one of them.
 func (c *Client) loadGCAServers() error {
 	path := filepath.Join(c.staticBaseDir, GCAServerMapFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("GCA server file not found, client was configured incorrectly: %v", err)
 	}
@@ -209,7 +208,7 @@ func (c *Client) loadGCAServers() error {
 	// non-banned server from the randomized list. This ensures that even
 	// at startup the client is being robust against bad actors.
 	servers := make([]glow.PublicKey, 0, len(c.gcaServers))
-	for server, _ := range c.gcaServers {
+	for server := range c.gcaServers {
 		servers = append(servers, server)
 	}
 	for i := range servers {
@@ -235,7 +234,7 @@ func (c *Client) loadGCAServers() error {
 // 5 minutes for 10 years.
 func (c *Client) loadShortID() error {
 	path := filepath.Join(c.staticBaseDir, ShortIDFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client shortID not found, the client was configured incorrectly")
 	}
