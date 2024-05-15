@@ -37,7 +37,7 @@ func TestCISettings(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not open ct settings file: %v", err)
 	}
-	ctContent := "-2000\n-4000\n" // this will set energy multipler to 2000, divider to 4000
+	ctContent := "-2000\n-4000\n" // this will set energy value to 1/2.
 	_, err = ctf.WriteString(ctContent)
 	if err != nil {
 		ctf.Close()
@@ -50,8 +50,7 @@ func TestCISettings(t *testing.T) {
 	}
 	defer client.Close()
 
-	// Update the monitoring file so that the client submits data to the
-	// server.
+	// Update the monitoring file so that the client submits data to the server.
 	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5}, []uint64{500, 3000})
 	if err != nil {
 		t.Fatal(err)
