@@ -161,9 +161,10 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 // region and time range.
 func getWattTimeHistoricalDataRaw(token, region string, startTime, endTime int64) ([]byte, error) {
 	// Convert the times to ISO 8601.
-	startTimeT := time.Unix(startTime, 0)
+	// Assumes that the input time is in UTC format.
+	startTimeT := time.Unix(startTime, 0).UTC()
 	startTimeISO := startTimeT.Format("2006-01-02T15:04:05Z")
-	endTimeT := time.Unix(endTime, 0)
+	endTimeT := time.Unix(endTime, 0).UTC()
 	endTimeISO := endTimeT.Format("2006-01-02T15:04:05Z")
 
 	// Create the base url
