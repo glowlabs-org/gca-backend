@@ -364,7 +364,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 		// 3. Select the first non-banned server.
 		c.mu.Lock()
 		servers := make([]glow.PublicKey, 0, len(c.gcaServers))
-		for server, _ := range c.gcaServers {
+		for server := range c.gcaServers {
 			servers = append(servers, server)
 		}
 		for i := range servers {
