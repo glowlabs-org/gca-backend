@@ -99,6 +99,8 @@ type GCAServer struct {
 	tcpPort        uint16         // The port that the TCP listener is using
 	mu             sync.Mutex
 	tg             threadgroup.ThreadGroup
+
+	ApiArchiveRateLimiter *glow.RateLimiter // Rate limiter for the /archive endpoint.
 }
 
 // NewGCAServer initializes a new instance of GCAServer and returns either
@@ -116,21 +118,22 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 
 	// Initialize GCAServer with the necessary fields
 	server := &GCAServer{
-		baseDir:             baseDir,
-		equipment:           make(map[uint32]glow.EquipmentAuthorization),
-		equipmentShortID:    make(map[glow.PublicKey]uint32),
-		equipmentBans:       make(map[uint32]struct{}),
-		equipmentImpactRate: make(map[uint32]*[4032]float64),
-		equipmentMigrations: make(map[glow.PublicKey]EquipmentMigration),
-		equipmentReports:    make(map[uint32]*[4032]glow.EquipmentReport),
-		recentReports:       make([]glow.EquipmentReport, 0, maxRecentReports),
+		baseDir:               baseDir,
+		equipment:             make(map[uint32]glow.EquipmentAuthorization),
+		equipmentShortID:      make(map[glow.PublicKey]uint32),
+		equipmentBans:         make(map[uint32]struct{}),
+		equipmentImpactRate:   make(map[uint32]*[4032]float64),
+		equipmentMigrations:   make(map[glow.PublicKey]EquipmentMigration),
+		equipmentReports:      make(map[uint32]*[4032]glow.EquipmentReport),
+		recentReports:         make([]glow.EquipmentReport, 0, maxRecentReports),
+		ApiArchiveRateLimiter: glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate),
 	}
 	if testMode {
 		// Create a background thread that will print out the name of the
 		// server if the server hasn't been shut down after 120 seconds.
 		server.tg.Launch(func() {
 			if server.tg.Sleep(time.Second * 120) {
-				panic("server lived for longer than 120 seconds: "+baseDir)
+				panic("server lived for longer than 120 seconds: " + baseDir)
 			}
 		})
 	}
@@ -149,8 +152,8 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// Create the http server and provision its shutdown.
 	server.mux = http.NewServeMux()
 	server.httpServer = &http.Server{
-		Addr: serverIP + ":" + strconv.Itoa(httpPort),
-		Handler: server.mux,
+		Addr:        serverIP + ":" + strconv.Itoa(httpPort),
+		Handler:     server.mux,
 		ReadTimeout: serverShutdownTime / 2,
 	}
 	server.tg.OnStop(func() error {
@@ -215,7 +218,6 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// equipmentReports before starting the threadedMigrateReports loop
 	// which will permanently archive our data and prevent it from being
 	// used again.
-
 
 	// Load the watttime credentials.
 	wtUsernamePath := filepath.Join(server.baseDir, "watttime_data", "username")

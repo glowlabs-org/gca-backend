@@ -14,3 +14,9 @@ const (
 	// banned. There's in implied division by 100, so 135 implies 135%.
 	MaxCapacityBuffer = 135
 )
+
+var (
+	// Change order of the public files: gca public key, equipment authorization, equipment reports, all device statistics.
+	// Files should be archived in reverse order.
+	PublicFiles = []string{"allDeviceStats.dat", "equipment-reports.dat", "equipment-authorizations.dat", "gcaPubKey.dat", "gcaTempPubKey.dat"}
+)
