@@ -221,15 +221,15 @@ func ServerWithArchiveFiles(name string) (*GCAServer, string, error) {
 	}
 
 	// Submit reports for slots 0, 2, and 4.
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 0, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 0, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 2, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 2, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4, 50)
 	if err != nil {
 		return nil, "", err
 	}
@@ -239,15 +239,15 @@ func ServerWithArchiveFiles(name string) (*GCAServer, string, error) {
 	// migration.
 	glow.SetCurrentTimeslot(4000)
 	time.Sleep(450 * time.Millisecond) // Manually set to 450ms because it would NDF sometimes at 250ms.
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4031, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4031, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4030, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4030, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4028, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4028, 50)
 	if err != nil {
 		return nil, "", err
 	}
