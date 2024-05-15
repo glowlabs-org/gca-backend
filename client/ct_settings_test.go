@@ -43,6 +43,7 @@ func TestCISettings(t *testing.T) {
 		ctf.Close()
 		t.Errorf("unable to write ct settings file: %v", err)
 	}
+	ctf.Close()
 	// start the client
 	client, err := NewClient(clientDir)
 	if err != nil {
@@ -106,6 +107,7 @@ func TestCISettingsMalformed(t *testing.T) {
 		ctf.Close()
 		t.Errorf("unable to write ct settings file: %v", err)
 	}
+	ctf.Close()
 	// try to start the client
 	client, err := NewClient(clientDir)
 	if err == nil {
@@ -138,6 +140,7 @@ func TestCISettingsMissingValue(t *testing.T) {
 		ctf.Close()
 		t.Errorf("unable to write ct settings file: %v", err)
 	}
+	ctf.Close()
 	// try to start the client
 	client, err := NewClient(clientDir)
 	if err == nil {
