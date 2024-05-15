@@ -37,7 +37,7 @@ func TestCISettings(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not open ct settings file: %v", err)
 	}
-	ctContent := "2000\n4000\n" // this will set energy multipler to 2000, divider to 4000
+	ctContent := "-2000\n-4000\n" // this will set energy multipler to 2000, divider to 4000
 	_, err = ctf.WriteString(ctContent)
 	if err != nil {
 		ctf.Close()
