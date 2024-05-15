@@ -129,7 +129,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// of performing the underflow conversion, otherwise
 			// the multiplier will be multiplying a giant uint64 by
 			// 4 rather than multiplying a negative number by 4.
-			energy = uint64(EnergyMultiplier * energyF64 / 1e3)
+			energy = uint64(c.energyMultiplier * energyF64 / c.energyDivider)
 		}
 
 		// Append the data to the records slice

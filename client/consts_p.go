@@ -25,8 +25,10 @@ const (
 
 	// CTMultiplier is the multiplier that we use on the current
 	// transformer to correctly normalize the readings from the current
-	// transformer.
-	EnergyMultiplier = -2000
+	// transformer. The reported energy value is first multiplied, then divided by
+	// these values.
+	EnergyMultiplierDefault = -2000
+	EnergyDividerDefault    = 1000
 
 	// UDPSleepSyncTime sets the amount of time that the system sleeps
 	// between each UDP packet that gets sent. We sleep between packets

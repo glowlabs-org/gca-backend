@@ -47,6 +47,7 @@ package client
 // typical.
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -54,6 +55,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -76,16 +78,22 @@ type Client struct {
 	staticPubKey        glow.PublicKey
 	staticPrivKey       glow.PrivateKey
 
+	// Energy multiplier
+	energyMultiplier float64
+	energyDivider    float64
+
 	// Sync primitives.
-	mu     sync.Mutex
-	tg     threadgroup.ThreadGroup
+	mu sync.Mutex
+	tg threadgroup.ThreadGroup
 }
 
 // NewClient will return a new client that is running smoothly.
 func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
-		staticBaseDir: baseDir,
+		staticBaseDir:    baseDir,
+		energyMultiplier: EnergyMultiplierDefault,
+		energyDivider:    EnergyDividerDefault,
 	}
 	if testMode {
 		// Create a background thread that will panic if the client is
@@ -95,7 +103,7 @@ func NewClient(baseDir string) (*Client, error) {
 		// out if a client isn't closed.
 		c.tg.Launch(func() {
 			if c.tg.Sleep(time.Second * 120) {
-				panic("client was not closed during testing: "+baseDir)
+				panic("client was not closed during testing: " + baseDir)
 			}
 		})
 	}
@@ -120,6 +128,10 @@ func NewClient(baseDir string) (*Client, error) {
 	err = c.loadShortID()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load the short id: %v", err)
+	}
+	err = c.readCTSettingsFile()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CT file: %v", err)
 	}
 
 	// Launch the loop that will send UDP reports to the GCA server. The
@@ -231,5 +243,43 @@ func (c *Client) loadShortID() error {
 		return fmt.Errorf("unable to read short id file: %v", err)
 	}
 	c.shortID = binary.LittleEndian.Uint32(data)
+	return nil
+}
+
+// readCTFile looks for a CT settings file, and if it is found,
+// parses it by line for the energy multiplier and divider.
+func (c *Client) readCTSettingsFile() error {
+	path := filepath.Join(c.staticBaseDir, CTSettingsFile)
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // use defaults
+		} else {
+			return fmt.Errorf("error opening ct settings file: %v", err)
+		}
+	}
+	defer file.Close()
+	var mult, div float64
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() {
+		line := scanner.Text()
+		mult, err = strconv.ParseFloat(line, 64)
+		if err != nil {
+			return fmt.Errorf("could not parse 1st ct settings line: %v", err)
+		}
+	} else {
+		return fmt.Errorf("ct settings file has no 1st line")
+	}
+	if scanner.Scan() {
+		line := scanner.Text()
+		div, err = strconv.ParseFloat(line, 64)
+		if err != nil {
+			return fmt.Errorf("could not parse 2nd ct settings line: %v", err)
+		}
+	} else {
+		return fmt.Errorf("ct settings file has no 2nd line")
+	}
+	c.energyMultiplier = mult
+	c.energyDivider = div
 	return nil
 }
