@@ -48,6 +48,7 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -90,9 +91,7 @@ type Client struct {
 func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
-		staticBaseDir:    baseDir,
-		energyMultiplier: EnergyMultiplierDefault,
-		energyDivider:    EnergyDividerDefault,
+		staticBaseDir: baseDir,
 	}
 	if testMode {
 		// Create a background thread that will panic if the client is
@@ -247,36 +246,33 @@ func (c *Client) loadShortID() error {
 
 // readCTFile looks for a CT settings file, and if it is found,
 // parses it by line for the energy multiplier and divider.
+// If the file is not found sets defaults and exits.
 func (c *Client) readCTSettingsFile() error {
 	path := filepath.Join(c.staticBaseDir, CTSettingsFile)
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil // use defaults
-		} else {
-			return fmt.Errorf("error opening ct settings file: %v", err)
-		}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		c.energyMultiplier = EnergyMultiplierDefault
+		c.energyDivider = EnergyDividerDefault
+		return nil
 	}
-	defer file.Close()
-	var mult, div float64
-	scanner := bufio.NewScanner(file)
-	if scanner.Scan() {
-		line := scanner.Text()
-		mult, err = strconv.ParseFloat(line, 64)
-		if err != nil {
-			return fmt.Errorf("could not parse 1st ct settings line: %v", err)
-		}
-	} else {
+	if err != nil {
+		return fmt.Errorf("error opening ct settings file: %v", err)
+	}
+	buf := bytes.NewReader(data)
+	scanner := bufio.NewScanner(buf)
+	if !scanner.Scan() {
 		return fmt.Errorf("ct settings file has no 1st line")
 	}
-	if scanner.Scan() {
-		line := scanner.Text()
-		div, err = strconv.ParseFloat(line, 64)
-		if err != nil {
-			return fmt.Errorf("could not parse 2nd ct settings line: %v", err)
-		}
-	} else {
+	mult, err := strconv.ParseFloat(scanner.Text(), 64)
+	if err != nil {
+		return fmt.Errorf("could not parse 1st ct settings line: %v", err)
+	}
+	if !scanner.Scan() {
 		return fmt.Errorf("ct settings file has no 2nd line")
+	}
+	div, err := strconv.ParseFloat(scanner.Text(), 64)
+	if err != nil {
+		return fmt.Errorf("could not parse 2nd ct settings line: %v", err)
 	}
 	c.energyMultiplier = mult
 	c.energyDivider = div
