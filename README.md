@@ -5,6 +5,11 @@ and the clients that report to the servers.
 
 Run tests with `go test -v -tags test ./...`
 
+To run a subset of tests, use the following:
+```
+go test -v -tags test -run TestRateLimiter ./... # runs all RateLimiter tests
+```
+
 ## Standards and Conventions
 
 Within the code, "PublicKey" can be abbreviated to "PubKey" or "pubKey", but
@@ -146,3 +151,15 @@ The glow-monitor assumes that there will be at least 30 minutes of network
 uptime every day during the daylight, with at most 2 consecutive days of
 downtime. More downtime than that will result in missing power reports that
 under-represent a solar farms contributions.
+
+## File Writing and Archiving
+
+To ensure consistency of files stored on the server, they should be written
+append-only, using a single write call. This allows consistent read access
+without the need for file locking.
+
+The archive strategy is to return all public data as files, providing
+them in a zip archive. In case of updates during the archive
+process, files must be archived in the reverse order to which they would
+be modified. The archive order is: all device stats, equipment reports,
+equipment authizations, gca public keys, and gca server public keys.
