@@ -22,4 +22,7 @@ const (
 	// ShortIDFile contains the ShortID of the device, which is useful for
 	// compressing communications with the GCA servers.
 	ShortIDFile = "shortID.dat"
+
+	// CTSettingsFile contains the current transformer multiplier.
+	CTSettingsFile = "ct-settings.txt"
 )
