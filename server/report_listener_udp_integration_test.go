@@ -23,12 +23,12 @@ func (gcas *GCAServer) sendEquipmentReport(ea glow.EquipmentAuthorization, ePriv
 	// cannot use 0 or 1 because both of those values are sentinel values
 	// and thus the report will simply be ignored by the server.
 	output := glow.GenerateSecureRandomInt(2, int(ea.Capacity))
-	return gcas.sendEquipmentReportSpecific(ea, ePriv, glow.CurrentTimeslot(), uint64(output))
+	return gcas.staticSendEquipmentReportSpecific(ea, ePriv, glow.CurrentTimeslot(), uint64(output))
 }
 
-// sendEquipmentReportSpecific is the same as sendEquipmentReport, but takes
+// staticSendEquipmentReportSpecific is the same as sendEquipmentReport, but takes
 // specific values for the power output and the timeslot.
-func (gcas *GCAServer) sendEquipmentReportSpecific(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey, timeslot uint32, output uint64) error {
+func (gcas *GCAServer) staticSendEquipmentReportSpecific(ea glow.EquipmentAuthorization, ePriv glow.PrivateKey, timeslot uint32, output uint64) error {
 	// Create the report and sign it using the provided private key.
 	er := glow.EquipmentReport{
 		ShortID:     ea.ShortID,
