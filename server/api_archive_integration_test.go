@@ -209,45 +209,40 @@ func ServerWithArchiveFiles(name string) (*GCAServer, string, error) {
 		return nil, "", err
 	}
 
-	// Generate a keypair for a device.
-	authPub, authPriv := glow.GenerateKeyPair()
-	auth := glow.EquipmentAuthorization{ShortID: 0, PublicKey: authPub}
-	sb := auth.SigningBytes()
-	sig := glow.Sign(sb, gcaPrivKey)
-	auth.Signature = sig
-	_, err = gcas.saveEquipment(auth)
+	// Submit new hardware via API
+	auth, authPriv, err := gcas.submitNewHardware(0, gcaPrivKey)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Submit reports for slots 0, 2, and 4.
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 0, 50)
+	// Submit reports via API for slots 0, 2, and 4.
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 0, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 2, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 2, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4, 50)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Submit reports for slots 4031, 4030, and 4028. For these reports to
+	// Submit reports via API for slots 4031, 4030, and 4028. For these reports to
 	// be accepted, time must be shifted. This will also trigger a report
 	// migration.
 	glow.SetCurrentTimeslot(4000)
 	time.Sleep(450 * time.Millisecond) // Manually set to 450ms because it would NDF sometimes at 250ms.
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4031, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4031, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4030, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4030, 50)
 	if err != nil {
 		return nil, "", err
 	}
-	err = gcas.sendEquipmentReportSpecific(auth, authPriv, 4028, 50)
+	err = gcas.staticSendEquipmentReportSpecific(auth, authPriv, 4028, 50)
 	if err != nil {
 		return nil, "", err
 	}
