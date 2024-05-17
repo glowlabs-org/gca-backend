@@ -42,7 +42,7 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
-	c.EventLog.UpdateEventStats("udp report sent")
+	c.EventLog.Printf("udp report sent")
 	glow.SendUDPReport(data, location)
 }
 
@@ -66,7 +66,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		c.EventLog.Printf("unable to read monitoring file: %v", err)
 		return nil, fmt.Errorf("unable to read monitoring file: %v", err)
 	}
-	c.EventLog.UpdateEventStats("read energy file")
+	c.EventLog.Printf("read energy file")
 
 	// Iterate over the CSV records
 	reader := csv.NewReader(strings.NewReader(string(data)))
@@ -130,7 +130,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// Note that the sentinel value '1' is already reserve
 			// to indicate that the gca server has banned a
 			// timeslot.
-			c.EventLog.UpdateEventStats("energy read but below absolute value 24")
+			c.EventLog.Printf("energy read but below absolute value 24")
 			energy = 2
 		} else {
 			// NOTE: 'energy' might be a negative number, which will cast
@@ -143,7 +143,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// of performing the underflow conversion, otherwise
 			// the multiplier will be multiplying a giant uint64 by
 			// 4 rather than multiplying a negative number by 4.
-			c.EventLog.UpdateEventStats("negative energy value read")
+			c.EventLog.Printf("negative energy value read")
 			energy = uint64(c.energyMultiplier * energyF64 / c.energyDivider)
 		}
 
@@ -185,7 +185,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	defer conn.Close()
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], c.shortID)
-	c.EventLog.UpdateEventStats(fmt.Sprintf("tcp send to %v", gcas.Location))
+	c.EventLog.Printf(fmt.Sprintf("tcp send to %v", gcas.Location))
 	_, err = conn.Write(buf[:])
 	if err != nil {
 		c.EventLog.Printf("unable to send reqeust to gca server %v: %v", gcas.Location, err)
@@ -202,7 +202,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read the response length: %v", err)
 	}
 	respLen := binary.LittleEndian.Uint16(respLenBuf[:])
-	c.EventLog.UpdateEventStats(fmt.Sprintf("tcp response from %v", gcas.Location))
+	c.EventLog.Printf(fmt.Sprintf("tcp response from %v", gcas.Location))
 
 	// Receive the response.
 	respBuf := make([]byte, respLen)

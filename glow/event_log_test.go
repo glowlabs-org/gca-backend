@@ -2,62 +2,112 @@ package glow
 
 import (
 	"testing"
+	"time"
 )
 
-func TestEventLogDefaults(t *testing.T) {
-}
-
-/*
-func TestEventLogDefaults(t *testing.T) {
-	l := NewEventLog(100 * time.Millisecond, 1024, })
-
-	l.Printf("alpha")
-	l.Printf("bravo")
-	if len(l.GetEventLogs()) != 2 {
-		t.Fatalf("Expected 2, got %v", len(l.GetEventLogs()))
-	}
-	s := l.DumpLog()
-	if !strings.Contains(s, "alpha") || !strings.Contains(s, "bravo") {
-		t.Fatalf("Bad content")
-	}
-	time.Sleep(100 * time.Millisecond)
-	l.Printf("charlie")
-	l.Printf("delta")
-	if len(l.GetEventLogs()) != 2 {
-		t.Fatalf("Expected 2, got %v", len(l.GetEventLogs()))
-	}
-	s = l.DumpLog()
-	if !strings.Contains(s, "charlie") || !strings.Contains(s, "delta") {
-		t.Fatalf("Bad content")
+func TestInitialConditionHandling(t *testing.T) {
+	l := NewEventLogger(0, -1, -1)
+	if l != nil {
+		t.Errorf("Expected nil logger due to invalid initial conditions, got non-nil")
 	}
 }
 
-/*
+func TestEventLogBasic(t *testing.T) {
+	l := NewEventLogger(time.Second, 1000, 100) // 2 logs of size 5 requires 20 bytes
+	l.Printf("abcde")
+	time.Sleep(5 * time.Millisecond)
+	l.Printf("fghij")
+	time.Sleep(5 * time.Millisecond)
+	entries, order := l.DumpLogEntries()
+	if len(entries) != 2 {
+		t.Errorf("wrong size, expecting %v got %v", 2, len(entries))
+	}
+	if _, found := entries["abcde"]; !found {
+		t.Errorf("missing log: %v", "abcde")
+	}
+	if _, found := entries["fghij"]; !found {
+		t.Errorf("missing log: %v", "fghij")
+	}
+	if len(order) != 2 {
+		t.Errorf("wrong size, expecting %v got %v", 2, len(order))
+	}
+	if order[0] != "abcde" {
+		t.Errorf("out of order: %v", "abcde")
+	}
+	if order[1] != "fghij" {
+		t.Errorf("out of order: %v", "fghij")
+	}
+}
+
 func TestEventLogMaxSize(t *testing.T) {
-	l := NewEventLog() // Default does not store anything.
-	l.Printf("12345")
-	l.Printf("67890")
-	if len(l.GetEventLogs()) != 0 {
-		t.Fatalf("Expected 0, got %v", len(l.GetEventLogs()))
+	l := NewEventLogger(time.Second, 20, 100) // 2 logs of size 5 requires 20 bytes
+	l.Printf("abcde")
+	time.Sleep(5 * time.Millisecond)
+	l.Printf("fghij")
+	time.Sleep(5 * time.Millisecond)
+	entries, _ := l.DumpLogEntries()
+	if len(entries) != 2 {
+		t.Fatalf("Expected 2, got %v", len(entries))
 	}
-	l.Options.LimitBytes = 2*8 + 2*5 // Just enough for two events.
-	l.Printf("12345")
-	l.Printf("67890")
-	if len(l.GetEventLogs()) != 2 {
-		t.Fatalf("Expected 2, got %v", len(l.GetEventLogs()))
+	if _, found := entries["abcde"]; !found {
+		t.Errorf("missing log: %v", "abcde")
 	}
-	s := l.DumpLog()
-	if !strings.Contains(s, "12345") || !strings.Contains(s, "67890") {
-		t.Fatalf("Bad content")
+	if _, found := entries["fghij"]; !found {
+		t.Errorf("missing log: %v", "fghij")
 	}
-	l.Printf("54321")
-	l.Printf("09876")
-	if len(l.GetEventLogs()) != 2 {
-		t.Fatalf("Expected 2, got %v", len(l.GetEventLogs()))
+	l.Printf("klmno")
+	time.Sleep(5 * time.Millisecond)
+	l.Printf("pqrst")
+	time.Sleep(5 * time.Millisecond)
+	entries, _ = l.DumpLogEntries()
+	if len(entries) != 2 {
+		t.Fatalf("Expected 2, got %v", len(entries))
 	}
-	s = l.DumpLog()
-	if !strings.Contains(s, "54321") || !strings.Contains(s, "09876") {
-		t.Fatalf("Bad content")
+	if _, found := entries["klmno"]; !found {
+		t.Errorf("missing log: %v", "klmno")
+	}
+	if _, found := entries["pqrst"]; !found {
+		t.Errorf("missing log: %v", "pqrst")
 	}
 }
-*/
+
+func TestEventLogExpiry(t *testing.T) {
+	l := NewEventLogger(5*time.Millisecond, 1000, 100)
+	l.Printf("abcde")
+	l.Printf("fghij")
+	entries, _ := l.DumpLogEntries()
+	if len(entries) != 2 {
+		t.Fatalf("Expected 2, got %v", len(entries))
+	}
+	if _, found := entries["abcde"]; !found {
+		t.Errorf("missing log: %v", "abcde")
+	}
+	if _, found := entries["fghij"]; !found {
+		t.Errorf("missing log: %v", "fghij")
+	}
+	time.Sleep(5 * time.Millisecond)
+	l.Printf("klmno")
+	l.Printf("pqrst")
+	entries, _ = l.DumpLogEntries()
+	if len(entries) != 2 {
+		t.Fatalf("Expected 2, got %v", len(entries))
+	}
+	if _, found := entries["klmno"]; !found {
+		t.Errorf("missing log: %v", "klmno")
+	}
+	if _, found := entries["pqrst"]; !found {
+		t.Errorf("missing log: %v", "pqrst")
+	}
+}
+
+func TestEventLogLineLengthLimit(t *testing.T) {
+	l := NewEventLogger(5*time.Millisecond, 1000, 5)
+	l.Printf("abcdefghij")
+	entries, _ := l.DumpLogEntries()
+	if _, found := entries["abcdefghij"]; found {
+		t.Errorf("log was not truncated: %v", "abcdefghij")
+	}
+	if _, found := entries["abcde"]; !found {
+		t.Errorf("missing log: %v", "abcde")
+	}
+}

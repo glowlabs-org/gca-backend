@@ -181,15 +181,19 @@ func (c *Client) DumpEventLogs() string {
 		sb.WriteString(fmt.Sprintf("pubKey:        %v banned: %v\n", hex.EncodeToString(key[:]), serv.Banned))
 	}
 
-	sb.WriteString("\nEvent Statistics\n----------\n")
-
-	es := c.EventLog.DumpEventStats()
-	sb.WriteString(es)
-
 	sb.WriteString("\nLogs\n----------\n")
 
-	le := c.EventLog.DumpLogEntries()
-	sb.WriteString(le)
+	mapEntries, entryOrder := c.EventLog.DumpLogEntries()
+	for _, line := range entryOrder {
+		updates := mapEntries[line]
+		last := updates[len(updates)-1]
+		sb.WriteString(last.UTC().Format(time.RFC3339))
+		sb.WriteString(" " + line)
+		if len(updates) > 1 {
+			sb.WriteString(" (" + strconv.Itoa(len(updates)) + " repeats)")
+		}
+		sb.WriteString("\n")
+	}
 
 	return sb.String()
 }
