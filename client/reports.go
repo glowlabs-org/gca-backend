@@ -548,6 +548,9 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 		}
 	}
 
+	// Let the reset handler know that we had a successful sync.
+	c.syncChan <- true
+
 	return true
 }
 
