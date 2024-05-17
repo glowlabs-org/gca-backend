@@ -51,11 +51,13 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,6 +84,9 @@ type Client struct {
 	energyMultiplier float64
 	energyDivider    float64
 
+	// Event log.
+	EventLog *glow.EventLogger
+
 	// Sync primitives.
 	mu sync.Mutex
 	tg threadgroup.ThreadGroup
@@ -104,6 +109,9 @@ func NewClient(baseDir string) (*Client, error) {
 				panic("client was not closed during testing: " + baseDir)
 			}
 		})
+	}
+	if c.EventLog = glow.NewEventLogger(EventLogExpiry, EventLogLimitBytes, EventLogLineLimitBytes); c.EventLog == nil {
+		panic("could not create event log")
 	}
 
 	// Load the persist data for the client.
@@ -141,7 +149,53 @@ func NewClient(baseDir string) (*Client, error) {
 
 // Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
+	if testMode {
+		// Dump the logs & events to the test client directory.
+		path := filepath.Join(c.staticBaseDir, "status.txt")
+		os.WriteFile(path, []byte(c.DumpEventLogs()), 0644)
+	}
 	return c.tg.Stop()
+}
+
+// Helper to dump client status to a string. Returns general information,
+// followed by the event log.
+func (c *Client) DumpEventLogs() string {
+	var sb strings.Builder
+
+	now := time.Now()
+
+	sb.WriteString(fmt.Sprintf("UTC:    %v\n", now.UTC().Format(time.RFC3339)))
+	sb.WriteString(fmt.Sprintf("Local:  %v\n", now.Format(time.RFC3339)))
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	sb.WriteString("\nState\n----------\n")
+	sb.WriteString(fmt.Sprintf("pubKey:        %v\n", hex.EncodeToString(c.staticPubKey[:])))
+	sb.WriteString(fmt.Sprintf("shortId:       %v\n", c.shortID))
+	sb.WriteString(fmt.Sprintf("gcaPubKey:     %v\n", hex.EncodeToString(c.gcaPubKey[:])))
+	sb.WriteString(fmt.Sprintf("primaryServer: %v\n", hex.EncodeToString(c.primaryServer[:])))
+
+	sb.WriteString("\nGCA Servers\n----------\n")
+	for key, serv := range c.gcaServers {
+		sb.WriteString(fmt.Sprintf("pubKey:        %v banned: %v\n", hex.EncodeToString(key[:]), serv.Banned))
+	}
+
+	sb.WriteString("\nLogs\n----------\n")
+
+	mapEntries, entryOrder := c.EventLog.DumpLogEntries()
+	for _, line := range entryOrder {
+		updates := mapEntries[line]
+		last := updates[len(updates)-1]
+		sb.WriteString(last.UTC().Format(time.RFC3339))
+		sb.WriteString(" " + line)
+		if len(updates) > 1 {
+			sb.WriteString(" (" + strconv.Itoa(len(updates)) + " repeats)")
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
 }
 
 // loadKeypair will load the client keys from disk. The GCA should have put

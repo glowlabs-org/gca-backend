@@ -33,6 +33,12 @@ const (
 	// operation is all but guaranteed to get them dropped.
 	UDPSleepSyncTime = time.Millisecond
 
+	// Event log constants. These values limit the in-memory footprint
+	// of the event logging system.
+	EventLogExpiry         = 20 * time.Second // enough time for the tests to complete
+	EventLogLimitBytes     = 1000
+	EventLogLineLimitBytes = 200
+
 	// RequestResetDelay is the delay between successful sync calls after which
 	// a request restart file will be created.
 	RequestResetDelay = 200 * time.Millisecond
