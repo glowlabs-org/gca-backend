@@ -7,7 +7,6 @@ package client
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/csv"
 	"fmt"
@@ -43,7 +42,7 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
-	c.EventLog.Printf("udp send ShortID %v Timeslot %v PowerOutput %v", eqr.ShortID, eqr.Timeslot, eqr.PowerOutput)
+	c.EventLog.UpdateEventStats("udp report sent")
 	glow.SendUDPReport(data, location)
 }
 
@@ -67,6 +66,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 		c.EventLog.Printf("unable to read monitoring file: %v", err)
 		return nil, fmt.Errorf("unable to read monitoring file: %v", err)
 	}
+	c.EventLog.UpdateEventStats("read energy file")
 
 	// Iterate over the CSV records
 	reader := csv.NewReader(strings.NewReader(string(data)))
@@ -130,6 +130,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// Note that the sentinel value '1' is already reserve
 			// to indicate that the gca server has banned a
 			// timeslot.
+			c.EventLog.UpdateEventStats("energy read but below absolute value 24")
 			energy = 2
 		} else {
 			// NOTE: 'energy' might be a negative number, which will cast
@@ -142,6 +143,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// of performing the underflow conversion, otherwise
 			// the multiplier will be multiplying a giant uint64 by
 			// 4 rather than multiplying a negative number by 4.
+			c.EventLog.UpdateEventStats("negative energy value read")
 			energy = uint64(EnergyMultiplier * energyF64 / 1e3)
 		}
 
@@ -177,16 +179,16 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
 	conn, err := net.Dial("tcp", location)
 	if err != nil {
-		c.EventLog.Printf("unable to dial the gca server: %v", err)
+		c.EventLog.Printf("unable to dial the gca server %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to dial the gca server: %v", err)
 	}
 	defer conn.Close()
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], c.shortID)
-	c.EventLog.Printf("tcp send shortID: %v", c.shortID)
+	c.EventLog.UpdateEventStats(fmt.Sprintf("tcp send to %v", gcas.Location))
 	_, err = conn.Write(buf[:])
 	if err != nil {
-		c.EventLog.Printf("unable to send reqeust to gca server: %v", err)
+		c.EventLog.Printf("unable to send reqeust to gca server %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to send reqeust to gca server: %v", err)
 	}
 
@@ -200,7 +202,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read the response length: %v", err)
 	}
 	respLen := binary.LittleEndian.Uint16(respLenBuf[:])
-	c.EventLog.Printf("tcp recv respLen: %v", respLen)
+	c.EventLog.UpdateEventStats(fmt.Sprintf("tcp response from %v", gcas.Location))
 
 	// Receive the response.
 	respBuf := make([]byte, respLen)
@@ -226,7 +228,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	var sig glow.Signature
 	copy(sig[:], respBuf[respLen-64:])
 	if !glow.Verify(gcasKey, respBuf[:respLen-64], sig) {
-		c.EventLog.Printf("received response from server with invalid signature: %v", err)
+		c.EventLog.Printf("received response from server with invalid signature")
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
 	}
 
@@ -392,7 +394,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 		// 3. Select the first non-banned server.
 		c.mu.Lock()
 		servers := make([]glow.PublicKey, 0, len(c.gcaServers))
-		for server, _ := range c.gcaServers {
+		for server := range c.gcaServers {
 			servers = append(servers, server)
 		}
 		for i := range servers {
@@ -410,7 +412,6 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 			}
 			found = true
 			c.primaryServer = server
-			c.EventLog.Printf("server sync primary server set to %v", base64.URLEncoding.EncodeToString(c.primaryServer[:]))
 			break
 		}
 		if !found {

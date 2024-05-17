@@ -79,7 +79,7 @@ type Client struct {
 	staticPrivKey       glow.PrivateKey
 
 	// Event log.
-	EventLog *glow.EventLog
+	EventLog *glow.EventLogger
 
 	// Sync primitives.
 	mu sync.Mutex
@@ -91,7 +91,6 @@ func NewClient(baseDir string) (*Client, error) {
 	// Create an empty client.
 	c := &Client{
 		staticBaseDir: baseDir,
-		EventLog:      glow.NewEventLog(glow.EventLogOptions{Expiry: EventLogExpiry, LimitBytes: EventLogLimitBytes}),
 	}
 	if testMode {
 		// Create a background thread that will panic if the client is
@@ -104,6 +103,9 @@ func NewClient(baseDir string) (*Client, error) {
 				panic("client was not closed during testing: " + baseDir)
 			}
 		})
+	}
+	if c.EventLog = glow.NewEventLogger(EventLogExpiry, EventLogLimitBytes, EventLogLineLimitBytes); c.EventLog == nil {
+		panic("could not create event log")
 	}
 
 	// Load the persist data for the client.
@@ -137,20 +139,23 @@ func NewClient(baseDir string) (*Client, error) {
 
 // Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
+	if testMode {
+		// Dump the logs & events to the test client directory.
+		path := filepath.Join(c.staticBaseDir, "status.txt")
+		os.WriteFile(path, []byte(c.DumpEventLogs()), 0644)
+	}
 	return c.tg.Stop()
 }
 
 // Helper to dump client status to a string. Returns general information,
 // followed by the event log.
-func (c *Client) DumpStatus() string {
+func (c *Client) DumpEventLogs() string {
 	var sb strings.Builder
 
 	now := time.Now()
 
 	sb.WriteString(fmt.Sprintf("UTC:    %v\n", now.UTC().Format(time.RFC3339)))
 	sb.WriteString(fmt.Sprintf("Local:  %v\n", now.Format(time.RFC3339)))
-
-	elog := c.EventLog.DumpLog()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -166,8 +171,15 @@ func (c *Client) DumpStatus() string {
 		sb.WriteString(fmt.Sprintf("pubKey:        %v banned: %v\n", hex.EncodeToString(key[:]), serv.Banned))
 	}
 
-	sb.WriteString("\nEvent Log\n----------\n")
-	sb.WriteString(fmt.Sprintf("%v", elog))
+	sb.WriteString("\nEvent Statistics\n----------\n")
+
+	es := c.EventLog.DumpEventStats()
+	sb.WriteString(es)
+
+	sb.WriteString("\nLogs\n----------\n")
+
+	le := c.EventLog.DumpLogEntries()
+	sb.WriteString(le)
 
 	return sb.String()
 }
