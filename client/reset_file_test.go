@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestResetFileCreateAndRemove(t *testing.T) {
+func TestRestartFileCreateAndRemove(t *testing.T) {
 	// Create a client and a server to perform the test.
 	client, gcas, _, _ := FullClientTestEnvironment(t.Name())
 	defer client.Close()
@@ -47,7 +47,7 @@ func TestResetFileCreateAndRemove(t *testing.T) {
 	}
 }
 
-func TestResetRemoveOnClose(t *testing.T) {
+func TestRestartFileRemoveOnClose(t *testing.T) {
 	// Create a client and a server to perform the test.
 	client, gcas, _, _ := FullClientTestEnvironment(t.Name())
 	defer gcas.Close()
