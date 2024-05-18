@@ -15,33 +15,35 @@ func TestResetFileCreateAndRemove(t *testing.T) {
 
 	path := filepath.Join(client.staticBaseDir, RequestResetFile)
 
+	// Settle to give the thread time to process
+	time.Sleep(10 * time.Millisecond)
+
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
 	}
 
-	// Execute a sync with the server and make sure the file is still there.
+	// Execute a sync with the server and make sure the file is still not there.
 	if s := client.threadedSyncWithServer(0); !s {
 		t.Error("sync failed")
 	}
 
+	time.Sleep(10 * time.Millisecond)
+
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
 	}
 
-	// Wait for the thread to create the file
 	time.Sleep(RequestResetDelay + 10*time.Millisecond)
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Errorf("does not exist when it should: %v", path)
 	}
 
-	// Send another sync
 	if s := client.threadedSyncWithServer(0); !s {
 		t.Error("sync failed")
 	}
 
-	// Give the thread time to remove the file
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
