@@ -26,6 +26,6 @@ const (
 	// CTSettingsFile contains the current transformer multiplier.
 	CTSettingsFile = "ct-settings.txt"
 
-	// RequestResetFile is a file that asks the system for a reset.
-	RequestResetFile = "request-reset.txt"
+	// RequestRestartFile is a file that asks the system for a restart.
+	RequestRestartFile = "request-restart.txt"
 )

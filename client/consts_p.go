@@ -37,9 +37,9 @@ const (
 	// operation is all but guaranteed to get them dropped.
 	UDPSleepSyncTime = time.Second
 
-	// RequestResetDelay is the delay between successful sync calls after which
+	// RequestRestartFileDelay is the delay between successful sync calls after which
 	// a request restart file will be created.
-	RequestResetDelay = 24 * time.Hour
+	RequestRestartFileDelay = 24 * time.Hour
 
 	// Indicate that this is not a testing build of the client.
 	testMode = false

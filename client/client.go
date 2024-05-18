@@ -135,9 +135,9 @@ func NewClient(baseDir string) (*Client, error) {
 		return nil, fmt.Errorf("error reading CT file: %v", err)
 	}
 
-	// Launch a loop that will monitor for successful syncs, and create a reset file
-	// after 24 hours.
-	c.launchRestartFile()
+	// Launch a loop that will monitor for successful syncs, and create a request
+	// restart file after 24 hours.
+	c.launchRequestRestartFile()
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
@@ -286,27 +286,29 @@ func (c *Client) readCTSettingsFile() error {
 	return nil
 }
 
-// launchResetFile starts a timer, which creates a request reset file after
+// launchRequestRestartFile starts a timer, which creates an empty request restart file after
 // the specified duration. The file is removed if it exists whenever a successful
 // sync happens, and the timer is reset. The file is removed on shutdown if it exists.
-func (c *Client) launchRestartFile() {
+//
+// The file is intended to be used by a systemd process.
+func (c *Client) launchRequestRestartFile() {
 	c.syncChan = make(chan bool)
-	path := filepath.Join(c.staticBaseDir, RequestResetFile)
+	path := filepath.Join(c.staticBaseDir, RequestRestartFile)
 	c.tg.AfterStop(func() error {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("can't remove request reset file %v: %v", path, err)
+			return fmt.Errorf("can't remove request restart file %v: %v", path, err)
 		}
 		return nil
 	})
 	c.tg.Launch(func() {
-		timer := time.NewTimer(RequestResetDelay)
+		timer := time.NewTimer(RequestRestartFileDelay)
 		for {
 			select {
 			case <-c.tg.StopChan():
 				return
 			case <-c.syncChan:
 				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-					panic("can't remove request reset file: " + path)
+					panic("can't remove request restart file: " + path)
 				}
 				timer.Stop()
 				// Consume any timer still in the channel.
@@ -314,14 +316,14 @@ func (c *Client) launchRestartFile() {
 				case <-timer.C:
 				default:
 				}
-				timer.Reset(RequestResetDelay)
+				timer.Reset(RequestRestartFileDelay)
 			case <-timer.C:
 				f, err := os.Create(path)
 				if err != nil {
-					panic("can't create request reset file: " + path)
+					panic("can't create request restart file: " + path)
 				}
 				if err := f.Close(); err != nil {
-					panic("can't close request reset file: " + path)
+					panic("can't close request restart file: " + path)
 				}
 			}
 		}

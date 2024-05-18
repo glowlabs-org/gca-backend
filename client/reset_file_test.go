@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-func TestRestartFileCreateAndRemove(t *testing.T) {
+func TestRequestRestartFileCreateAndRemove(t *testing.T) {
 	// Create a client and a server to perform the test.
 	client, gcas, _, _ := FullClientTestEnvironment(t.Name())
 	defer client.Close()
 	defer gcas.Close()
 
-	path := filepath.Join(client.staticBaseDir, RequestResetFile)
+	path := filepath.Join(client.staticBaseDir, RequestRestartFile)
 
 	// Settle to give the thread time to process
 	time.Sleep(10 * time.Millisecond)
@@ -32,7 +32,7 @@ func TestRestartFileCreateAndRemove(t *testing.T) {
 	}
 
 	// Wait for the delay period again to create a file
-	time.Sleep(RequestResetDelay + 10*time.Millisecond)
+	time.Sleep(RequestRestartFileDelay + 10*time.Millisecond)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Errorf("does not exist when it should: %v", path)
 	}
@@ -47,15 +47,15 @@ func TestRestartFileCreateAndRemove(t *testing.T) {
 	}
 }
 
-func TestRestartFileRemoveOnClose(t *testing.T) {
+func TestRequestRestartFileRemoveOnClose(t *testing.T) {
 	// Create a client and a server to perform the test.
 	client, gcas, _, _ := FullClientTestEnvironment(t.Name())
 	defer gcas.Close()
 
-	path := filepath.Join(client.staticBaseDir, RequestResetFile)
+	path := filepath.Join(client.staticBaseDir, RequestRestartFile)
 
 	// Wait for the client to create a file
-	time.Sleep(RequestResetDelay + 10*time.Millisecond)
+	time.Sleep(RequestRestartFileDelay + 10*time.Millisecond)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		client.Close()
 		t.Errorf("does not exist when it should: %v", path)
