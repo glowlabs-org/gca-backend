@@ -137,7 +137,7 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Launch a loop that will monitor for successful syncs, and create a reset file
 	// after 24 hours.
-	c.launchResetFile()
+	c.launchResetFileThread()
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
@@ -289,7 +289,7 @@ func (c *Client) readCTSettingsFile() error {
 // launchResetFile starts a timer, which creates a request reset file after
 // the specified duration. The file is removed if it exists whenever a successful
 // sync happens, and the timer is reset. The file is removed on shutdown if it exists.
-func (c *Client) launchResetFile() {
+func (c *Client) launchResetFileThread() {
 	c.syncChan = make(chan bool)
 	path := filepath.Join(c.staticBaseDir, RequestResetFile)
 	c.tg.AfterStop(func() error {
