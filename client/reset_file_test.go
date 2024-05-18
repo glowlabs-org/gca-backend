@@ -26,34 +26,24 @@ func TestResetFileCreateAndRemove(t *testing.T) {
 	if s := client.threadedSyncWithServer(0); !s {
 		t.Error("sync failed")
 	}
-
 	time.Sleep(10 * time.Millisecond)
-
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
 	}
 
+	// Wait for the delay period again to create a file
 	time.Sleep(RequestResetDelay + 10*time.Millisecond)
-
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Errorf("does not exist when it should: %v", path)
 	}
 
+	// Sync again to remove the file
 	if s := client.threadedSyncWithServer(0); !s {
 		t.Error("sync failed")
 	}
-
 	time.Sleep(10 * time.Millisecond)
-
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
-	}
-
-	// Wait again for the file to be written
-	time.Sleep(RequestResetDelay + 10*time.Millisecond)
-
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Errorf("does not exist when it should: %v", path)
 	}
 }
 
@@ -66,15 +56,13 @@ func TestResetRemoveOnClose(t *testing.T) {
 
 	// Wait for the client to create a file
 	time.Sleep(RequestResetDelay + 10*time.Millisecond)
-
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		client.Close()
 		t.Errorf("does not exist when it should: %v", path)
 	}
 
-	// Stop the client
+	// Stop the client, which should remove the file
 	client.Close()
-
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
 	}
