@@ -46,6 +46,13 @@ func TestResetFileCreateAndRemove(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("exists when it should not: %v", path)
 	}
+
+	// Wait again for the file to be written
+	time.Sleep(RequestResetDelay + 10*time.Millisecond)
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Errorf("does not exist when it should: %v", path)
+	}
 }
 
 func TestResetRemoveOnClose(t *testing.T) {
