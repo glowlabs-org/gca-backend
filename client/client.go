@@ -82,6 +82,9 @@ type Client struct {
 	energyMultiplier float64
 	energyDivider    float64
 
+	// Channel to signal a successful sync.
+	syncChan chan bool
+
 	// Sync primitives.
 	mu sync.Mutex
 	tg threadgroup.ThreadGroup
@@ -131,6 +134,10 @@ func NewClient(baseDir string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading CT file: %v", err)
 	}
+
+	// Launch a loop that will monitor for successful syncs, and create a reset file
+	// after 24 hours.
+	c.launchResetFile()
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
@@ -277,4 +284,46 @@ func (c *Client) readCTSettingsFile() error {
 	c.energyMultiplier = mult
 	c.energyDivider = div
 	return nil
+}
+
+// launchResetFile starts a timer, which creates a request reset file after
+// the specified duration. The file is removed if it exists whenever a successful
+// sync happens, and the timer is reset. The file is removed on shutdown if it exists.
+func (c *Client) launchResetFile() {
+	c.syncChan = make(chan bool)
+	path := filepath.Join(c.staticBaseDir, RequestResetFile)
+	c.tg.AfterStop(func() error {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("can't remove request reset file %v: %v", path, err)
+		}
+		return nil
+	})
+	c.tg.Launch(func() {
+		timer := time.NewTimer(RequestResetDelay)
+		for {
+			select {
+			case <-c.tg.StopChan():
+				return
+			case <-c.syncChan:
+				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+					panic("can't remove request reset file: " + path)
+				}
+				timer.Stop()
+				// Consume any timer still in the channel.
+				select {
+				case <-timer.C:
+				default:
+				}
+				timer.Reset(RequestResetDelay)
+			case <-timer.C:
+				f, err := os.Create(path)
+				if err != nil {
+					panic("can't create request reset file: " + path)
+				}
+				if err := f.Close(); err != nil {
+					panic("can't close request reset file: " + path)
+				}
+			}
+		}
+	})
 }
