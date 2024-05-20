@@ -100,6 +100,8 @@ type GCAServer struct {
 	allowIntApis   bool           // Enables bench testing the server with production settings
 	mu             sync.Mutex
 	tg             threadgroup.ThreadGroup
+
+	ApiArchiveRateLimiter *glow.RateLimiter // Rate limiter for the /archive endpoint.
 }
 
 // Enable bench test mode. Allows internal APIs and sets the server log level higher.
@@ -124,14 +126,15 @@ func NewGCAServer(baseDir string) (*GCAServer, error) {
 
 	// Initialize GCAServer with the necessary fields
 	server := &GCAServer{
-		baseDir:             baseDir,
-		equipment:           make(map[uint32]glow.EquipmentAuthorization),
-		equipmentShortID:    make(map[glow.PublicKey]uint32),
-		equipmentBans:       make(map[uint32]struct{}),
-		equipmentImpactRate: make(map[uint32]*[4032]float64),
-		equipmentMigrations: make(map[glow.PublicKey]EquipmentMigration),
-		equipmentReports:    make(map[uint32]*[4032]glow.EquipmentReport),
-		recentReports:       make([]glow.EquipmentReport, 0, maxRecentReports),
+		baseDir:               baseDir,
+		equipment:             make(map[uint32]glow.EquipmentAuthorization),
+		equipmentShortID:      make(map[glow.PublicKey]uint32),
+		equipmentBans:         make(map[uint32]struct{}),
+		equipmentImpactRate:   make(map[uint32]*[4032]float64),
+		equipmentMigrations:   make(map[glow.PublicKey]EquipmentMigration),
+		equipmentReports:      make(map[uint32]*[4032]glow.EquipmentReport),
+		recentReports:         make([]glow.EquipmentReport, 0, maxRecentReports),
+		ApiArchiveRateLimiter: glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate),
 	}
 	if testMode {
 		// Create a background thread that will print out the name of the

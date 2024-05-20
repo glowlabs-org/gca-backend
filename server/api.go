@@ -17,6 +17,7 @@ func (gcas *GCAServer) launchAPI() {
 	gcas.mux.HandleFunc("/api/v1/register-gca", gcas.RegisterGCAHandler)
 	gcas.mux.HandleFunc("/api/v1/recent-reports", gcas.RecentReportsHandler)
 	gcas.mux.HandleFunc("/api/v1/geo-stats", gcas.GeoStatsHandler)
+	gcas.mux.HandleFunc("/api/v1/archive", gcas.ArchiveHandler)
 	// Internal APIs which will not be accessible except under bench testing mode
 	gcas.mux.HandleFunc("/api/int/wt-signal-index", gcas.InternalWattTimeSignalIndexHandler)
 

@@ -47,13 +47,15 @@ package client
 // typical.
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -76,9 +78,13 @@ type Client struct {
 	staticPubKey        glow.PublicKey
 	staticPrivKey       glow.PrivateKey
 
+	// Energy multiplier
+	energyMultiplier float64
+	energyDivider    float64
+
 	// Sync primitives.
-	mu     sync.Mutex
-	tg     threadgroup.ThreadGroup
+	mu sync.Mutex
+	tg threadgroup.ThreadGroup
 }
 
 // NewClient will return a new client that is running smoothly.
@@ -95,7 +101,7 @@ func NewClient(baseDir string) (*Client, error) {
 		// out if a client isn't closed.
 		c.tg.Launch(func() {
 			if c.tg.Sleep(time.Second * 120) {
-				panic("client was not closed during testing: "+baseDir)
+				panic("client was not closed during testing: " + baseDir)
 			}
 		})
 	}
@@ -121,6 +127,10 @@ func NewClient(baseDir string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to load the short id: %v", err)
 	}
+	err = c.readCTSettingsFile()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CT file: %v", err)
+	}
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
@@ -144,7 +154,7 @@ func (c *Client) Close() error {
 // this case anyway.
 func (c *Client) loadKeypair() error {
 	path := filepath.Join(c.staticBaseDir, ClientKeyFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
 	}
@@ -161,7 +171,7 @@ func (c *Client) loadKeypair() error {
 // to the GCA.
 func (c *Client) loadGCAPub() error {
 	path := filepath.Join(c.staticBaseDir, GCAPubKeyFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client keys not found, the client was configured incorrectly")
 	}
@@ -177,7 +187,7 @@ func (c *Client) loadGCAPub() error {
 // themselves, so the client only needs to send to one of them.
 func (c *Client) loadGCAServers() error {
 	path := filepath.Join(c.staticBaseDir, GCAServerMapFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("GCA server file not found, client was configured incorrectly: %v", err)
 	}
@@ -197,7 +207,7 @@ func (c *Client) loadGCAServers() error {
 	// non-banned server from the randomized list. This ensures that even
 	// at startup the client is being robust against bad actors.
 	servers := make([]glow.PublicKey, 0, len(c.gcaServers))
-	for server, _ := range c.gcaServers {
+	for server := range c.gcaServers {
 		servers = append(servers, server)
 	}
 	for i := range servers {
@@ -223,7 +233,7 @@ func (c *Client) loadGCAServers() error {
 // 5 minutes for 10 years.
 func (c *Client) loadShortID() error {
 	path := filepath.Join(c.staticBaseDir, ShortIDFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("client shortID not found, the client was configured incorrectly")
 	}
@@ -231,5 +241,40 @@ func (c *Client) loadShortID() error {
 		return fmt.Errorf("unable to read short id file: %v", err)
 	}
 	c.shortID = binary.LittleEndian.Uint32(data)
+	return nil
+}
+
+// readCTFile looks for a CT settings file, and if it is found,
+// parses it by line for the energy multiplier and divider.
+// If the file is not found sets defaults and exits.
+func (c *Client) readCTSettingsFile() error {
+	path := filepath.Join(c.staticBaseDir, CTSettingsFile)
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		c.energyMultiplier = EnergyMultiplierDefault
+		c.energyDivider = EnergyDividerDefault
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error opening ct settings file: %v", err)
+	}
+	buf := bytes.NewReader(data)
+	scanner := bufio.NewScanner(buf)
+	if !scanner.Scan() {
+		return fmt.Errorf("ct settings file has no 1st line")
+	}
+	mult, err := strconv.ParseFloat(scanner.Text(), 64)
+	if err != nil {
+		return fmt.Errorf("could not parse 1st ct settings line: %v", err)
+	}
+	if !scanner.Scan() {
+		return fmt.Errorf("ct settings file has no 2nd line")
+	}
+	div, err := strconv.ParseFloat(scanner.Text(), 64)
+	if err != nil {
+		return fmt.Errorf("could not parse 2nd ct settings line: %v", err)
+	}
+	c.energyMultiplier = mult
+	c.energyDivider = div
 	return nil
 }

@@ -317,7 +317,7 @@ func TestConcurrency(t *testing.T) {
 				slot := atomic.AddUint32(&glow.ManualCurrentTimeslot, 1)
 
 				// Try submitting a new report.
-				err := gcas.sendEquipmentReportSpecific(ea, ePriv, slot, 5)
+				err := gcas.staticSendEquipmentReportSpecific(ea, ePriv, slot, 5)
 				if err != nil {
 					t.Fatal("reports should send correctly")
 				}
@@ -339,7 +339,7 @@ func TestConcurrency(t *testing.T) {
 						if bitfield[byteIndex]&mask != 0 {
 							continue
 						}
-						err := gcas.sendEquipmentReportSpecific(ea, ePriv, offset+uint32(i), 5)
+						err := gcas.staticSendEquipmentReportSpecific(ea, ePriv, offset+uint32(i), 5)
 						if err != nil {
 							t.Fatal(err)
 						}

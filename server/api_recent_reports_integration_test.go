@@ -26,7 +26,7 @@ func TestRecentReportsIntegration(t *testing.T) {
 	}
 
 	// Generate some reports for the equipment (this part might vary based on how reports are generated in your system)
-	err = server.sendEquipmentReportSpecific(ea, equipmentKey, 4, 45)
+	err = server.staticSendEquipmentReportSpecific(ea, equipmentKey, 4, 45)
 	if err != nil {
 		t.Fatal("Failed to generate reports for testing: ", err)
 	}
