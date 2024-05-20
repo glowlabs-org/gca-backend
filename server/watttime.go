@@ -91,17 +91,17 @@ func getBalancingAuthority(token string, latitude, longitude float64) (string, e
 
 // getWattTimeIndex returns the MOER value for the provided lat+long at the
 // curernt time.
-func getWattTimeIndex(token string, latitude float64, longitude float64) (float64, int64, error) {
+func getWattTimeIndex(token string, latitude float64, longitude float64) (float64, int64, string, error) {
 	// Since this code depends on external APIs, we return an arbitrary
 	// value during testing.
 	if testMode {
-		return latitude + longitude + 200 + float64(time.Now().UnixNano()%250), glow.TimeslotToUnix(glow.CurrentTimeslot()), nil
+		return latitude + longitude + 200 + float64(time.Now().UnixNano()%250), glow.TimeslotToUnix(glow.CurrentTimeslot()), "", nil
 	}
 
 	// Get the region associated with these coordinates
 	region, err := getBalancingAuthority(token, latitude, longitude)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get watttime region: %v", err)
+		return 0, 0, "", fmt.Errorf("unable to get watttime region: %v", err)
 	}
 
 	// Create the base url
@@ -109,7 +109,7 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	url := "https://api.watttime.org/v3/signal-index"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get watttime index: %v", err)
+		return 0, 0, "", fmt.Errorf("unable to get watttime index: %v", err)
 	}
 
 	// Set the parameters
@@ -122,12 +122,12 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// Make the API request
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to make watttime api request")
+		return 0, 0, "", fmt.Errorf("unable to make watttime api request")
 	}
 	defer resp.Body.Close()
 	// Check for non-200 status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, 0, fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
+		return 0, 0, "", fmt.Errorf("watttime API request failed with status code: %d", resp.StatusCode)
 	}
 
 	// Parse the JSON response.
@@ -137,16 +137,16 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	var jr jsonResponse
 	err = json.NewDecoder(resp.Body).Decode(&jr)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to parse watttime api response: %v", err)
+		return 0, 0, "", fmt.Errorf("unable to parse watttime api response: %v", err)
 	}
 	// WattTime API should have a single point in the response
 	if len(jr.Data) != 1 {
-		return 0, 0, fmt.Errorf("invalid api return: %v data items", len(jr.Data))
+		return 0, 0, "", fmt.Errorf("invalid api return: %v data items", len(jr.Data))
 	}
 	// Parse the string time.
 	t, err := time.Parse("2006-01-02T15:04:05+00:00", jr.Data[0].PointTime)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to parse watttime response time: %v", err)
+		return 0, 0, "", fmt.Errorf("unable to parse watttime response time: %v", err)
 	}
 	moer := jr.Data[0].Value
 
@@ -154,14 +154,13 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// pounds per megawatt hour. We multiply by 453.59237 to get from
 	// pounds per megawatt hour to grams per megawatt hour.
 	moer *= 453.59237
-	return moer, t.Unix(), nil
+	return moer, t.Unix(), region, nil
 }
 
 // getWattTimeHistoricalDataRaw returns uninterpreted WattTime historical data for a given
 // region and time range.
 func getWattTimeHistoricalDataRaw(token, region string, startTime, endTime int64) ([]byte, error) {
-	// Convert the times to ISO 8601.
-	// Assumes that the input time is in UTC format.
+	// Convert the times to ISO 8601 UTC format
 	startTimeT := time.Unix(startTime, 0).UTC()
 	startTimeISO := startTimeT.Format("2006-01-02T15:04:05Z")
 	endTimeT := time.Unix(endTime, 0).UTC()
@@ -201,9 +200,9 @@ func getWattTimeHistoricalDataRaw(token, region string, startTime, endTime int64
 	return rb, nil
 }
 
-// getWattTimeData returns the MOER values for the provided lat+long from the
+// getWattTimeWeeklyData returns the MOER values for the provided lat+long from the
 // provided time to 1 week later.
-func getWattTimeData(token string, latitude float64, longitude float64, startTime int64) ([]float64, []int64, error) {
+func getWattTimeWeeklyData(token string, latitude float64, longitude float64, startTime int64) ([]float64, []int64, error) {
 	// Determine what data range can be requested. If the end time is
 	// within 5 days of the current time, WattTime will be asked for the
 	// full set of data that it has. In the WattTime API v3 the end time is
@@ -312,7 +311,7 @@ func (gcas *GCAServer) managedGetWattTimeIndexData(username, password string) er
 			time.Sleep(250 * time.Millisecond)
 		}
 		// Fetch the current results for this device.
-		moer, date, err := getWattTimeIndex(token, lats[i], longs[i])
+		moer, date, _, err := getWattTimeIndex(token, lats[i], longs[i])
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
 			gcas.logger.Errorf("watttime lat: %v, long: %v", lats[i], longs[i])
@@ -382,7 +381,7 @@ func (gcas *GCAServer) managedGetWattTimeWeekData(username, password string) err
 			time.Sleep(250 * time.Millisecond)
 		}
 		// Fetch the current results for this device.
-		moers, dates, err := getWattTimeData(token, lats[i], longs[i], startTime)
+		moers, dates, err := getWattTimeWeeklyData(token, lats[i], longs[i], startTime)
 		if err != nil {
 			gcas.logger.Errorf("unable to get watttime data: %v", err)
 			gcas.logger.Errorf("watttime lat: %v, long: %v, startTime: %v", lats[i], longs[i], startTime)
