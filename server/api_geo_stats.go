@@ -242,10 +242,7 @@ func readMOERJson(filePath string) (map[string]map[string][]float64, error) {
 	}
 	defer file.Close()
 
-	type jsonData struct {
-		Data []DataPoint `json:"data"`
-	}
-	var jd jsonData
+	var jd DataPointsJSON
 	err = json.NewDecoder(file).Decode(&jd)
 	if err != nil {
 		return nil, err

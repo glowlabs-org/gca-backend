@@ -40,6 +40,16 @@ type DataPoint struct {
 	Value     float64 `json:"value"`
 }
 
+type DataPointsJSON struct {
+	Data []DataPoint `json:"data"`
+	Meta struct {
+		DataPointPeriodSeconds int    `json:"data_point_period_seconds"`
+		Region                 string `json:"region"`
+		SignalType             string `json:"signal_type"`
+		Units                  string `json:"units"`
+	} `json:"meta"`
+}
+
 // loadWattTimeCredentials is a helper function to load one of
 // the watttime credential files from disk.
 func loadWattTimeCredentials(filename string) (string, error) {
@@ -131,14 +141,13 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	}
 
 	// Parse the JSON response.
-	type jsonResponse struct {
-		Data []DataPoint `json:"data"`
-	}
-	var jr jsonResponse
+	var jr DataPointsJSON
 	err = json.NewDecoder(resp.Body).Decode(&jr)
 	if err != nil {
-		return 0, 0, "", fmt.Errorf("unable to parse watttime api response: %v", err)
+		return 0, 0, "", fmt.Errorf("unable to decode watttime historical data: %v", err)
 	}
+	SentinelizeHistoricalData(&jr)
+
 	// WattTime API should have a single point in the response
 	if len(jr.Data) != 1 {
 		return 0, 0, "", fmt.Errorf("invalid api return: %v data items", len(jr.Data))
@@ -155,6 +164,14 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// pounds per megawatt hour to grams per megawatt hour.
 	moer *= 453.59237
 	return moer, t.Unix(), region, nil
+}
+
+// SentinalizeHistoricalData provides sentinal values into the JSON
+// data as follows:
+// 0 denotes no data found for this time slot
+// 2 denotes 0 returned for this time slot
+// and integer N below 24 is replaced with a decimal N - 0.0001
+func SentinelizeHistoricalData(jr *DataPointsJSON) {
 }
 
 // getWattTimeHistoricalDataRaw returns uninterpreted WattTime historical data for a given
@@ -229,15 +246,13 @@ func getWattTimeWeeklyData(token string, latitude float64, longitude float64, st
 	}
 	br := bytes.NewReader(raw)
 
-	// Parse the JSON respose.
-	type jsonResponse struct {
-		Data []DataPoint `json:"data"`
-	}
-	var jr jsonResponse
+	// Parse the JSON response.
+	var jr DataPointsJSON
 	err = json.NewDecoder(br).Decode(&jr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse watttime api data: %v", err)
+		return nil, nil, fmt.Errorf("unable to decode watttime historical data: %v", err)
 	}
+	SentinelizeHistoricalData(&jr)
 
 	// Build the return values.
 	var moers []float64

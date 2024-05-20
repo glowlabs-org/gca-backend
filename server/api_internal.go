@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -69,20 +70,22 @@ func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, 
 		http.Error(w, fmt.Sprintf("unable to get watttime historical data: %v", err), http.StatusInternalServerError)
 		return
 	}
-	//br := bytes.NewReader(raw)
-	/*	// Parse the JSON response
-		type jsonResponse struct {
-			Data []DataPoint `json:"data"`
-			Meta struct{}    `json:"meta"`
-		}
-		var jr jsonResponse
-		err = json.NewDecoder(br).Decode(&jr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("unable to parse watttime api data: %v", err), http.StatusInternalServerError)
-			return
-		}*/
+	br := bytes.NewReader(raw)
+	var jr DataPointsJSON
+	err = json.NewDecoder(br).Decode(&jr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to decode watttime historical data: %v", err), http.StatusInternalServerError)
+		return
+	}
+	SentinelizeHistoricalData(&jr)
+	jsonData, err := json.Marshal(&jr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to marshal watttime historical data: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(raw)
+	w.Write(jsonData)
 }
 
 // InternalWattTimeSignalIndexHandler is an internal API to test the WattTime signal index query.
