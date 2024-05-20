@@ -275,7 +275,6 @@ func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 // managedBuildDeviceStats will build a DeviceStats object for the provided

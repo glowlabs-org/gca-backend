@@ -86,7 +86,6 @@ func (gca *GCAServer) EquipmentMigrateHandler(w http.ResponseWriter, r *http.Req
 	// ensure that the persistence is functioning.
 
 	// Send a success response
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	gca.logger.Info("Successfully authorized equipment.")
 }

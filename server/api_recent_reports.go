@@ -57,7 +57,6 @@ func (s *GCAServer) RecentReportsHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Send the response as JSON with a status code of OK
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		s.logger.Error("Failed to encode JSON response:", err)
