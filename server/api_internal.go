@@ -10,8 +10,8 @@ import (
 )
 
 // InternalWattTimeHistoricalHandler is an Internal API to test the WattTime historical query.
-// For a latitude and longitude, a time offset from the current time, and a duration,
-// returns historical energy data for this range.
+// For a latitude and longitude, a start time, and a duration, returns historical energy data
+// for this range. Time format is yyyy-mm-ddThh:mm:ssZ.
 func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, r *http.Request) {
 	if !gcas.allowIntApis {
 		http.Error(w, "Not implemented in production", http.StatusNotImplemented)
@@ -30,11 +30,10 @@ func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, 
 		http.Error(w, "Invalid coordinate query parameters", http.StatusBadRequest)
 		return
 	}
-	// Parse the offset and duration
-
-	off, durOff := time.ParseDuration(query.Get("off"))
+	// Parse the start time and duration
+	start, startErr := time.Parse("2006-01-02T15:04:05Z", query.Get("start"))
 	dur, durErr := time.ParseDuration(query.Get("dur"))
-	if durOff != nil || durErr != nil {
+	if startErr != nil || durErr != nil {
 		http.Error(w, "Invalid time query parameters", http.StatusBadRequest)
 		return
 	}
@@ -64,10 +63,8 @@ func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, 
 		http.Error(w, fmt.Sprintf("unable to get watttime region: %v", err), http.StatusInternalServerError)
 		return
 	}
-	startTime := time.Now().Add(-off)
-	endTime := startTime.Add(dur)
-
-	raw, err := getWattTimeHistoricalDataRaw(token, region, startTime.Unix(), endTime.Unix())
+	endTime := start.Add(dur)
+	raw, err := getWattTimeHistoricalDataRaw(token, region, start.Unix(), endTime.Unix())
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to get watttime historical data: %v", err), http.StatusInternalServerError)
 		return
