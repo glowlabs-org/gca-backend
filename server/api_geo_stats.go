@@ -116,7 +116,6 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 		AverageCarbonCertificates: averageCarbonCredits,
 	}
 
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(responseData); err != nil {
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		return

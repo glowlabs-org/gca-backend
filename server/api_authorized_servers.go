@@ -37,7 +37,6 @@ func (s *GCAServer) AuthorizedServersHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Send the response as JSON with a status code of OK
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(asr); err != nil {
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		s.logger.Error("Failed to encode JSON response:", err)
@@ -75,21 +74,18 @@ func (s *GCAServer) AuthorizedServersHandlerPOST(w http.ResponseWriter, r *http.
 		if s.gcaServers.servers[i].PublicKey == server.PublicKey {
 			if s.gcaServers.servers[i].Banned {
 				s.gcaServers.mu.Unlock()
-				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 				s.logger.Info("received authorization for server that is banned")
 				return
 			}
 			if !server.Banned {
 				s.gcaServers.mu.Unlock()
-				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 				s.logger.Info("received authorization for server that already exists")
 				return
 			}
 			s.gcaServers.servers[i] = server
 			s.gcaServers.mu.Unlock()
-			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 			s.logger.Info("received authorization to ban server")
 			return
@@ -169,7 +165,6 @@ func (s *GCAServer) AuthorizedServersHandlerPOST(w http.ResponseWriter, r *http.
 		resp.Body.Close()
 	}
 
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	s.logger.Info("received authorization for new server")
 }
