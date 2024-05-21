@@ -163,6 +163,25 @@ func (c *Client) Close() error {
 	return c.tg.Stop()
 }
 
+// latestLogWithPrefix searches for the most recent logs starting with a prefix,
+// and prints it with a newline.
+func latestLogWithPrefix(logs map[string][]time.Time, prefix string) string {
+
+	var t time.Time
+	var line string
+	for key, times := range logs {
+		// If the latest time is past t, this is latest.
+		if strings.HasPrefix(key, prefix) && times[len(times)-1].After(t) {
+			t = times[len(times)-1]
+			line = key
+		}
+	}
+	if len(line) == 0 {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339) + " " + line + "\n"
+}
+
 // Helper to dump client status to a string. Returns general information,
 // followed by the event log.
 func (c *Client) DumpEventLogs() string {
@@ -187,9 +206,16 @@ func (c *Client) DumpEventLogs() string {
 		sb.WriteString(fmt.Sprintf("pubKey:        %v banned: %v\n", hex.EncodeToString(key[:]), serv.Banned))
 	}
 
-	sb.WriteString("\nLogs\n----------\n")
-
 	mapEntries, entryOrder := c.EventLog.DumpLogEntries()
+
+	sb.WriteString("\nRecent UDP report\n----------\n")
+	sb.WriteString(latestLogWithPrefix(mapEntries, "udp report to "))
+	sb.WriteString("\nRecent successful sync\n----------\n")
+	sb.WriteString(latestLogWithPrefix(mapEntries, "sync successful"))
+	sb.WriteString("\nRecent failed sync\n----------\n")
+	sb.WriteString(latestLogWithPrefix(mapEntries, "failed sync"))
+
+	sb.WriteString("\nLogs\n----------\n")
 	for _, line := range entryOrder {
 		updates := mapEntries[line]
 		last := updates[len(updates)-1]

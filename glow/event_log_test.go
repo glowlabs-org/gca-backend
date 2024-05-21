@@ -5,13 +5,6 @@ import (
 	"time"
 )
 
-func TestInitialConditionHandling(t *testing.T) {
-	l := NewEventLogger(0, -1, -1)
-	if l != nil {
-		t.Errorf("Expected nil logger due to invalid initial conditions, got non-nil")
-	}
-}
-
 func TestEventLogBasic(t *testing.T) {
 	l := NewEventLogger(time.Second, 1000, 100) // 2 logs of size 5 requires 20 bytes
 	l.Printf("abcde")

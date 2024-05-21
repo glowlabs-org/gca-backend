@@ -182,7 +182,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
 	conn, err := net.Dial("tcp", location)
 	if err != nil {
-		c.EventLog.Printf("unable to dial the gca server %v: %v", gcas.Location, err)
+		c.EventLog.Printf("failed sync unable to dial the gca server %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to dial the gca server: %v", err)
 	}
 	defer conn.Close()
@@ -191,7 +191,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	c.EventLog.Printf(fmt.Sprintf("tcp send to %v", gcas.Location))
 	_, err = conn.Write(buf[:])
 	if err != nil {
-		c.EventLog.Printf("unable to send reqeust to gca server %v: %v", gcas.Location, err)
+		c.EventLog.Printf("failed sync unable to send reqeust to gca server %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to send reqeust to gca server: %v", err)
 	}
 
@@ -201,21 +201,21 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	var respLenBuf [2]byte
 	_, err = io.ReadFull(conn, respLenBuf[:])
 	if err != nil {
-		c.EventLog.Printf("unable to read the response length: %v", err)
+		c.EventLog.Printf("failed sync unable to read the response length: %v", err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read the response length: %v", err)
 	}
 	respLen := binary.LittleEndian.Uint16(respLenBuf[:])
-	c.EventLog.Printf(fmt.Sprintf("tcp response from %v", gcas.Location))
+	c.EventLog.Printf(fmt.Sprintf("sync got tcp response from %v", gcas.Location))
 
 	// Receive the response.
 	respBuf := make([]byte, respLen)
 	n, err := io.ReadFull(conn, respBuf)
 	if err != nil {
-		c.EventLog.Printf("unable to read response from %v: %v", gcas.Location, err)
+		c.EventLog.Printf("failed sync unable to read response from %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read response from gca server: %v", err)
 	}
 	if n != int(respLen) {
-		c.EventLog.Printf("%v did not send enough data: %v", gcas.Location, err)
+		c.EventLog.Printf("%v failed sync did not send enough data: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("server did not send enough data: %v", err)
 	}
 
@@ -225,13 +225,13 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	signingTime := binary.LittleEndian.Uint64(respBuf[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
-		c.EventLog.Printf("received response from %v that is out of bounds temporally: %v vs %v", gcas.Location, now, signingTime)
+		c.EventLog.Printf("failed sync received response from %v that is out of bounds temporally: %v vs %v", gcas.Location, now, signingTime)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v vs %v", now, signingTime)
 	}
 	var sig glow.Signature
 	copy(sig[:], respBuf[respLen-64:])
 	if !glow.Verify(gcasKey, respBuf[:respLen-64], sig) {
-		c.EventLog.Printf("received response from %v with invalid signature", gcas.Location)
+		c.EventLog.Printf("failed sync received response from %v with invalid signature", gcas.Location)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
 	}
 
@@ -251,7 +251,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	// associated with our shortID, and therefore this response is
 	// meaningless.
 	if equipmentKey != c.staticPubKey {
-		c.EventLog.Printf("equipment appears to have the wrong short id: key %v pubkey %v", hex.EncodeToString(equipmentKey[:]), hex.EncodeToString(c.staticPubKey[:]))
+		c.EventLog.Printf("failed sync equipment appears to have the wrong short id: key %v pubkey %v", hex.EncodeToString(equipmentKey[:]), hex.EncodeToString(c.staticPubKey[:]))
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
 	}
 
@@ -263,7 +263,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	migrationBytes := append(equipmentKey[:], respBuf[540:respLen-(64+72)]...)
 	newGCASigningBytes := append([]byte("EquipmentMigration"), migrationBytes...)
 	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
-		c.EventLog.Printf("received new GCA from server with invalid signature")
+		c.EventLog.Printf("failed sync received new GCA from server with invalid signature")
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature")
 	}
 
@@ -279,7 +279,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		// Check that there are enough bytes to read up to the
 		// locationLen.
 		if i+34 > end {
-			c.EventLog.Printf("unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
+			c.EventLog.Printf("failed sync unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
 		}
 		var as server.AuthorizedServer
@@ -290,7 +290,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		locationLen := int(respBuf[i])
 		i += 1
 		if i+locationLen+70 > end {
-			c.EventLog.Printf("unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
+			c.EventLog.Printf("failed sync unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
 		}
 		as.Location = string(respBuf[i : i+locationLen])
@@ -318,11 +318,12 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 			verify = glow.Verify(gcaKey, sb, as.GCAAuthorization)
 		}
 		if !verify {
-			c.EventLog.Printf("received authorized server which has invalid authorization")
+			c.EventLog.Printf("failed sync received authorized server which has invalid authorization")
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received authorized server which has invalid authorization")
 		}
 	}
 
+	c.EventLog.Printf("sync successful with %v", gcas.Location)
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
