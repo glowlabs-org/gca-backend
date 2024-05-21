@@ -146,14 +146,13 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("unable to decode watttime historical data: %v", err)
 	}
-	SentinelizeHistoricalData(&jr)
 
 	// WattTime API should have a single point in the response
 	if len(jr.Data) != 1 {
 		return 0, 0, "", fmt.Errorf("invalid api return: %v data items", len(jr.Data))
 	}
 	// Parse the string time.
-	t, err := time.Parse("2006-01-02T15:04:05+00:00", jr.Data[0].PointTime)
+	t, err := time.Parse("2006-01-02T15:04:05Z07:00", jr.Data[0].PointTime)
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("unable to parse watttime response time: %v", err)
 	}
@@ -164,14 +163,6 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 	// pounds per megawatt hour to grams per megawatt hour.
 	moer *= 453.59237
 	return moer, t.Unix(), region, nil
-}
-
-// SentinalizeHistoricalData provides sentinal values into the JSON
-// data as follows:
-// 0 denotes no data found for this time slot
-// 2 denotes 0 returned for this time slot
-// and integer N below 24 is replaced with a decimal N - 0.0001
-func SentinelizeHistoricalData(jr *DataPointsJSON) {
 }
 
 // getWattTimeHistoricalDataRaw returns uninterpreted WattTime historical data for a given
@@ -252,14 +243,13 @@ func getWattTimeWeeklyData(token string, latitude float64, longitude float64, st
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to decode watttime historical data: %v", err)
 	}
-	SentinelizeHistoricalData(&jr)
 
 	// Build the return values.
 	var moers []float64
 	var dates []int64
 	for _, ir := range jr.Data {
 		// Parse the string time.
-		t, err := time.Parse("2006-01-02T15:04:05Z", ir.PointTime)
+		t, err := time.Parse("2006-01-02T15:04:05Z07:00", ir.PointTime)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to parse watttime response time: %v", err)
 		}

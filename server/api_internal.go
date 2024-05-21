@@ -77,7 +77,6 @@ func (gcas *GCAServer) InternalWattTimeHistoricalHandler(w http.ResponseWriter, 
 		http.Error(w, fmt.Sprintf("unable to decode watttime historical data: %v", err), http.StatusInternalServerError)
 		return
 	}
-	SentinelizeHistoricalData(&jr)
 	jsonData, err := json.Marshal(&jr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to marshal watttime historical data: %v", err), http.StatusInternalServerError)
