@@ -37,7 +37,7 @@ func main() {
 		case syscall.SIGUSR2:
 			// Write the status to a file "status.txt" in the client directory. File will be
 			// created and/or truncated before writing.
-			path := filepath.Join(baseDir, "status.txt")
+			path := filepath.Join(c.baseDir, "status.txt")
 			fmt.Printf("Dumping server status to %v\n", path)
 			if err := os.WriteFile(path, []byte(c.DumpEventLogs()), 0644); err != nil {
 				fmt.Printf("%v", c.DumpEventLogs())

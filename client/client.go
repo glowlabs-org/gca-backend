@@ -110,9 +110,15 @@ func NewClient(baseDir string) (*Client, error) {
 			}
 		})
 	}
-	if c.EventLog = glow.NewEventLogger(EventLogExpiry, EventLogLimitBytes, EventLogLineLimitBytes); c.EventLog == nil {
-		panic("could not create event log")
+
+	// Set up the EventLogger and check for sanity conditions and reasonable limits.
+	if EventLogExpiry == time.Duration(0) || EventLogLimitBytes <= 0 || EventLogLineLimitBytes <= 0 {
+		panic("LogEntry log settings do not allow log collection.")
 	}
+	if EventLogLimitBytes >= 1e8 || EventLogLineLimitBytes >= 1e3 {
+		panic(fmt.Sprintf("LogEntry log parameters are too high: max bytes is %v and max line bytes is %v", EventLogLimitBytes, EventLogLineLimitBytes))
+	}
+	c.EventLog = glow.NewEventLogger(EventLogExpiry, EventLogLimitBytes, EventLogLineLimitBytes)
 
 	// Load the persist data for the client.
 	err := c.loadKeypair()

@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/csv"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -42,7 +43,7 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
-	c.EventLog.Printf("udp report sent")
+	c.EventLog.Printf("udp report to %v: slot %v energy %v", gcas.Location, er.Timeslot, er.Energy)
 	glow.SendUDPReport(data, location)
 }
 
@@ -130,7 +131,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// Note that the sentinel value '1' is already reserve
 			// to indicate that the gca server has banned a
 			// timeslot.
-			c.EventLog.Printf("energy read but below absolute value 24")
+			c.EventLog.Printf("low energy read: ts %v value %v", record[0], record[1])
 			energy = 2
 		} else {
 			// NOTE: 'energy' might be a negative number, which will cast
@@ -143,7 +144,9 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// of performing the underflow conversion, otherwise
 			// the multiplier will be multiplying a giant uint64 by
 			// 4 rather than multiplying a negative number by 4.
-			c.EventLog.Printf("negative energy value read")
+			if energyF64 < 0 {
+				c.EventLog.Printf("negative energy read: ts %v value %v", record[0], record[1])
+			}
 			energy = uint64(c.energyMultiplier * energyF64 / c.energyDivider)
 		}
 
@@ -208,11 +211,11 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	respBuf := make([]byte, respLen)
 	n, err := io.ReadFull(conn, respBuf)
 	if err != nil {
-		c.EventLog.Printf("unable to read response from gca server: %v", err)
+		c.EventLog.Printf("unable to read response from %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read response from gca server: %v", err)
 	}
 	if n != int(respLen) {
-		c.EventLog.Printf("server did not send enough data: %v", err)
+		c.EventLog.Printf("%v did not send enough data: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("server did not send enough data: %v", err)
 	}
 
@@ -222,13 +225,13 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	signingTime := binary.LittleEndian.Uint64(respBuf[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
-		c.EventLog.Printf("received response from server that is out of bounds temporally: %v vs %v", now, signingTime)
+		c.EventLog.Printf("received response from %v that is out of bounds temporally: %v vs %v", gcas.Location, now, signingTime)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v vs %v", now, signingTime)
 	}
 	var sig glow.Signature
 	copy(sig[:], respBuf[respLen-64:])
 	if !glow.Verify(gcasKey, respBuf[:respLen-64], sig) {
-		c.EventLog.Printf("received response from server with invalid signature")
+		c.EventLog.Printf("received response from %v with invalid signature", gcas.Location)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
 	}
 
@@ -248,7 +251,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	// associated with our shortID, and therefore this response is
 	// meaningless.
 	if equipmentKey != c.staticPubKey {
-		c.EventLog.Printf("equipment appears to have the wrong short id")
+		c.EventLog.Printf("equipment appears to have the wrong short id: key %v pubkey %v", hex.EncodeToString(equipmentKey[:]), hex.EncodeToString(c.staticPubKey[:]))
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
 	}
 
@@ -260,8 +263,8 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	migrationBytes := append(equipmentKey[:], respBuf[540:respLen-(64+72)]...)
 	newGCASigningBytes := append([]byte("EquipmentMigration"), migrationBytes...)
 	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
-		c.EventLog.Printf("received new GCA from server with invalid signature: %v", err)
-		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature: %v", err)
+		c.EventLog.Printf("received new GCA from server with invalid signature")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature")
 	}
 
 	// Extract the variable length fields. Safety checks are needed for
@@ -276,8 +279,8 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		// Check that there are enough bytes to read up to the
 		// locationLen.
 		if i+34 > end {
-			c.EventLog.Printf("unable to decode authorized servers due to length mismatches")
-			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches")
+			c.EventLog.Printf("unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
+			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
 		}
 		var as server.AuthorizedServer
 		copy(as.PublicKey[:], respBuf[i:i+32])
@@ -287,8 +290,8 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		locationLen := int(respBuf[i])
 		i += 1
 		if i+locationLen+70 > end {
-			c.EventLog.Printf("unable to decode authorized servers due to length mismatches")
-			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches")
+			c.EventLog.Printf("unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
+			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
 		}
 		as.Location = string(respBuf[i : i+locationLen])
 		i += locationLen

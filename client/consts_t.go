@@ -36,7 +36,7 @@ const (
 	// Event log constants. These values limit the in-memory footprint
 	// of the event logging system.
 	EventLogExpiry         = 20 * time.Second // enough time for the tests to complete
-	EventLogLimitBytes     = 1000
+	EventLogLimitBytes     = 1e3
 	EventLogLineLimitBytes = 200
 
 	// Indicate that this is a testing build of the client.

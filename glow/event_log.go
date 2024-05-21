@@ -30,15 +30,6 @@ type EventLogger struct {
 // NewEventLogger creates an in-memory event logger with size limitations to protect the client
 // from run-time failures.
 func NewEventLogger(logExpiry time.Duration, logMaxBytes, logMaxLineBytes int) *EventLogger {
-	// Require parameters that allow logs to be collected, and enforce some reasonable limits.
-	if logExpiry == time.Duration(0) || logMaxBytes <= 0 || logMaxLineBytes <= 0 {
-		fmt.Println("LogEntry log settings do not allow log collection.")
-		return nil
-	}
-	if logMaxBytes >= 1e8 || logMaxLineBytes >= 1e3 {
-		fmt.Printf("LogEntry log parameters are too high: max bytes is %v and max line bytes is %v", logMaxBytes, logMaxLineBytes)
-		return nil
-	}
 	return &EventLogger{
 		logs:            make(map[string]*LogEntry),
 		logExpiry:       logExpiry,
