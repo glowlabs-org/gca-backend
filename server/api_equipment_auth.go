@@ -69,7 +69,6 @@ func (gca *GCAServer) AuthorizeEquipmentHandler(w http.ResponseWriter, r *http.R
 	}
 
 	// Send a success response
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	gca.logger.Info("Successfully authorized equipment.")
 }

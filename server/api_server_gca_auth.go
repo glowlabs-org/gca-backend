@@ -96,7 +96,6 @@ func (s *GCAServer) RegisterGCAHandler(w http.ResponseWriter, r *http.Request) {
 		TcpPort:   s.tcpPort,
 		UdpPort:   s.udpPort,
 	}
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		// Handle the error if JSON encoding fails
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)

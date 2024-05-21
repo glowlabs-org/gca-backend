@@ -271,7 +271,6 @@ func (s *GCAServer) AllDeviceStatsHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Send the response as JSON with a status code of OK
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(stats); err != nil {
 		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
 		return
