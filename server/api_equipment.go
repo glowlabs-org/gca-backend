@@ -35,7 +35,6 @@ func (gcas *GCAServer) EquipmentHandler(w http.ResponseWriter, r *http.Request) 
 	gcas.mu.Unlock()
 
 	// Write the response
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(er); err != nil {
 		http.Error(w, "Failed to encode JSON response: "+err.Error(), http.StatusInternalServerError)
 		return
