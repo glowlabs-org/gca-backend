@@ -163,3 +163,16 @@ them in a zip archive. In case of updates during the archive
 process, files must be archived in the reverse order to which they would
 be modified. The archive order is: all device stats, equipment reports,
 equipment authizations, gca public keys, and gca server public keys.
+
+## Glow Monitor Event Logging
+
+The Glow Monitor now contains an in-memory event logging systems, to
+allow logging of monitor status and event history from the console.
+To dump the log events and status to the console:
+```
+kill -usr1 `pidof glow-monitor`
+```
+To dump to a file `status.txt` in the Glow Monitor's home directory:
+```
+kill -usr2 `pidof glow-monitor`
+```
