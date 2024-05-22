@@ -37,6 +37,12 @@ const (
 	// a request restart file will be created.
 	RequestRestartFileDelay = 100 * time.Millisecond
 
+	// Event log constants. These values limit the in-memory footprint
+	// of the event logging system.
+	EventLogExpiry         = 20 * time.Second // enough time for the tests to complete
+	EventLogLimitBytes     = 1e3
+	EventLogLineLimitBytes = 200
+
 	// Indicate that this is a testing build of the client.
 	testMode = true
 )
