@@ -324,6 +324,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	}
 
 	c.EventLog.Printf("sync successful with %v", gcas.Location)
+	c.updateSyncFile()
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
@@ -551,9 +552,6 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 			time.Sleep(UDPSleepSyncTime)
 		}
 	}
-
-	// Let the restart thread know that we had a successful sync.
-	c.syncChan <- true
 
 	return true
 }

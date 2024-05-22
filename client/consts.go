@@ -26,6 +26,6 @@ const (
 	// CTSettingsFile contains the current transformer multiplier.
 	CTSettingsFile = "ct-settings.txt"
 
-	// RequestRestartFile is a file that asks the system for a restart.
-	RequestRestartFile = "request-restart.txt"
+	// LastSyncFile is a file that contains the last successful sync time.
+	LastSyncFile = "last-sync.txt"
 )

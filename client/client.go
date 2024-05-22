@@ -84,9 +84,6 @@ type Client struct {
 	energyMultiplier float64
 	energyDivider    float64
 
-	// Channel to signal a successful sync.
-	syncChan chan bool
-
 	// Event log.
 	EventLog *glow.EventLogger
 
@@ -149,9 +146,10 @@ func NewClient(baseDir string) (*Client, error) {
 		return nil, fmt.Errorf("error reading CT file: %v", err)
 	}
 
-	// Launch a loop that will monitor for successful syncs, and create a request
-	// restart file after 24 hours.
-	c.launchRequestRestartFile()
+	// Create the initial sync file.
+	if err := c.updateSyncFile(); err != nil {
+		panic("could not create sync file: " + fmt.Sprintf("%v", err))
+	}
 
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
@@ -372,46 +370,11 @@ func (c *Client) readCTSettingsFile() error {
 	return nil
 }
 
-// launchRequestRestartFile starts a timer, which creates an empty request restart file after
-// the specified duration. The file is removed if it exists whenever a successful
-// sync happens, and the timer is reset. The file is removed on shutdown if it exists.
-//
-// The file is intended to be used by a systemd process.
-func (c *Client) launchRequestRestartFile() {
-	c.syncChan = make(chan bool)
-	path := filepath.Join(c.staticBaseDir, RequestRestartFile)
-	c.tg.AfterStop(func() error {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("can't remove request restart file %v: %v", path, err)
-		}
-		return nil
-	})
-	c.tg.Launch(func() {
-		timer := time.NewTimer(RequestRestartFileDelay)
-		for {
-			select {
-			case <-c.tg.StopChan():
-				return
-			case <-c.syncChan:
-				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-					panic("can't remove request restart file: " + path)
-				}
-				timer.Stop()
-				// Consume any timer still in the channel.
-				select {
-				case <-timer.C:
-				default:
-				}
-				timer.Reset(RequestRestartFileDelay)
-			case <-timer.C:
-				f, err := os.Create(path)
-				if err != nil {
-					panic("can't create request restart file: " + path)
-				}
-				if err := f.Close(); err != nil {
-					panic("can't close request restart file: " + path)
-				}
-			}
-		}
-	})
+// updateSyncFile updates the sync file with the current timestamp.
+func (c *Client) updateSyncFile() error {
+	path := filepath.Join(c.staticBaseDir, LastSyncFile)
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644); err != nil {
+		return fmt.Errorf("error writing to %v: %v", path, err)
+	}
+	return nil
 }

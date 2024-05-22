@@ -33,10 +33,6 @@ const (
 	// operation is all but guaranteed to get them dropped.
 	UDPSleepSyncTime = time.Millisecond
 
-	// RequestRestartFileDelay is the delay between successful sync calls after which
-	// a request restart file will be created.
-	RequestRestartFileDelay = 100 * time.Millisecond
-
 	// Event log constants. These values limit the in-memory footprint
 	// of the event logging system.
 	EventLogExpiry         = 20 * time.Second // enough time for the tests to complete
