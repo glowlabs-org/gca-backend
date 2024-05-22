@@ -131,7 +131,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// Note that the sentinel value '1' is already reserve
 			// to indicate that the gca server has banned a
 			// timeslot.
-			c.EventLog.Printf("low energy read: ts %v value %v", record[0], record[1])
+			c.EventLog.Printf("low energy read")
 			energy = 2
 		} else {
 			// NOTE: 'energy' might be a negative number, which will cast
@@ -145,7 +145,7 @@ func (c *Client) staticReadEnergyFile() ([]EnergyRecord, error) {
 			// the multiplier will be multiplying a giant uint64 by
 			// 4 rather than multiplying a negative number by 4.
 			if energyF64 < 0 {
-				c.EventLog.Printf("negative energy read: ts %v value %v", record[0], record[1])
+				c.EventLog.Printf("negative energy read")
 			}
 			energy = uint64(c.energyMultiplier * energyF64 / c.energyDivider)
 		}
