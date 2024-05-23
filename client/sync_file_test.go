@@ -75,7 +75,7 @@ func TestReportFileCreateOnStartup(t *testing.T) {
 	}
 }
 
-func TestReportFileUpdateOnSync(t *testing.T) {
+func TestReportFileUpdateOnReport(t *testing.T) {
 	client, gcas, _, _ := FullClientTestEnvironment(t.Name())
 	defer client.Close()
 	defer gcas.Close()
@@ -83,10 +83,13 @@ func TestReportFileUpdateOnSync(t *testing.T) {
 	if err := os.WriteFile(path, []byte("12345"), 0644); err != nil {
 		t.Errorf("error writing to %v: %v", path, err)
 	}
-	// Execute a sync with the server
-	if s := client.threadedSyncWithServer(0); !s {
-		t.Error("sync failed")
+	// Send a report to the server
+	err := updateMonitorFile(client.staticBaseDir, []uint32{1, 5, 10}, []uint64{500, 3000, 5000})
+	if err != nil {
+		gcas.Close()
+		t.Fatal(err)
 	}
+	time.Sleep(2 * sendReportTime)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Errorf("file %s missing: %v", path, err)
