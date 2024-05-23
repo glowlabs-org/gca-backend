@@ -25,7 +25,8 @@ def update_timestamp():
     current_time = int(time.time())
 
     try:
-        # open the file for writing, with failure if it does not already exist.
+        # The file is managed by the client, so it is an error if
+        # it does not already exist.
         with open(_sync_file_path, 'r+') as file:
             file.write(str(current_time))
 
