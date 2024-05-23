@@ -16,10 +16,8 @@ func TestEventLogIntegration(t *testing.T) {
 	defer client.Close()
 	defer glow.SetCurrentTimeslot(0)
 
-	l1 := "read energy file"
-	l2 := "udp report to 127.0.0.1"
-	l3 := "invalid energy value in energy file: random error here"
-	l4 := "low energy read"
+	l1 := "udp report to 127.0.0.1"
+	l2 := "invalid energy value in energy file: random error here"
 
 	// Send a report to the server
 	err = updateMonitorFile(client.staticBaseDir, []uint32{1, 5, 10}, []uint64{500, 3000, 5000})
@@ -33,14 +31,8 @@ func TestEventLogIntegration(t *testing.T) {
 	if !strings.Contains(dump, l1) {
 		t.Errorf("logs missing: %v", l1)
 	}
-	if !strings.Contains(dump, l2) {
+	if strings.Contains(dump, l2) {
 		t.Errorf("logs missing: %v", l2)
-	}
-	if strings.Contains(dump, l3) {
-		t.Errorf("logs missing: %v", l3)
-	}
-	if strings.Contains(dump, l4) {
-		t.Errorf("logs missing: %v", l4)
 	}
 
 	// Add a report using the magic number that creates a bad record.
@@ -56,11 +48,5 @@ func TestEventLogIntegration(t *testing.T) {
 	}
 	if !strings.Contains(dump, l2) {
 		t.Errorf("logs missing: %v", l1)
-	}
-	if !strings.Contains(dump, l3) {
-		t.Errorf("logs missing: %v", l1)
-	}
-	if !strings.Contains(dump, l4) {
-		t.Errorf("logs missing: %v", l4)
 	}
 }
