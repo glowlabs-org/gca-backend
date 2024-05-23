@@ -24,9 +24,14 @@ def signal_handler(sig, frame):
 def update_timestamp():
     current_time = int(time.time())
 
-    with open(_sync_file_path, 'w') as file:
-        file.write(str(current_time))
+    try:
+        # open the file for writing, with failure if it does not already exist.
+        with open(_sync_file_path, 'r+') as file:
+            file.write(str(current_time))
 
+    except FileNotFoundError:
+        print(f"fatal error does not exist: {_sync_file_path}")
+        sys.exit(1)
 
 # sync_threshold_handler handles processing when the threshold is exceeded.
 # In production mode, this will issue a kill -usr2 to the glow monitor to
