@@ -1,0 +1,13 @@
+[Unit]
+Description=Sync Monitor Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /usr/bin/sync-monitor.py production
+Restart=no
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

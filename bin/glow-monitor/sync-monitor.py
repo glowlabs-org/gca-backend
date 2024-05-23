@@ -8,11 +8,11 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-_sync_file_path = Path.home() / "last-sync.txt"
+_sync_file_path = "/opt/glow-monitor/last-sync.txt"
 _reboot_delay_sec = 86400 # 24 hours
 _check_delay_sec = 7200   # 2 hours
-_glow_monitor_kill_cmd = "sudo kill -usr2 `pidof glow-monitor`"
-_reboot_cmd = "sudo reboot"
+_glow_monitor_kill_cmd = "kill -usr2 `pidof glow-monitor`"
+_reboot_cmd = "reboot"
 _production_mode = False
 
 # signal_handler exits the script on a signal.
