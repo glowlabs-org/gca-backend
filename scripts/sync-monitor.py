@@ -34,6 +34,7 @@ def update_timestamp():
         print(f"fatal error does not exist: {_sync_file_path}")
         sys.exit(1)
 
+
 # sync_threshold_handler handles processing when the threshold is exceeded.
 # In production mode, this will issue a kill -usr2 to the glow monitor to
 # create an event log dump file, and then will issue a reboot command.
@@ -80,6 +81,7 @@ def check_timestamp():
     except ValueError:
         print(f"fatal error: sync file {_sync_file_path} contents is not a valid timestamp")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "production":
