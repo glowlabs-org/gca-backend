@@ -43,8 +43,14 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
+	if err := glow.SendUDPReport(data, location); err != nil {
+		c.EventLog.Printf("udp report to %v: slot %v energy %v failed: %v", gcas.Location, er.Timeslot, er.Energy, err)
+		return
+	}
+	// Report file is updated on a successful send, in order to validate that the networking
+	// is working correctly.
+	c.updateReportFile()
 	c.EventLog.Printf("udp report to %v: slot %v energy %v", gcas.Location, er.Timeslot, er.Energy)
-	glow.SendUDPReport(data, location)
 }
 
 // staticReadEnergyFile will read the data from the energy file and return an array

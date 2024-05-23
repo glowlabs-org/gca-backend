@@ -151,6 +151,11 @@ func NewClient(baseDir string) (*Client, error) {
 		panic("could not create sync file: " + fmt.Sprintf("%v", err))
 	}
 
+	// Create the initial report file.
+	if err := c.updateReportFile(); err != nil {
+		panic("could not create sync file: " + fmt.Sprintf("%v", err))
+	}
+
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
 	c.launchSendReports()
@@ -372,7 +377,24 @@ func (c *Client) readCTSettingsFile() error {
 
 // updateSyncFile updates the sync file with the current timestamp.
 func (c *Client) updateSyncFile() error {
-	path := filepath.Join(c.staticBaseDir, LastSyncFile)
+	basePath := "/dev/shm"
+	if testMode {
+		basePath = c.staticBaseDir
+	}
+	path := filepath.Join(basePath, LastSyncFile)
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644); err != nil {
+		return fmt.Errorf("error writing to %v: %v", path, err)
+	}
+	return nil
+}
+
+// updateReportFile updates the sync file with the current timestamp.
+func (c *Client) updateReportFile() error {
+	basePath := "/dev/shm"
+	if testMode {
+		basePath = c.staticBaseDir
+	}
+	path := filepath.Join(basePath, LastReportFile)
 	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644); err != nil {
 		return fmt.Errorf("error writing to %v: %v", path, err)
 	}
