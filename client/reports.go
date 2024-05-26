@@ -49,9 +49,10 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	}
 	// Report file is updated on a successful send, in order to validate that the networking
 	// is working correctly.
-	c.updateReportFile()
-	c.EventLog.Printf("udp report to %v: slot %v energy %v", gcas.Location, er.Timeslot, er.Energy)
-	c.EventLog.Printf("successful udp report") // this message will be deduplicated to give a count
+	err := c.updateReportFile()
+	if err != nil {
+		c.EventLog.Printf("unable to update report file: %v", err)
+	}
 }
 
 // staticReadEnergyFile will read the data from the energy file and return an array
@@ -325,8 +326,12 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		}
 	}
 
-	c.updateSyncFile()
-	c.EventLog.Printf("successful sync with %v", gcas.Location)
+	err = c.updateSyncFile()
+	if err != nil {
+		c.EventLog.Printf("unable to update sync file after successful sync: %v", err)
+	} else {
+		c.EventLog.Printf("successful sync with %v", gcas.Location)
+	}
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 

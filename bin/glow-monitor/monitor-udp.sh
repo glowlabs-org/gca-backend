@@ -2,15 +2,7 @@
 
 # Define the path for the timestamp file and log file
 TIMESTAMP_FILE="/dev/shm/last-udp.txt"
-
-# Ensure the timestamp file exists and has the current timestamp
-touch "$TIMESTAMP_FILE"
-echo "$(date +%s)" > "$TIMESTAMP_FILE"
-
-# Function to update timestamp
-update_timestamp() {
-    echo "$(date +%s)" > "$TIMESTAMP_FILE"
-}
+touch $TIMESTAMP_FILE
 
 # Function to check the age of the timestamp
 check_timestamp() {
@@ -18,24 +10,17 @@ check_timestamp() {
     last_timestamp=$(cat "$TIMESTAMP_FILE")
     time_diff=$((current_time - last_timestamp))
 
-    # If the timestamp is older than 15 minutes (900 seconds)
+    # Restart the glow_monitor service if the timestamp is older than 900
+    # seconds. This means that for some reason, the glow-monitor binary hasn't
+    # attempted to send a udp packet in at least 900 seconds, but the
+    # glow-monitor binary should be attempting this every 5 minutes.
     if [ "$time_diff" -gt 900 ]; then
-        # Dump logs
-        pid=$(pidof glow-monitor)
-        if [ -n "$pid" ]; then
-            kill -USR1 "$pid"
-        fi
-
-        # Update timestamp before rebooting
-        update_timestamp
-
-        # Reboot system
-        echo "rebooting system as $TIMESTAMP_FILE was not updated"
-        /sbin/reboot
+	# Restart the glow_monitor service
+	systemctl restart glow_monitor.service
     fi
 }
 
-# Set up a loop to check the timestamp every 4 minutes
+# Set up a loop to check the timestamp every 4 minutes.
 echo "starting $TIMESTAMP_FILE monitor"
 while true; do
     check_timestamp

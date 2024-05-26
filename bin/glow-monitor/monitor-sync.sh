@@ -1,37 +1,34 @@
 #!/bin/bash
 
-# Define the path for the timestamp file and log file
-TIMESTAMP_FILE="/dev/shm/last-sync.txt"
+# Define the path for the timestamp file.
+TIMESTAMP_FILE="/opt/glow-monitor/last-sync.txt"
+touch $TIMESTAMP_FILE
 
-# Ensure the timestamp file exists and has the current timestamp
-touch "$TIMESTAMP_FILE"
-echo "$(date +%s)" > "$TIMESTAMP_FILE"
-
-# Function to update timestamp
-update_timestamp() {
-    echo "$(date +%s)" > "$TIMESTAMP_FILE"
-}
-
-# Function to check the age of the timestamp
+# Write a function that will reboot the system if the timestamp is more than 24
+# hours old.
 check_timestamp() {
+    # See how long it has been since the last successful sync.
     current_time=$(date +%s)
     last_timestamp=$(cat "$TIMESTAMP_FILE")
     time_diff=$((current_time - last_timestamp))
 
-    # If the timestamp is older than 24 hours (86400 seconds)
-    if [ "$time_diff" -gt 86400 ]; then
-        # Dump logs
+    # See how long the system has been up.
+    uptime_seconds=$(awk '{print int($1)}' /proc/uptime)
+
+    # Reboot the system if the timestamp of the last successful sync is more
+    # than 24 hours old, and also the system has had more than 24 hours of
+    # uptime. We check that the system has had 24 hours of uptime in case this
+    # service got restarted at some point while the system was operating.
+    if [ "$uptime_seconds" -gt 86400 ] && [ "$time_diff" -gt 86400 ]; then
+        # Send a command to the glow-monitor service to dump its logs.
         pid=$(pidof glow-monitor)
         if [ -n "$pid" ]; then
             kill -USR1 "$pid"
         fi
 
-        # Update timestamp before rebooting
-        update_timestamp
-
         # Reboot system
-        echo "rebooting system as $TIMESTAMP_FILE was not updated"
-        /sbin/reboot
+        echo "rebooting the system because there has not been a successful sync in the past 24 hours"
+        reboot
     fi
 }
 

@@ -16,7 +16,6 @@ func TestEventLogIntegration(t *testing.T) {
 	defer client.Close()
 	defer glow.SetCurrentTimeslot(0)
 
-	l1 := "udp report to 127.0.0.1"
 	l2 := "invalid energy value in energy file: random error here"
 
 	// Send a report to the server
@@ -28,9 +27,6 @@ func TestEventLogIntegration(t *testing.T) {
 	time.Sleep(2 * sendReportTime)
 	dump := client.DumpEventLogs()
 
-	if !strings.Contains(dump, l1) {
-		t.Errorf("logs missing: %v", l1)
-	}
 	if strings.Contains(dump, l2) {
 		t.Errorf("logs missing: %v", l2)
 	}
@@ -43,10 +39,7 @@ func TestEventLogIntegration(t *testing.T) {
 	}
 	time.Sleep(2 * sendReportTime)
 	dump = client.DumpEventLogs()
-	if !strings.Contains(dump, l1) {
-		t.Errorf("logs missing: %v", l1)
-	}
 	if !strings.Contains(dump, l2) {
-		t.Errorf("logs missing: %v", l1)
+		t.Errorf("logs missing: %v", l2)
 	}
 }

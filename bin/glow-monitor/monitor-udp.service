@@ -1,12 +1,10 @@
 [Unit]
 Description=Sync Monitor Service
-After=network.target
 
 [Service]
 Type=simple
-User=root
 ExecStart=/usr/bin/monitor-udp.sh
-Restart=no
+Restart=always
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=basic.target

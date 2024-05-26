@@ -113,10 +113,10 @@ func NewClient(baseDir string) (*Client, error) {
 
 	// Set up the EventLogger and check for sanity conditions and reasonable limits.
 	if EventLogExpiry == time.Duration(0) || EventLogLimitBytes <= 0 || EventLogLineLimitBytes <= 0 {
-		panic("LogEntry log settings do not allow log collection.")
+		return nil, fmt.Errorf("LogEntry log settings do not allow log collection.")
 	}
 	if EventLogLimitBytes >= 1e8 || EventLogLineLimitBytes >= 1e3 {
-		panic(fmt.Sprintf("LogEntry log parameters are too high: max bytes is %v and max line bytes is %v", EventLogLimitBytes, EventLogLineLimitBytes))
+		return nil, fmt.Errorf("LogEntry log parameters are too high: max bytes is %v and max line bytes is %v", EventLogLimitBytes, EventLogLineLimitBytes)
 	}
 	c.EventLog = glow.NewEventLogger(EventLogExpiry, EventLogLimitBytes, EventLogLineLimitBytes)
 
@@ -146,14 +146,21 @@ func NewClient(baseDir string) (*Client, error) {
 		return nil, fmt.Errorf("error reading CT file: %v", err)
 	}
 
-	// Create the initial sync file.
-	if err := c.updateSyncFile(); err != nil {
-		panic("could not create sync file: " + fmt.Sprintf("%v", err))
+	// Create the sync file if it does not exist.
+	path := filepath.Join(c.staticBaseDir, LastSyncFile)
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		err := c.updateSyncFile()
+		if err != nil {
+			return nil, fmt.Errorf("error creating the sync file at startup: %v", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("error reading the sync file at startup: %v", err)
 	}
 
 	// Create the initial report file.
 	if err := c.updateReportFile(); err != nil {
-		panic("could not create sync file: " + fmt.Sprintf("%v", err))
+		return nil, fmt.Errorf("could not create sync file: %v", err)
 	}
 
 	// Launch the loop that will send UDP reports to the GCA server. The
@@ -377,11 +384,7 @@ func (c *Client) readCTSettingsFile() error {
 
 // updateSyncFile updates the sync file with the current timestamp.
 func (c *Client) updateSyncFile() error {
-	basePath := "/dev/shm"
-	if testMode {
-		basePath = c.staticBaseDir
-	}
-	path := filepath.Join(basePath, LastSyncFile)
+	path := filepath.Join(c.staticBaseDir, LastSyncFile)
 	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644); err != nil {
 		return fmt.Errorf("error writing to %v: %v", path, err)
 	}
