@@ -16,6 +16,7 @@ check_timestamp() {
     # glow-monitor binary should be attempting this every 5 minutes.
     if [ "$time_diff" -gt 900 ]; then
 	# Restart the glow_monitor service
+	echo "restarting glow_monitor.service because the udp file is 15 minutes old"
 	systemctl restart glow_monitor.service
     fi
 }
