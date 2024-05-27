@@ -8,7 +8,7 @@ fi
 retry_command() {
     local command=$1
     local retry_interval=8
-    local max_retries=8
+    local max_retries=20
     while [ $retry_count -lt $max_retries ]; do
         echo "Attempting to run command: $command"
         eval $command
