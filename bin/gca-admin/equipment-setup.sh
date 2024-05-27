@@ -16,17 +16,23 @@ is_number() {
 # Check that the short-id is an integer.
 is_number $1
 
-# Function to retry command until it succeeds.
+# Function to retry command until it succeeds
 retry_command() {
     local command=$1
+    local suppress="${2:-false}"
     local retry_interval=8
-    local max_retries=8
+    local max_retries=20
+    local retry_count=0
     while [ $retry_count -lt $max_retries ]; do
-        echo "Attempting to run command: $command"
+	if [ "$suppress" = false ]; then
+            echo "Attempting to run command: $command"
+        else
+            echo "Attempting to run a sensitive command"
+	fi
         eval $command
         local status=$?
         if [ $status -eq 0 ]; then
-            echo "Command succeeded: $command"
+            echo "Command succeeded"
             break
         else
             echo "Command failed with status $status, retrying in $retry_interval seconds..."

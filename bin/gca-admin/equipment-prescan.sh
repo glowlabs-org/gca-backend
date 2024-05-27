@@ -38,18 +38,23 @@ is_number() {
 is_number $2
 is_number $3
 
-# Function to retry command until it succeeds.
+# Function to retry command until it succeeds
 retry_command() {
     local command=$1
+    local suppress="${2:-false}"
     local retry_interval=8
-    local max_retries=8
+    local max_retries=20
     local retry_count=0
     while [ $retry_count -lt $max_retries ]; do
-        echo "Attempting to run command: $command"
+	if [ "$suppress" = false ]; then
+            echo "Attempting to run command: $command"
+        else
+            echo "Attempting to run a sensitive command"
+	fi
         eval $command
         local status=$?
         if [ $status -eq 0 ]; then
-            echo "Command succeeded: $command"
+            echo "Command succeeded"
             break
         else
             echo "Command failed with status $status, retrying in $retry_interval seconds..."
@@ -64,7 +69,7 @@ retry_command() {
 # device so that it isn't just using the default password.
 retry_command "ssh-copy-id halki@$1"
 sleep 1
-retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\""
+retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
 sleep 1
 
 # Add the new halki-app firmware to the device so that the CT is reading the
