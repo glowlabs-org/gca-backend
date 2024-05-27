@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/csv"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -245,7 +244,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	// associated with our shortID, and therefore this response is
 	// meaningless.
 	if equipmentKey != c.staticPubKey {
-		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id, expected %x and got %x", c.staticPubKey, equipmentKey)
 	}
 
 	// Ensure that if there's a new GCA, the signature authorizing the GCA
