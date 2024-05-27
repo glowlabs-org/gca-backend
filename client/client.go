@@ -225,12 +225,12 @@ func (c *Client) DumpEventLogs() string {
 
 	mapEntries, entryOrder := c.EventLog.DumpLogEntries()
 
-	sb.WriteString("\nRecent UDP report\n----------\n")
+	sb.WriteString("\nRecent Failed UDP report\n----------\n")
 	sb.WriteString(latestLogWithPrefix(mapEntries, "udp report to "))
 	sb.WriteString("\nRecent successful sync\n----------\n")
-	sb.WriteString(latestLogWithPrefix(mapEntries, "sync successful"))
+	sb.WriteString(latestLogWithPrefix(mapEntries, "successful sync"))
 	sb.WriteString("\nRecent failed sync\n----------\n")
-	sb.WriteString(latestLogWithPrefix(mapEntries, "failed sync"))
+	sb.WriteString(latestLogWithPrefix(mapEntries, "sync failed"))
 
 	sb.WriteString("\nLogs\n----------\n")
 	for _, line := range entryOrder {
