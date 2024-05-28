@@ -15,10 +15,10 @@ check_timestamp() {
     # attempted to send a udp packet in at least 900 seconds, but the
     # glow-monitor binary should be attempting this every 5 minutes.
     if [ "$time_diff" -gt 900 ]; then
-	# Restart the glow_monitor service
-	echo "restarting glow_monitor.service because the udp file is 15 minutes old"
-	echo $current_time > $TIMESTAMP_FILE
-	systemctl restart glow_monitor.service
+        # Restart the glow_monitor service
+        echo "restarting glow_monitor.service because the udp file is 15 minutes old"
+        echo $current_time > $TIMESTAMP_FILE
+        systemctl restart glow_monitor.service
     fi
 }
 

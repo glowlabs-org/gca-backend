@@ -2,8 +2,8 @@
 
 # Make sure that the right parameters were provided.
 if [ $# -lt 2 ]; then
-	echo "Usage: $0 [port] [subdomain]"
-	exit 1
+        echo "Usage: $0 [port] [subdomain]"
+        exit 1
 fi
 
 # Function to retry command until it succeeds
@@ -14,11 +14,11 @@ retry_command() {
     local max_retries=20
     local retry_count=0
     while [ $retry_count -lt $max_retries ]; do
-	if [ "$suppress" = false ]; then
+        if [ "$suppress" = false ]; then
             echo "Attempting to run command: $command"
         else
             echo "Attempting to run a sensitive command"
-	fi
+        fi
         eval $command
         local status=$?
         if [ $status -eq 0 ]; then
@@ -27,7 +27,7 @@ retry_command() {
         else
             echo "Command failed with status $status, retrying in $retry_interval seconds..."
             sleep $retry_interval
-	    ((retry_count++))
+            ((retry_count++))
         fi
     done
 }

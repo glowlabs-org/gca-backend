@@ -28,6 +28,7 @@ check_timestamp() {
 
         # Reboot system
         echo "rebooting the system because there has not been a successful sync in the past 24 hours"
+        echo $(date) >> /opt/glow-monitor/reboots.sh
         reboot
     fi
 }

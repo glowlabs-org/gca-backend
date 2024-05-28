@@ -23,8 +23,8 @@
 
 # Check that the correct parameters were provided.
 if [ $# -lt 3 ]; then
-	echo "Usage: $0 [equipment-ip] [ct-numerator] [ct-denominator]"
-	exit 1
+        echo "Usage: $0 [equipment-ip] [ct-numerator] [ct-denominator]"
+        exit 1
 fi
 
 # Function to check if the input is an integer
@@ -46,11 +46,11 @@ retry_command() {
     local max_retries=20
     local retry_count=0
     while [ $retry_count -lt $max_retries ]; do
-	if [ "$suppress" = false ]; then
+        if [ "$suppress" = false ]; then
             echo "Attempting to run command: $command"
         else
             echo "Attempting to run a sensitive command"
-	fi
+        fi
         eval $command
         local status=$?
         if [ $status -eq 0 ]; then
@@ -59,7 +59,7 @@ retry_command() {
         else
             echo "Command failed with status $status, retrying in $retry_interval seconds..."
             sleep $retry_interval
-	    ((retry_count++))
+            ((retry_count++))
         fi
     done
 }
@@ -87,8 +87,8 @@ echo "Initial firmware update is complete. Please set up the box to be reading f
 echo "Type 'YES' when setup is complete:"
 read confirmation
 if [[ "${confirmation^^}" != "YES" ]]; then
-	echo "Please run this script again when you are ready."
-	exit 1
+        echo "Please run this script again when you are ready."
+        exit 1
 fi
 echo "Proceeding with setup. This will take approximately 11 minutes."
 
@@ -118,8 +118,8 @@ data=$(tail -n +2 /opt/halki/energy_data.csv)
 # Check that there are at least 2 energy readings.
 line_count=$(echo "$data" | wc -l)
 if [ "$line_count" -lt 2 ]; then
-	echo "energy test failed, not enough energy readings collected"
-	exit 1
+        echo "energy test failed, not enough energy readings collected"
+        exit 1
 fi
 
 # Check on the data in the file. Check that every line has the same sign
@@ -132,8 +132,8 @@ while IFS=, read -r timestamp energy; do
     energy_int=${energy_abs%%.*}
     # Verify that the result is really an int.
     if ! [[ $energy_int =~ ^[0-9]+$ ]]; then
-	    echo "energy test failed, invalid energy reading: $energy"
-	    exit 1
+            echo "energy test failed, invalid energy reading: $energy"
+            exit 1
     fi
 
     # Check if the absolute value of the energy is less than 1200 (1.2 watt hours in 5 minutes)
@@ -148,7 +148,7 @@ while IFS=, read -r timestamp energy; do
     # If this is the first number, set the sign. Otherwise, check that the sign
     # matches the first sign.
     if [ $first_sign -eq 0 ]; then
-	first_sign=$current_sign
+        first_sign=$current_sign
     else
         if [ $current_sign -ne $first_sign ]; then
             echo "energy test failed, energy signal is not consistent"
@@ -182,8 +182,8 @@ sleep 4
 echo "Data testing is complete. Please remove the CT and type 'DONE' when finished:"
 read confirmation
 if [[ "${confirmation^^}" != "DONE" ]]; then
-	echo "Text does not equal 'DONE'. Assuming error. Please restart the script."
-	exit 1
+        echo "Text does not equal 'DONE'. Assuming error. Please restart the script."
+        exit 1
 fi
 retry_command "ssh halki@$1 'sudo systemctl start atm90e32.service'"
 sleep 4

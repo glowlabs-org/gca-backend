@@ -2,8 +2,8 @@
 
 # Check that the correct parameters were provided.
 if [ $# -lt 2 ]; then
-	echo "Usage: $0 [short-id] [equipment-ip]"
-	exit 1
+        echo "Usage: $0 [short-id] [equipment-ip]"
+        exit 1
 fi
 
 # Function to check if the input is an integer
@@ -24,22 +24,24 @@ retry_command() {
     local max_retries=20
     local retry_count=0
     while [ $retry_count -lt $max_retries ]; do
-	if [ "$suppress" = false ]; then
+        if [ "$suppress" = false ]; then
             echo "Attempting to run command: $command"
         else
             echo "Attempting to run a sensitive command"
-	fi
+        fi
         eval $command
         local status=$?
         if [ $status -eq 0 ]; then
             echo "Command succeeded"
-            break
+            return 0
         else
             echo "Command failed with status $status, retrying in $retry_interval seconds..."
             sleep $retry_interval
-	    ((retry_count++))
+            ((retry_count++))
         fi
     done
+    echo "Error: maximum retries reached for command. Script has failed, please try running it again."
+    exit 1
 }
 
 # Copy over all of the custom files for the device.
@@ -85,5 +87,15 @@ retry_command "ssh halki@$2 'sudo systemctl start monitor-sync.service'"
 sleep 1
 retry_command "ssh halki@$2 'sudo systemctl start monitor-udp.service'"
 sleep 1
+
+# Wait for 15 seconds to give the glow-monitor service time to start up and
+# error out. Then check whether the service is running. If not, report the
+# error and quit.
+sleep 15
+monitor_status=$(ssh halki@$2 'sudo systemctl is-active glow_monitor.service')
+if [ "$monitor_status" != "active" ]; then
+    echo "Error: glow-monitor did not start, setup appears to have FAILED. Please run the script again"
+    exit 1
+fi
 
 echo "Hardware setup is complete"
