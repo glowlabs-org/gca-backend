@@ -8,7 +8,7 @@ fi
 
 # Function to check if the input is an integer
 is_number() {
-    if ! [[ $1 =~ ^-?[0-9]+$ ]]; then
+    if ! [[ $1 =~ ^[0-9]+$ ]]; then
         echo "Error: Input is not a valid number."
         exit 1
     fi

@@ -29,7 +29,7 @@ fi
 
 # Function to check if the input is an integer
 is_number() {
-    if ! [[ $1 =~ ^-?[0-9]+$ ]]; then
+    if ! [[ $1 =~ ^[0-9]+$ ]]; then
         echo "Error: Input is not a valid number."
         exit 1
     fi
@@ -55,13 +55,15 @@ retry_command() {
         local status=$?
         if [ $status -eq 0 ]; then
             echo "Command succeeded"
-            break
+            return 0
         else
             echo "Command failed with status $status, retrying in $retry_interval seconds..."
             sleep $retry_interval
             ((retry_count++))
         fi
     done
+    echo "Error: maximum retries reached for command. Script has failed, please try running it again."
+    exit 1
 }
 
 # First add the local ssh pubkey to the device so that all of these commands
