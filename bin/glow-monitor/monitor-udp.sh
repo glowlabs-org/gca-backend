@@ -18,6 +18,7 @@ check_timestamp() {
         # Restart the glow_monitor service
         echo "restarting glow_monitor.service because the udp file is 15 minutes old"
         echo $current_time > $TIMESTAMP_FILE
+	echo $(date) >> /dev/shm/glow-monitor-reset.txt
         systemctl restart glow_monitor.service
     fi
 }

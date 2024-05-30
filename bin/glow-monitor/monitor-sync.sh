@@ -16,10 +16,13 @@ check_timestamp() {
     uptime_seconds=$(awk '{print int($1)}' /proc/uptime)
 
     # Reboot the system if the timestamp of the last successful sync is more
-    # than 24 hours old, and also the system has had more than 24 hours of
-    # uptime. We check that the system has had 24 hours of uptime in case this
-    # service got restarted at some point while the system was operating.
-    if [ "$uptime_seconds" -gt 86400 ] && [ "$time_diff" -gt 86400 ]; then
+    # than 24 hours old, and also the system has had more than 10 hours of
+    # uptime. We check that the system has had 10 hours of uptime in case this
+    # service got restarted at some point while the system was operating. 10
+    # hours of system uptime is enough for 2 sync operations, if that much time
+    # has passed without a successful sync, it means the latest reboot probably
+    # didn't work and another reboot should be attempted.
+    if [ "$uptime_seconds" -gt 36000 ] && [ "$time_diff" -gt 86400 ]; then
         # Send a command to the glow-monitor service to dump its logs.
         pid=$(pidof glow-monitor)
         if [ -n "$pid" ]; then
@@ -28,7 +31,7 @@ check_timestamp() {
 
         # Reboot system
         echo "rebooting the system because there has not been a successful sync in the past 24 hours"
-        echo $(date) >> /opt/glow-monitor/reboots.sh
+        echo $(date) >> /opt/glow-monitor/reboots.txt
         reboot
     fi
 }
