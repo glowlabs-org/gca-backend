@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	// reports will get sent every 50 milliseconds during testing. 50
+	// reports will get sent every 60 milliseconds during testing. 50
 	// milliseconds was chosen because it is slow enough that our reports
-	// testing can happen in real time.
-	sendReportTime = 50 * time.Millisecond
+	// testing can happen in real time. Later bumped to 60ms because an NDF
+	// was seen at 50ms - seen only one time out of at least 50 trials.
+	sendReportTime = 60 * time.Millisecond
 
 	// EnergyFile is the file used by the monitoring equipment to write the total
 	// amount of energy that was measured in each timeslot.

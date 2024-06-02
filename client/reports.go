@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/csv"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -43,8 +42,16 @@ func (c *Client) staticSendReport(gcas GCAServer, er EnergyRecord) {
 	eqr.Signature = glow.Sign(sb, c.staticPrivKey)
 	data := eqr.Serialize()
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.UdpPort)
-	c.EventLog.Printf("udp report to %v: slot %v energy %v", gcas.Location, er.Timeslot, er.Energy)
-	glow.SendUDPReport(data, location)
+	if err := glow.SendUDPReport(data, location); err != nil {
+		c.EventLog.Printf("udp report to %v failed: %v", gcas.Location, err)
+		return
+	}
+	// Report file is updated on a successful send, in order to validate that the networking
+	// is working correctly.
+	err := c.updateReportFile()
+	if err != nil {
+		c.EventLog.Printf("unable to update report file: %v", err)
+	}
 }
 
 // staticReadEnergyFile will read the data from the energy file and return an array
@@ -177,16 +184,13 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	location := fmt.Sprintf("%v:%v", gcas.Location, gcas.TcpPort)
 	conn, err := net.Dial("tcp", location)
 	if err != nil {
-		c.EventLog.Printf("failed sync unable to dial the gca server %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to dial the gca server: %v", err)
 	}
 	defer conn.Close()
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], c.shortID)
-	c.EventLog.Printf(fmt.Sprintf("tcp send to %v", gcas.Location))
 	_, err = conn.Write(buf[:])
 	if err != nil {
-		c.EventLog.Printf("failed sync unable to send reqeust to gca server %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to send reqeust to gca server: %v", err)
 	}
 
@@ -196,21 +200,17 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	var respLenBuf [2]byte
 	_, err = io.ReadFull(conn, respLenBuf[:])
 	if err != nil {
-		c.EventLog.Printf("failed sync unable to read the response length: %v", err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read the response length: %v", err)
 	}
 	respLen := binary.LittleEndian.Uint16(respLenBuf[:])
-	c.EventLog.Printf(fmt.Sprintf("sync got tcp response from %v", gcas.Location))
 
 	// Receive the response.
 	respBuf := make([]byte, respLen)
 	n, err := io.ReadFull(conn, respBuf)
 	if err != nil {
-		c.EventLog.Printf("failed sync unable to read response from %v: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to read response from gca server: %v", err)
 	}
 	if n != int(respLen) {
-		c.EventLog.Printf("%v failed sync did not send enough data: %v", gcas.Location, err)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("server did not send enough data: %v", err)
 	}
 
@@ -220,13 +220,11 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	signingTime := binary.LittleEndian.Uint64(respBuf[respLen-72:])
 	now := uint64(time.Now().Unix())
 	if now+24*3600 < signingTime || now-24*3600 > signingTime {
-		c.EventLog.Printf("failed sync received response from %v that is out of bounds temporally: %v vs %v", gcas.Location, now, signingTime)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server that is out of bounds temporally: %v vs %v", now, signingTime)
 	}
 	var sig glow.Signature
 	copy(sig[:], respBuf[respLen-64:])
 	if !glow.Verify(gcasKey, respBuf[:respLen-64], sig) {
-		c.EventLog.Printf("failed sync received response from %v with invalid signature", gcas.Location)
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received response from server with invalid signature: %v", err)
 	}
 
@@ -246,8 +244,7 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	// associated with our shortID, and therefore this response is
 	// meaningless.
 	if equipmentKey != c.staticPubKey {
-		c.EventLog.Printf("failed sync equipment appears to have the wrong short id: key %v pubkey %v", hex.EncodeToString(equipmentKey[:]), hex.EncodeToString(c.staticPubKey[:]))
-		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id")
+		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("equipment appears to have the wrong short id, expected %x and got %x", c.staticPubKey, equipmentKey)
 	}
 
 	// Ensure that if there's a new GCA, the signature authorizing the GCA
@@ -258,7 +255,6 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 	migrationBytes := append(equipmentKey[:], respBuf[540:respLen-(64+72)]...)
 	newGCASigningBytes := append([]byte("EquipmentMigration"), migrationBytes...)
 	if newGCA != blank && !glow.Verify(gcaKey, newGCASigningBytes, newGCASignature) {
-		c.EventLog.Printf("failed sync received new GCA from server with invalid signature")
 		return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received new GCA from server with invalid signature")
 	}
 
@@ -274,7 +270,6 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		// Check that there are enough bytes to read up to the
 		// locationLen.
 		if i+34 > end {
-			c.EventLog.Printf("failed sync unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches: %v > %v", i+34, end)
 		}
 		var as server.AuthorizedServer
@@ -285,7 +280,6 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 		locationLen := int(respBuf[i])
 		i += 1
 		if i+locationLen+70 > end {
-			c.EventLog.Printf("failed sync unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("unable to decode authorized servers due to length mismatches: %v > %v", i+locationLen+70, end)
 		}
 		as.Location = string(respBuf[i : i+locationLen])
@@ -313,12 +307,14 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 			verify = glow.Verify(gcaKey, sb, as.GCAAuthorization)
 		}
 		if !verify {
-			c.EventLog.Printf("failed sync received authorized server which has invalid authorization")
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received authorized server which has invalid authorization")
 		}
 	}
 
-	c.EventLog.Printf("sync successful with %v", gcas.Location)
+	err = c.updateSyncFile()
+	if err != nil {
+		c.EventLog.Printf("unable to update sync file after successfully receiving sync data: %v", err)
+	}
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
@@ -430,6 +426,7 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 		if err == nil {
 			break
 		}
+		c.EventLog.Printf("sync failed with %v: %v", gcas.Location, err)
 		failedServers[gcasKey] = struct{}{}
 	}
 
@@ -514,16 +511,23 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 	}
 	raw, err := SerializeGCAServerMap(c.gcaServers)
 	if err != nil {
+		// This is a panic instead of returning an error because a
+		// corrupted GCA server map will destory the client and render
+		// it useless.
 		panic(err)
 	}
 	err = os.WriteFile(filepath.Join(c.staticBaseDir, GCAServerMapFile), raw[:], 0644)
 	if err != nil {
+		// This is a panic instead of returning an error because a
+		// corrupted GCA server map will destory the client and render
+		// it useless.
 		panic(err)
 	}
 	c.mu.Unlock()
 
 	// Scan through the bitfield and submit any reports that the device has
 	// but the GCA server does not.
+	reportsSent := 0
 	lastIndex := latestReading - timeslotOffset
 	for i := uint32(0); i <= lastIndex && int(i)/8 < len(bitfield); i++ {
 		if bitfield[i/8]&(1<<(i%8)) == 0 {
@@ -542,10 +546,19 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 				Timeslot: i + timeslotOffset,
 				Energy:   uint64(int32(powerOutput)),
 			}
-			c.staticSendReport(gcas, record)
 			time.Sleep(UDPSleepSyncTime)
+			c.staticSendReport(gcas, record)
+			reportsSent++
 		}
 	}
+	// 0 reports sent means that things are looking pretty reliable.
+	// Anything under 5 reports means that the connection is generally
+	// pretty reliable. More than 5 reports indicates that something might
+	// be wrong and that the monitoring box should be checked more closely
+	// for potential firmware or hardware issues. It may just be a busy
+	// cell tower or that the cell signal is weak, but it's worthy of
+	// investigation nonetheless.
+	c.EventLog.Printf("successful sync with %v, sent %v reports", gcas.Location, reportsSent)
 
 	return true
 }
