@@ -71,18 +71,22 @@ retry_command() {
 # device so that it isn't just using the default password.
 retry_command "ssh-copy-id halki@$1"
 sleep 1
-retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
-sleep 1
+if [ -f halki-password ]; then
+    retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
+    sleep 1
+fi
 
 # Add the new halki-app firmware to the device so that the CT is reading the
 # right values. The halki-app firmware cannot be updated unless the atm90e32
 # service is stopped.
-retry_command "scp .config/gca-data/clients/halki-app halki@$1:/home/halki"
-sleep 4
 retry_command "ssh halki@$1 'sudo systemctl stop atm90e32.service'"
 sleep 1
-retry_command "ssh halki@$1 'sudo mv /home/halki/halki-app /usr/bin/halki-app'"
-sleep 4
+if [ -f .config/gca-data/clients/halki-app ]; then
+    retry_command "scp .config/gca-data/clients/halki-app halki@$1:/home/halki"
+    sleep 4
+    retry_command "ssh halki@$1 'sudo mv /home/halki/halki-app /usr/bin/halki-app'"
+    sleep 4
+fi
 
 # Get a confirmation from the user that the CT is set up and reading power.
 echo "Initial firmware update is complete. Please set up the box to be reading from a power source of at least 50 watts."
@@ -98,7 +102,7 @@ echo "Proceeding with setup. This will take approximately 11 minutes."
 # file before starting the firmware ensures that any old readings (before the
 # CT was confirmed to be set up correctly) get wiped. The test can't be
 # performed if the atm90e32 service isn't running.
-retry_command "ssh halki@$1 'echo \"timestamp,energy (mWh)\" > /opt/halki/energy_data.csv'"
+retry_command "ssh halki@$1 'echo \"timestamp,energy (mWh)\" | sudo tee /opt/halki/energy_data.csv > /dev/null'"
 sleep 4
 retry_command "ssh halki@$1 'sudo systemctl start atm90e32.service'"
 
@@ -115,7 +119,7 @@ sleep 655
 # validates the readings.
 
 # Read the data skipping the header
-data=$(tail -n +2 /opt/halki/energy_data.csv)
+data=$(ssh halki@$1 "tail -n +2 /opt/halki/energy_data.csv")
 
 # Check that there are at least 2 energy readings.
 line_count=$(echo "$data" | wc -l)
@@ -166,10 +170,10 @@ final_numerator=$((first_sign * $2))
 # a file in /opt/glow-monitor/ called 'ct-settings.txt' where the first line is
 # the final numerator and the second line is the denomintor (provided as the
 # third input to the script).
-retry_command "ssh halki@$1 'echo $final_numerator > /opt/glow-monitor/ct-settings.txt'"
-sleep 4
-retry_command "ssh halki@$1 'echo $3 >> /opt/glow-monitor/ct-settings.txt'"
-sleep 4
+retry_command "ssh halki@$1 'echo $final_numerator | sudo tee /opt/glow-monitor/ct-settings.txt > /dev/null'"
+sleep 1
+retry_command "ssh halki@$1 'echo $3 | sudo tee -a /opt/glow-monitor/ct-settings.txt > /dev/null'"
+sleep 1
 
 # Setup is now complete, but we collected a bunch of false data in the
 # energy_data.csv file. We need to make sure the user takes off the CT, and
@@ -178,7 +182,7 @@ sleep 4
 # the file can only be cleared correctly if the atm90e32 service is stopped.
 retry_command "ssh halki@$1 'sudo systemctl stop atm90e32.service'"
 sleep 4
-retry_command "ssh halki@$1 'echo \"timestamp,energy (mWh)\" > /opt/halki/energy_data.csv'"
+retry_command "ssh halki@$1 'echo \"timestamp,energy (mWh)\" | sudo tee /opt/halki/energy_data.csv > /dev/null'"
 sleep 4
 
 echo "Data testing is complete. Please remove the CT and type 'DONE' when finished:"
