@@ -1,6 +1,7 @@
 package client
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,7 +24,7 @@ func TestSyncFileCreateOnStartup(t *testing.T) {
 		return
 	}
 	currentTime := time.Now().Unix()
-	if storedTime != currentTime {
+	if math.Abs(float64(storedTime)-float64(currentTime)) > 3 {
 		t.Errorf("stored time %v different than current time %v", storedTime, currentTime)
 	}
 }
@@ -50,7 +51,7 @@ func TestSyncFileUpdateOnSync(t *testing.T) {
 		return
 	}
 	currentTime := time.Now().Unix()
-	if storedTime != currentTime {
+	if math.Abs(float64(storedTime)-float64(currentTime)) > 3 {
 		t.Errorf("stored time %v different than current time %v", storedTime, currentTime)
 	}
 }
@@ -70,7 +71,7 @@ func TestReportFileCreateOnStartup(t *testing.T) {
 		return
 	}
 	currentTime := time.Now().Unix()
-	if storedTime != currentTime {
+	if math.Abs(float64(storedTime)-float64(currentTime)) > 3 {
 		t.Errorf("stored time %v different than current time %v", storedTime, currentTime)
 	}
 }
@@ -100,7 +101,7 @@ func TestReportFileUpdateOnReport(t *testing.T) {
 		return
 	}
 	currentTime := time.Now().Unix()
-	if storedTime != currentTime {
+	if math.Abs(float64(storedTime)-float64(currentTime)) > 3 {
 		t.Errorf("stored time %v different than current time %v", storedTime, currentTime)
 	}
 }

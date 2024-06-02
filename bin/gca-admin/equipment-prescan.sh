@@ -69,24 +69,22 @@ retry_command() {
 # First add the local ssh pubkey to the device so that all of these commands
 # aren't asking for the password every time. Then change the password of the
 # device so that it isn't just using the default password.
+#
+# The GCA is expected to have a custom password for the monitoring boxes.
 retry_command "ssh-copy-id halki@$1"
 sleep 1
-if [ -f halki-password ]; then
-    retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
-    sleep 1
-fi
+retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
+sleep 1
 
 # Add the new halki-app firmware to the device so that the CT is reading the
 # right values. The halki-app firmware cannot be updated unless the atm90e32
 # service is stopped.
 retry_command "ssh halki@$1 'sudo systemctl stop atm90e32.service'"
 sleep 1
-if [ -f .config/gca-data/clients/halki-app ]; then
-    retry_command "scp .config/gca-data/clients/halki-app halki@$1:/home/halki"
-    sleep 4
-    retry_command "ssh halki@$1 'sudo mv /home/halki/halki-app /usr/bin/halki-app'"
-    sleep 4
-fi
+retry_command "scp .config/gca-data/clients/halki-app halki@$1:/home/halki"
+sleep 4
+retry_command "ssh halki@$1 'sudo mv /home/halki/halki-app /usr/bin/halki-app'"
+sleep 4
 
 # Get a confirmation from the user that the CT is set up and reading power.
 echo "Initial firmware update is complete. Please set up the box to be reading from a power source of at least 50 watts."
