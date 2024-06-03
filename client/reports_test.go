@@ -477,7 +477,7 @@ func TestAddingServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(2 * sendReportTime)
+	time.Sleep(3 * sendReportTime) // bumped because of NDF seen in CLI
 	resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%v/api/v1/recent-reports?publicKey=%x", httpPort3, c.staticPubKey))
 	if err != nil {
 		t.Fatal(err)
@@ -491,25 +491,25 @@ func TestAddingServers(t *testing.T) {
 	}
 	for i, report := range response.Reports {
 		if i == 1 && report.PowerOutput != 500 {
-			t.Error("expected power report")
+			t.Error("expected power report", report.PowerOutput)
 		} else if i == 2 && report.PowerOutput != 550 {
-			t.Error("expected power report")
+			t.Error("expected power report", report.PowerOutput)
 		} else if i == 3 && report.PowerOutput != 55 {
 			t.Error("expected power report", report.PowerOutput)
 		} else if i == 4 && report.PowerOutput != 59 {
 			t.Error("expected power report", report.PowerOutput)
 		} else if i == 5 && report.PowerOutput != 3000 {
-			t.Error("expected power report")
+			t.Error("expected power report", report.PowerOutput)
 		} else if i == 6 && report.PowerOutput != 3500 {
-			t.Error("expected power report")
+			t.Error("expected power report", report.PowerOutput)
 		} else if i == 7 && report.PowerOutput != 1200 {
-			t.Error("expected power report")
+			t.Error("expected power report", report.PowerOutput)
 		} else if i == 8 && report.PowerOutput != 1800 {
-			t.Error("expected power report")
+			t.Error("expected power report", report.PowerOutput)
 		} else if i == 9 && report.PowerOutput != negUint {
 			t.Error("expected negative power report", report.PowerOutput)
 		} else if (i < 1 || i > 9) && report.PowerOutput != 0 {
-			t.Error("expected no power report")
+			t.Error("expected no power report", report.PowerOutput)
 		}
 	}
 

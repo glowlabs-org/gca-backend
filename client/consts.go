@@ -25,4 +25,10 @@ const (
 
 	// CTSettingsFile contains the current transformer multiplier.
 	CTSettingsFile = "ct-settings.txt"
+
+	// LastSyncFile is a file that contains the last successful sync time.
+	LastSyncFile = "last-sync.txt"
+
+	// LastReportFile is a file that contains the last successful udp report sent time.
+	LastReportFile = "last-udp.txt"
 )

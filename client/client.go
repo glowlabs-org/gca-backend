@@ -51,11 +51,13 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,6 +84,9 @@ type Client struct {
 	energyMultiplier float64
 	energyDivider    float64
 
+	// Event log.
+	EventLog *glow.EventLogger
+
 	// Sync primitives.
 	mu sync.Mutex
 	tg threadgroup.ThreadGroup
@@ -105,6 +110,15 @@ func NewClient(baseDir string) (*Client, error) {
 			}
 		})
 	}
+
+	// Set up the EventLogger and check for sanity conditions and reasonable limits.
+	if EventLogExpiry == time.Duration(0) || EventLogLimitBytes <= 0 || EventLogLineLimitBytes <= 0 {
+		return nil, fmt.Errorf("LogEntry log settings do not allow log collection.")
+	}
+	if EventLogLimitBytes >= 1e8 || EventLogLineLimitBytes >= 1e3 {
+		return nil, fmt.Errorf("LogEntry log parameters are too high: max bytes is %v and max line bytes is %v", EventLogLimitBytes, EventLogLineLimitBytes)
+	}
+	c.EventLog = glow.NewEventLogger(EventLogExpiry, EventLogLimitBytes, EventLogLineLimitBytes)
 
 	// Load the persist data for the client.
 	err := c.loadKeypair()
@@ -132,6 +146,23 @@ func NewClient(baseDir string) (*Client, error) {
 		return nil, fmt.Errorf("error reading CT file: %v", err)
 	}
 
+	// Create the sync file if it does not exist.
+	path := filepath.Join(c.staticBaseDir, LastSyncFile)
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		err := c.updateSyncFile()
+		if err != nil {
+			return nil, fmt.Errorf("error creating the sync file at startup: %v", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("error reading the sync file at startup: %v", err)
+	}
+
+	// Create the initial report file.
+	if err := c.updateReportFile(); err != nil {
+		return nil, fmt.Errorf("could not create sync file: %v", err)
+	}
+
 	// Launch the loop that will send UDP reports to the GCA server. The
 	// regular synchronzation checks also happen inside this loop.
 	c.launchSendReports()
@@ -141,7 +172,79 @@ func NewClient(baseDir string) (*Client, error) {
 
 // Currently only closes the history file and shuts down the sync thread.
 func (c *Client) Close() error {
+	if testMode {
+		// Dump the logs & events to the test client directory.
+		path := filepath.Join(c.staticBaseDir, "status.txt")
+		os.WriteFile(path, []byte(c.DumpEventLogs()), 0644)
+	}
 	return c.tg.Stop()
+}
+
+// latestLogWithPrefix searches for the most recent logs starting with a prefix,
+// and prints it with a newline.
+func latestLogWithPrefix(logs map[string][]time.Time, prefix string) string {
+
+	var t time.Time
+	var line string
+	for key, times := range logs {
+		// If the latest time is past t, this is latest.
+		if strings.HasPrefix(key, prefix) && times[len(times)-1].After(t) {
+			t = times[len(times)-1]
+			line = key
+		}
+	}
+	if len(line) == 0 {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339) + " " + line + "\n"
+}
+
+// Helper to dump client status to a string. Returns general information,
+// followed by the event log.
+func (c *Client) DumpEventLogs() string {
+	var sb strings.Builder
+
+	now := time.Now()
+
+	sb.WriteString(fmt.Sprintf("UTC:    %v\n", now.UTC().Format(time.RFC3339)))
+	sb.WriteString(fmt.Sprintf("Local:  %v\n", now.Format(time.RFC3339)))
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	sb.WriteString("\nState\n----------\n")
+	sb.WriteString(fmt.Sprintf("pubKey:        %v\n", hex.EncodeToString(c.staticPubKey[:])))
+	sb.WriteString(fmt.Sprintf("shortId:       %v\n", c.shortID))
+	sb.WriteString(fmt.Sprintf("gcaPubKey:     %v\n", hex.EncodeToString(c.gcaPubKey[:])))
+	sb.WriteString(fmt.Sprintf("primaryServer: %v\n", hex.EncodeToString(c.primaryServer[:])))
+
+	sb.WriteString("\nGCA Servers\n----------\n")
+	for key, serv := range c.gcaServers {
+		sb.WriteString(fmt.Sprintf("pubKey:        %v banned: %v\n", hex.EncodeToString(key[:]), serv.Banned))
+	}
+
+	mapEntries, entryOrder := c.EventLog.DumpLogEntries()
+
+	sb.WriteString("\nRecent Failed UDP report\n----------\n")
+	sb.WriteString(latestLogWithPrefix(mapEntries, "udp report to "))
+	sb.WriteString("\nRecent successful sync\n----------\n")
+	sb.WriteString(latestLogWithPrefix(mapEntries, "successful sync"))
+	sb.WriteString("\nRecent failed sync\n----------\n")
+	sb.WriteString(latestLogWithPrefix(mapEntries, "sync failed"))
+
+	sb.WriteString("\nLogs\n----------\n")
+	for _, line := range entryOrder {
+		updates := mapEntries[line]
+		last := updates[len(updates)-1]
+		sb.WriteString(last.UTC().Format(time.RFC3339))
+		sb.WriteString(" " + line)
+		if len(updates) > 1 {
+			sb.WriteString(" (" + strconv.Itoa(len(updates)) + " repeats)")
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
 }
 
 // loadKeypair will load the client keys from disk. The GCA should have put
@@ -276,5 +379,27 @@ func (c *Client) readCTSettingsFile() error {
 	}
 	c.energyMultiplier = mult
 	c.energyDivider = div
+	return nil
+}
+
+// updateSyncFile updates the sync file with the current timestamp.
+func (c *Client) updateSyncFile() error {
+	path := filepath.Join(c.staticBaseDir, LastSyncFile)
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644); err != nil {
+		return fmt.Errorf("error writing to %v: %v", path, err)
+	}
+	return nil
+}
+
+// updateReportFile updates the sync file with the current timestamp.
+func (c *Client) updateReportFile() error {
+	basePath := "/dev/shm"
+	if testMode {
+		basePath = c.staticBaseDir
+	}
+	path := filepath.Join(basePath, LastReportFile)
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("%d", time.Now().Unix())), 0644); err != nil {
+		return fmt.Errorf("error writing to %v: %v", path, err)
+	}
 	return nil
 }

@@ -37,6 +37,12 @@ const (
 	// operation is all but guaranteed to get them dropped.
 	UDPSleepSyncTime = time.Second
 
+	// Event log constants. These values limit the in-memory footprint
+	// of the event logging system.
+	EventLogExpiry         = 30 * 24 * time.Hour
+	EventLogLimitBytes     = 10e6
+	EventLogLineLimitBytes = 500
+
 	// Indicate that this is not a testing build of the client.
 	testMode = false
 )
