@@ -648,7 +648,7 @@ func (c *Client) threadedSendReports(latestRecord uint32) {
 	} else {
 		syncStatus = 1
 	}
-	ticks := 0
+	ticks := 30
 	for {
 		// Check if the server has shut down.
 		if c.tg.IsStopped() {
