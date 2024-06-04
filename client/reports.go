@@ -310,11 +310,6 @@ func (c *Client) staticServerSync(gcas GCAServer, gcasKey glow.PublicKey, gcaKey
 			return 0, [504]byte{}, glow.PublicKey{}, 0, nil, fmt.Errorf("received authorized server which has invalid authorization")
 		}
 	}
-
-	err = c.updateSyncFile()
-	if err != nil {
-		c.EventLog.Printf("unable to update sync file after successfully receiving sync data: %v", err)
-	}
 	return timeslotOffset, bitfield, newGCA, newShortID, gcaServers, nil
 }
 
@@ -560,6 +555,12 @@ func (c *Client) threadedSyncWithServer(latestReading uint32) bool {
 	// investigation nonetheless.
 	c.EventLog.Printf("successful sync with %v, sent %v reports", gcas.Location, reportsSent)
 
+	// Update the file on-disk to indicate that there has been a successful
+	// sync.
+	err = c.updateSyncFile()
+	if err != nil {
+		c.EventLog.Printf("unable to update sync file after successfully receiving sync data: %v", err)
+	}
 	return true
 }
 
@@ -616,27 +617,38 @@ func (c *Client) launchSendReports() {
 // separate synchronization process that occurs at much larger intervals, which
 // will re-send any reports that failed to be delivered on their first attempt.
 func (c *Client) threadedSendReports(latestRecord uint32) {
-	// Infinite loop to send reports. We start ticks at 30 so that the
-	// catchup function will run about 2.5 hours after boot. We don't want
-	// to run it immediately after boot because if some process causes the
-	// device to restart frequently, the bandwidth costs of doing frequent
-	// sync operations could be quite expensive.
+	// Create an infinite loop to send reports to the server. Reports are
+	// sent roughly every 4.5 minutes, which is slightly faster than the
+	// pace at which the monitoring box creates energy readings.
 	//
-	// The client is expected to be operating on a mobile network, which is
-	// why we use UDP at all. Some research suggested that packet delivery
-	// rate over UDP is much greater than 99%, but packets will nearly
-	// always arrive out of order.
+	// The monitoring box uses a cellular network, which has very expensive
+	// bandwidth. To minimize total bandwidth use, udp is used for sending
+	// reports rather than TCP. Logging has shown that the success rate is
+	// usually >95%, though at times it has dropped as low as 60%.
 	//
-	// The client only ever sends one packet at a time (less than 200
-	// bytes), so ordering is not a concern. A 99% delivery rate is quite
-	// good, and means the background sync loop is not going to incur much
-	// overhead from packet loss.
+	// Roughly every 4.5 hours, a sync operation is performed with the
+	// server. The frequency of the sync operation is managed with a value
+	// called 'ticks'. The sync operation will check wih the server to
+	// identify any reports that got lost while sending over UDP, and it
+	// will resend them. The sync operation itself uses tcp.
 	//
-	// The infrequent sync loop is done using TCP, which is more expensive,
-	// but it also requires transferring more than one packet and we would
-	// rather let TCP handle the ordering than implement that ourselves.
-	ticks := 30
-	syncStatus := uint64(1)
+	// If the sync operation fails, another sync opertaion is attempted
+	// roughly 18 minutes later.
+	//
+	// The device has a file on it which tracks the time of the most recent
+	// successful sync. Right as the loop starts, that file is checked. If
+	// the file indicates that the most recent successful sync was more
+	// than 4.5 hours ago, the syncStatus is set to indicate that the most
+	// recent sync failed, which will trigger a new sync attempt within 18
+	// minutes of startup.
+	var syncStatus uint64
+	isRecent, err := c.isRecentSync()
+	if !isRecent || err != nil {
+		syncStatus = 0
+	} else {
+		syncStatus = 1
+	}
+	ticks := 0
 	for {
 		// Check if the server has shut down.
 		if c.tg.IsStopped() {
@@ -698,9 +710,18 @@ func (c *Client) threadedSendReports(latestRecord uint32) {
 		}
 
 		// Once every 60 iterations a server sync is performed. That's
-		// just under 5 hours between each sync operation.
+		// about 4.5 hours per sync operation. The syncStatus variable
+		// tracks whether the previous sync operation was successful.
+		// If the previous sync was unsuccessful, another sync is
+		// attempted quickly.
+		//
+		// The modulus means that a re-attempt of a sync will have to
+		// wait at least 4 ticks, which is about 18 minutes. This gives
+		// the previous sync attempt a generous amount of time to
+		// complete. The cell network for the monitoring devices can be
+		// quite slow, 18 minutes should be ample time though.
 		ticks++
-		if ticks >= 60 || atomic.LoadUint64(&syncStatus) == 0 {
+		if ticks >= 60 || (atomic.LoadUint64(&syncStatus) == 0 && ticks % 4 == 3) {
 			ticks = 0
 			c.tg.Launch(func() {
 				success := c.threadedSyncWithServer(latestRecord)

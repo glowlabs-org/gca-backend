@@ -73,7 +73,7 @@ retry_command() {
 # The GCA is expected to have a custom password for the monitoring boxes.
 retry_command "ssh-copy-id halki@$1"
 sleep 1
-retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
+retry_command "ssh halki@$1 \"echo 'halki:$(<.config/gca-data/clients/halki-password)' | sudo chpasswd\"" true
 sleep 1
 
 # Add the new halki-app firmware to the device so that the CT is reading the
