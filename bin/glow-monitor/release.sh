@@ -7,8 +7,6 @@ STAGE_DIR="stage"
 CLIENTS_DIR="stage/.config/gca-data/clients"
 ZIP_FILE="v2-upgrade.zip"
 
-OTHER_FILES_DIR="additional_files" # Directory containing other files to include in the release
-
 rm -rf ${STAGE_DIR}
 mkdir -p ${CLIENTS_DIR}
 
@@ -25,6 +23,7 @@ echo "Copying installation scripts"
 cp ../gca-admin/equipment-prescan.sh ../gca-admin/equipment-setup.sh ../gca-admin/server-setup.sh ${STAGE_DIR}
 
 echo "Creating zip file"
+rm ${ZIP_FILE}
 cd ${STAGE_DIR}
 zip -r ../${ZIP_FILE} * .*
 cd ..
