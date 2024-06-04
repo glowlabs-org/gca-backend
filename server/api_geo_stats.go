@@ -169,13 +169,9 @@ func (gcas *GCAServer) fetchAndSaveHistoricalBAData(token, ba string) error {
 		filePath := filepath.Join(dataPath, fname)
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			needed = append(needed, Info{filePath, start, end})
-			gcas.logger.Info("file needed: ", filePath)
-		} else {
-			gcas.logger.Info("file found: ", filePath)
 		}
 	}
 	for _, f := range needed {
-		gcas.logger.Info("fetching: ", f.name)
 		raw, err := getWattTimeHistoricalDataRaw(token, ba, f.start.Unix(), f.end.Unix())
 		if err != nil {
 			return err
@@ -183,8 +179,8 @@ func (gcas *GCAServer) fetchAndSaveHistoricalBAData(token, ba string) error {
 		if err = os.WriteFile(f.name, raw, 0644); err != nil {
 			return err
 		}
+		gcas.logger.Info("wrote historical data file: ", f.name)
 	}
-	gcas.logger.Info("Wrote historical data for ", ba, " to the directory: ", dataPath)
 	return nil
 }
 
