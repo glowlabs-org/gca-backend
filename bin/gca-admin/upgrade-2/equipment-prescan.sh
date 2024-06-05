@@ -117,7 +117,7 @@ sleep 655
 # validates the readings.
 
 # Read the data skipping the header
-data=$(ssh halki@$1 "tail -n +2 /opt/halki/energy_data.csv")
+data=$(ssh halki@$1 "tail -n +3 /opt/halki/energy_data.csv")
 
 # Check that there are at least 2 energy readings.
 line_count=$(echo "$data" | wc -l)
