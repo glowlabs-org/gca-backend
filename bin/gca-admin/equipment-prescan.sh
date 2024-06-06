@@ -120,14 +120,14 @@ while [ $counter -le 8 ]; do
     counter=$((counter + 1))
     data=$(ssh halki@$1 "cat /opt/halki/energy_data.csv")
     lines=$(echo "$data" | wc -l)
-    echo "File now has $lines lines in $((counter * 2)) minutes, waiting for 4 lines."
+    echo "File now has $lines lines in $((counter * 2)) minutes, need 4 lines."
     if [ "$lines" -ge 4 ]; then
         break
     fi
 done
 
 if [ "$lines" -lt 4 ]; then
-    echo "Error: File does not have 4 lines after 16 minutes."
+    echo "File does not have enough energy values after 16 minutes."
     exit 1
 fi
 
