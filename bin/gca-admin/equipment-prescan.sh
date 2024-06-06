@@ -73,7 +73,7 @@ retry_command() {
 # The GCA is expected to have a custom password for the monitoring boxes.
 retry_command "ssh-copy-id halki@$1"
 sleep 1
-retry_command "ssh halki@$1 \"echo 'halki:$(<halki-password)' | sudo chpasswd\"" true
+retry_command "ssh halki@$1 \"echo 'halki:$(<.config/gca-data/clients/halki-password)' | sudo chpasswd\"" true
 sleep 1
 
 # Add the new halki-app firmware to the device so that the CT is reading the
@@ -117,7 +117,7 @@ sleep 655
 # validates the readings.
 
 # Read the data skipping the header
-data=$(ssh halki@$1 "tail -n +2 /opt/halki/energy_data.csv")
+data=$(ssh halki@$1 "tail -n +3 /opt/halki/energy_data.csv")
 
 # Check that there are at least 2 energy readings.
 line_count=$(echo "$data" | wc -l)

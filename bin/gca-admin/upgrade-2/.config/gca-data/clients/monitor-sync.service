@@ -1,0 +1,10 @@
+[Unit]
+Description=Sync Monitor Service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/monitor-sync.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

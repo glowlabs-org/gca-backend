@@ -391,6 +391,25 @@ func (c *Client) updateSyncFile() error {
 	return nil
 }
 
+// isRecentSync checks if the most recent sync according to the disk was within
+// 6 hours.
+func (c *Client) isRecentSync() (bool, error) {
+	// Grab the most recent sync time from disk.
+	path := filepath.Join(c.staticBaseDir, LastSyncFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, fmt.Errorf("error reading from sync file: %v", err)
+	}
+	lastSync, err := strconv.ParseInt(string(data), 10, 64)
+	if err != nil {
+		return false, fmt.Errorf("sync file appears to be corrupt: %v", err)
+	}
+
+	// Return true if that time is less than 6 hours ago, false otherwise.
+	now := time.Now().Unix()
+	return now - lastSync < 6 * 3600, nil
+}
+
 // updateReportFile updates the sync file with the current timestamp.
 func (c *Client) updateReportFile() error {
 	basePath := "/dev/shm"
