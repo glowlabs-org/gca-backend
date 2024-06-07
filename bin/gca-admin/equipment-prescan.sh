@@ -91,8 +91,8 @@ echo "Initial firmware update is complete. Please set up the box to be reading f
 echo "Type 'YES' when setup is complete:"
 read confirmation
 if [[ "${confirmation^^}" != "YES" ]]; then
-        echo "Please run this script again when you are ready."
-        exit 1
+    echo "Please run this script again when you are ready."
+    exit 1
 fi
 echo "Proceeding with setup. This will take approximately 11 minutes."
 
@@ -104,19 +104,39 @@ retry_command "ssh halki@$1 'echo \"timestamp,energy (mWh)\" | sudo tee /opt/hal
 sleep 4
 retry_command "ssh halki@$1 'sudo systemctl start atm90e32.service'"
 
-# User has confirmed that setup is complete. We will now wait for 11 minutes to
-# collect power readings. We need to wait for 10 minutes because the device
-# only produces a reading every 5 minutes and we want at least two readings in
+# User has confirmed that setup is complete. We will now wait for a maximum of 16
+# minutes to collect power readings. We need to wait because the device
+# only produces a reading every 5 minutes and we want at least three readings in
 # the file. To cover the edge case where the atm90e32 service takes almost
-# minute to get going, we wait an extra 55 seconds.
-sleep 655
+# minute to get going, we wait an extra minute.
+# Some boxes generate a short energy value line a short time after the service
+# is started, so we will wait for 4 lines in the file to make sure we have 2
+# good entries, allowing a maximum of 16 minutes for this to happen.
+echo "Waiting for a maximum of 16 minutes for energy values."
+counter=0
+
+while [ $counter -le 8 ]; do
+    sleep 120
+    counter=$((counter + 1))
+    data=$(ssh halki@$1 "cat /opt/halki/energy_data.csv")
+    lines=$(echo "$data" | wc -l)
+    echo "File now has $lines lines in $((counter * 2)) minutes, need 4 lines."
+    if [ "$lines" -ge 4 ]; then
+        break
+    fi
+done
+
+if [ "$lines" -lt 4 ]; then
+    echo "File does not have enough energy values after 16 minutes."
+    exit 1
+fi
 
 # There should be at least two data readings in the file. If the data is good,
 # all energy readings will have the same sign, and all energy readings will
 # have a value >1200. The next section of code goes through the file and
 # validates the readings.
 
-# Read the data skipping the header
+# Read the data skipping the header and first energy line.
 data=$(ssh halki@$1 "tail -n +3 /opt/halki/energy_data.csv")
 
 # Check that there are at least 2 energy readings.
