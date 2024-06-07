@@ -129,8 +129,8 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 	params.Add("community", "RE")
 	params.Add("longitude", strconv.FormatFloat(longitude, 'f', -1, 64))
 	params.Add("latitude", strconv.FormatFloat(latitude, 'f', -1, 64))
-	params.Add("start", "20230101")
-	params.Add("end", "20231231")
+	params.Add("start", strconv.Itoa(WattTimeYear)+"0101")
+	params.Add("end", strconv.Itoa(WattTimeYear)+"1231")
 	params.Add("format", "json")
 	// Construct the final URL with encoded query parameters
 	finalURL := baseURL + "?" + params.Encode()
@@ -154,7 +154,8 @@ func (gcas *GCAServer) fetchAndSaveHistoricalBAData(token, ba string) error {
 	if err := os.MkdirAll(dataPath, os.ModePerm); err != nil {
 		return err
 	}
-	// Make a list of files we need to load for each month's data
+	// Make a list of files we need to load for each month's data. Since WattTime's API
+	// allows a maximum of 32 days per query, we will query by month.
 	type Info struct {
 		name  string
 		start time.Time
@@ -162,9 +163,12 @@ func (gcas *GCAServer) fetchAndSaveHistoricalBAData(token, ba string) error {
 	}
 	needed := make([]Info, 0)
 	for month := 1; month <= 12; month++ {
-		year := 2023
-		start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)    // First second of the month
-		end := time.Date(year, time.Month(month+1), 0, 23, 59, 59, 0, time.UTC) // Last second of the month
+		year := WattTimeYear
+		start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC) // First second of the month
+		// Calculate the last second of the month by by using the last second
+		// of the "0th day" of the next month. The 0th day is calculated as the last day
+		// of the previous month, so this calculation will give the result we need.
+		end := time.Date(year, time.Month(month+1), 0, 23, 59, 59, 0, time.UTC)
 		fname := fmt.Sprintf("%s_%d-%02d_MOER.json", ba, year, month)
 		filePath := filepath.Join(dataPath, fname)
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -252,7 +256,7 @@ func readMOERJson(filePath string) (map[string]map[string][]float64, error) {
 		year := parts[0][:4] // Extract YYYY
 		day := parts[0][5:]  // Extract MM-DD
 		hour := parts[1][:2] // Extract TT
-		if year != "2023" {
+		if year != strconv.Itoa(WattTimeYear) {
 			continue
 		}
 		if _, ok := moerValues[day]; !ok {
