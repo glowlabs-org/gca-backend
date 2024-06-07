@@ -47,7 +47,7 @@ def fetch_and_save_historical_data(token, ba):
 
 if __name__ == "__main__":
     # Command line: latitude longitude
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print('No region on command line, using CAISO_NORTH')
         ba = "CAISO_NORTH"
     else:
