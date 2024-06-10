@@ -1,5 +1,6 @@
 import requests
 import json
+import sys
 
 def prompt_for_coordinates():
     """
@@ -32,9 +33,11 @@ def fetch_nasa_data(latitude, longitude):
         "longitude": longitude,
         "latitude": latitude,
         "start": "20200101",
-        "end": "20221231",
+        "end": "20231231",
         "format": "json"
     }
+
+    print(f"Using time range {params['start']} to {params['end']}")
     
     # Perform the API request and parse the JSON response
     response = requests.get(url, params=params)
@@ -64,9 +67,15 @@ def calculate_average_sunlight(data):
     return average_sunlight
 
 if __name__ == "__main__":
-    # Step 1: Prompt user for coordinates
-    latitude, longitude = prompt_for_coordinates()
-    
+    # Command line: latitude longitude
+    if len(sys.argv) < 3:
+        print('No coordinates on command line, using Coit Tower (CAISO_NORTH)')
+        latitude = 37.803
+        longitude = -122.406
+    else:
+        latitude = sys.argv[1]
+        longitude = sys.argv[2]
+        
     # Step 2: Fetch NASA data
     data = fetch_nasa_data(latitude, longitude)
     
@@ -75,4 +84,3 @@ if __name__ == "__main__":
     
     # Step 4: Display the result
     print(f"The average annual sunlight for the coordinates {latitude}, {longitude} is {average_sunlight} kW-hr/m^2/day.")
-

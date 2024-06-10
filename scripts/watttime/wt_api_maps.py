@@ -3,6 +3,7 @@ from requests.auth import HTTPBasicAuth
 import os
 import sys
 import json
+from datetime import datetime
 
 # Your existing functions
 def load_credentials(filename):
@@ -10,7 +11,7 @@ def load_credentials(filename):
         return f.read().strip()
 
 def get_token(username, password):
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     if response.status_code == 200:
         return response.json()['token']
@@ -24,10 +25,11 @@ def save_ba_maps():
     password = load_credentials('password')
     token = get_token(username, password)
     
-    maps_url = 'https://api2.watttime.org/v2/maps'
+    maps_url = 'https://api.watttime.org/v3/maps'
     headers = {'Authorization': 'Bearer {}'.format(token)}
+    params = {'signal_type': 'co2_moer'}
     
-    response = requests.get(maps_url, headers=headers)
+    response = requests.get(maps_url, headers=headers, params=params)
     
     if response.status_code != 200:
         sys.exit(f"Failed to get maps, status code: {response.status_code}")
@@ -46,6 +48,20 @@ def save_ba_maps():
 
     print(f"Balancing authority maps saved to {file_path}")
 
-# Run the function
-save_ba_maps()
+if __name__ == "__main__":
+    # Downloads the region map file to data/ba_maps.json.
+    # This script requires a license from WattTime,
+    # and does not depend on any other script.
 
+    metadata = {
+        "generation_time": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    path = "data"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    path = os.path.join(path, "ba_maps_meta.json")
+    with open(path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    print("Creating a region map file")
+    save_ba_maps()

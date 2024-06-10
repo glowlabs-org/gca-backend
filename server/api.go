@@ -16,8 +16,11 @@ func (gcas *GCAServer) launchAPI() {
 	gcas.mux.HandleFunc("/api/v1/equipment-migrate", gcas.EquipmentMigrateHandler)
 	gcas.mux.HandleFunc("/api/v1/register-gca", gcas.RegisterGCAHandler)
 	gcas.mux.HandleFunc("/api/v1/recent-reports", gcas.RecentReportsHandler)
-	gcas.mux.HandleFunc("/api/v1/geo-stats", GeoStatsHandler)
+	gcas.mux.HandleFunc("/api/v1/geo-stats", gcas.GeoStatsHandler)
 	gcas.mux.HandleFunc("/api/v1/archive", gcas.ArchiveHandler)
+	// Internal APIs which will not be accessible except under bench testing mode
+	gcas.mux.HandleFunc("/api/int/wt-signal-index", gcas.InternalWattTimeSignalIndexHandler)
+	gcas.mux.HandleFunc("/api/int/wt-historical", gcas.InternalWattTimeHistoricalHandler)
 
 	// Create a listener. In prod it's a specfic port, during testing it's
 	// ":0". Because we don't know what the port is during testing, we need

@@ -272,7 +272,7 @@ func TestParseReportIntegration(t *testing.T) {
 	// Turn off the server and turn it back on, checking that there are
 	// still banned reports.
 	server.Close()
-	server, err = NewGCAServer(dir)
+	server, err = NewGCAServer(dir, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +373,7 @@ func TestCapacityEnforcement(t *testing.T) {
 	// Restart the server and check that the ban is still in place.
 	server.CheckInvariants()
 	server.Close()
-	server, err = NewGCAServer(dir)
+	server, err = NewGCAServer(dir, false)
 	if err != nil {
 		t.Fatal(err)
 	}

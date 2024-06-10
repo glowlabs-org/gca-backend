@@ -13,6 +13,9 @@ const (
 	// exceed its capacity by in a 5 minute period without the report being
 	// banned. There's in implied division by 100, so 135 implies 135%.
 	MaxCapacityBuffer = 135
+
+	// Full year to use for WattTime historical MOER data.
+	WattTimeYear = 2023
 )
 
 var (

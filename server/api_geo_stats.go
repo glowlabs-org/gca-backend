@@ -1,12 +1,9 @@
 package server
 
 import (
-	"archive/zip"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,19 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
-
-// Define a struct to receive the information from the call to get
-// a token from WattTime.
-type WattTimeTokenResponse struct {
-	Token string `json:"token"`
-}
-
-// Define a struct to receive the information from a call to get
-// the balancing authority from WattTime
-type BalancingAuthorityResponse struct {
-	Abbrev string `json:"abbrev"`
-}
 
 // Define a struct that contains the response data for the call to
 // the GeoStatsHandler.
@@ -36,7 +22,7 @@ type GeoStatsResponse struct {
 }
 
 // GeoStatsHandler will respond to a call to the /geo-stats api endpoint.
-func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
+func (gcas *GCAServer) GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET calls.
 	if r.Method != http.MethodGet {
 		http.Error(w, "Only GET method is allowed", http.StatusMethodNotAllowed)
@@ -53,8 +39,8 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load WattTime credentials and then get the auth token.
-	wtUsernamePath := filepath.Join("watttime_data", "username")
-	wtPasswordPath := filepath.Join("watttime_data", "password")
+	wtUsernamePath := filepath.Join(gcas.baseDir, "watttime_data", "username")
+	wtPasswordPath := filepath.Join(gcas.baseDir, "watttime_data", "password")
 	username, err := loadWattTimeCredentials(wtUsernamePath)
 	if err != nil {
 		http.Error(w, "Error in loading watttime username", http.StatusInternalServerError)
@@ -88,7 +74,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Get all of the historical data for this BA. It's a very expensive operation,
 	// but only if the historical data is not cached locally already. Luckily, most
 	// of the historical data is already cached locally.
-	err = fetchAndSaveHistoricalBAData(token, ba)
+	err = gcas.fetchAndSaveHistoricalBAData(token, ba)
 	if err != nil {
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
@@ -96,7 +82,7 @@ func GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Load the historical data from disk. The previous call to fetch the data saves
 	// it to disk if the data is not already saved.
-	baData, err := loadMOERData(ba)
+	baData, err := gcas.loadMOERData(ba)
 	if err != nil {
 		http.Error(w, "Error loading balancing authority historical data", http.StatusInternalServerError)
 		return
@@ -143,8 +129,8 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 	params.Add("community", "RE")
 	params.Add("longitude", strconv.FormatFloat(longitude, 'f', -1, 64))
 	params.Add("latitude", strconv.FormatFloat(latitude, 'f', -1, 64))
-	params.Add("start", "20220101")
-	params.Add("end", "20221231")
+	params.Add("start", strconv.Itoa(WattTimeYear)+"0101")
+	params.Add("end", strconv.Itoa(WattTimeYear)+"1231")
 	params.Add("format", "json")
 	// Construct the final URL with encoded query parameters
 	finalURL := baseURL + "?" + params.Encode()
@@ -161,94 +147,43 @@ func fetchNASAData(latitude, longitude float64) (map[string]float64, error) {
 }
 
 // fetchAndSaveHistoricalBAData fetches historical data for the given balancing
-// authority and saves it locally.
-func fetchAndSaveHistoricalBAData(token, ba string) error {
-	dataPath := filepath.Join("watttime_data", ba)
-	if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
-		// Data already exists
-		log.Println("Data for", ba, "already exists locally.")
-		return nil
-	}
-
-	// Make directory for the BA
+// authority and saves it locally. WattTime allows querying historical data
+// for up to 32 days, so we will create 12 data files for each month of the year.
+func (gcas *GCAServer) fetchAndSaveHistoricalBAData(token, ba string) error {
+	dataPath := filepath.Join(gcas.baseDir, "watttime_data", ba)
 	if err := os.MkdirAll(dataPath, os.ModePerm); err != nil {
 		return err
 	}
-
-	// Fetch historical data
-	historicalURL := "https://api2.watttime.org/v2/historical"
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", historicalURL, nil)
-	if err != nil {
-		return err
+	// Make a list of files we need to load for each month's data. Since WattTime's API
+	// allows a maximum of 32 days per query, we will query by month.
+	type Info struct {
+		name  string
+		start time.Time
+		end   time.Time
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	q := req.URL.Query()
-	q.Add("ba", ba)
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Check for non-200 status code
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API request failed with status code: %d", resp.StatusCode)
-	}
-
-	// Read the response body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	// Save the ZIP file
-	zipPath := filepath.Join(dataPath, ba+"_historical.zip")
-	if err := ioutil.WriteFile(zipPath, body, 0644); err != nil {
-		return err
-	}
-
-	// Extract the ZIP file
-	if err := extractZipFile(zipPath, dataPath); err != nil {
-		return err
-	}
-
-	log.Println("Wrote and unzipped historical data for", ba, "to the directory:", dataPath)
-	return nil
-}
-
-// extractZipFile extracts a ZIP file to the specified destination directory.
-func extractZipFile(zipFile, destDir string) error {
-	reader, err := zip.OpenReader(zipFile)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	for _, file := range reader.File {
-		path := filepath.Join(destDir, file.Name)
-		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, os.ModePerm)
-			continue
+	needed := make([]Info, 0)
+	for month := 1; month <= 12; month++ {
+		year := WattTimeYear
+		start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC) // First second of the month
+		// Calculate the last second of the month by by using the last second
+		// of the "0th day" of the next month. The 0th day is calculated as the last day
+		// of the previous month, so this calculation will give the result we need.
+		end := time.Date(year, time.Month(month+1), 0, 23, 59, 59, 0, time.UTC)
+		fname := fmt.Sprintf("%s_%d-%02d_MOER.json", ba, year, month)
+		filePath := filepath.Join(dataPath, fname)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			needed = append(needed, Info{filePath, start, end})
 		}
-
-		fileReader, err := file.Open()
+	}
+	for _, f := range needed {
+		raw, err := getWattTimeHistoricalDataRaw(token, ba, f.start.Unix(), f.end.Unix())
 		if err != nil {
 			return err
 		}
-		defer fileReader.Close()
-
-		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
-		if err != nil {
+		if err = os.WriteFile(f.name, raw, 0644); err != nil {
 			return err
 		}
-		defer targetFile.Close()
-
-		if _, err := io.Copy(targetFile, fileReader); err != nil {
-			return err
-		}
+		gcas.logger.Info("wrote historical data file: ", f.name)
 	}
 	return nil
 }
@@ -260,19 +195,26 @@ type MOERData struct {
 }
 
 // loadMOERData loads MOER data from CSV files for the specified balancing authority.
-func loadMOERData(ba string) (map[string]map[string][]float64, error) {
-	folderPath := filepath.Join("watttime_data", ba)
+func (gcas *GCAServer) loadMOERData(ba string) (map[string]map[string][]float64, error) {
+	dataPath := filepath.Join(gcas.baseDir, "watttime_data", ba)
 	moerData := make(map[string]map[string][]float64)
 
-	files, err := ioutil.ReadDir(folderPath)
+	entries, err := os.ReadDir(dataPath)
+	files := make([]fs.FileInfo, 0, len(entries))
 	if err != nil {
 		return nil, err
 	}
-
+	for _, entry := range entries {
+		fi, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, fi)
+	}
 	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".csv") {
-			filePath := filepath.Join(folderPath, file.Name())
-			fileData, err := readMOERCSV(filePath)
+		if strings.HasSuffix(file.Name(), ".json") {
+			filePath := filepath.Join(dataPath, file.Name())
+			fileData, err := readMOERJson(filePath)
 			if err != nil {
 				return nil, err
 			}
@@ -291,46 +233,32 @@ func loadMOERData(ba string) (map[string]map[string][]float64, error) {
 	return moerData, nil
 }
 
-// readMOERCSV reads MOER values from a CSV file.
-func readMOERCSV(filePath string) (map[string]map[string][]float64, error) {
+// readMOERJson reads MOER values from a Json formatted file.
+func readMOERJson(filePath string) (map[string]map[string][]float64, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
-	moerValues := make(map[string]map[string][]float64)
-
-	_, err = reader.Read() // Skip header
+	var jd DataPointsJSON
+	err = json.NewDecoder(file).Decode(&jd)
 	if err != nil {
 		return nil, err
 	}
 
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		timestamp, moerStr := record[0], record[1]
-		moer, err := strconv.ParseFloat(moerStr, 64)
-		if err != nil {
-			continue
-		}
-
+	// Convert the data to moer map
+	moerValues := make(map[string]map[string][]float64)
+	for _, dp := range jd.Data {
+		moer := dp.Value
 		// Assuming the timestamp format is YYYY-MM-DDTHH
-		parts := strings.Split(timestamp, "T")
+		parts := strings.Split(dp.PointTime, "T")
 		year := parts[0][:4] // Extract YYYY
 		day := parts[0][5:]  // Extract MM-DD
 		hour := parts[1][:2] // Extract TT
-		if year != "2022" {
+		if year != strconv.Itoa(WattTimeYear) {
 			continue
 		}
-
 		if _, ok := moerValues[day]; !ok {
 			moerValues[day] = make(map[string][]float64)
 		}

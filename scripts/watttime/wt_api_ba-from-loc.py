@@ -1,5 +1,6 @@
 import requests
 from requests.auth import HTTPBasicAuth
+import sys
 
 # Function to load credentials from a file
 def load_credentials(filename):
@@ -27,7 +28,7 @@ def get_token(username, password):
     Returns:
         str: The authorization token.
     """
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
@@ -44,13 +45,22 @@ def get_region_info(token, latitude, longitude):
     Returns:
         str: The API response as a string.
     """
-    region_url = 'https://api2.watttime.org/v2/ba-from-loc'
+    region_url = 'https://api.watttime.org/v3/region-from-loc'
     headers = {'Authorization': 'Bearer {}'.format(token)}
-    params = {'latitude': latitude, 'longitude': longitude}
+    params = {'latitude': latitude, 'longitude': longitude, 'signal_type': 'co2_moer'}
     response = requests.get(region_url, headers=headers, params=params)
     return response.text
 
 if __name__ == "__main__":
+    # Command line: latitude longitude
+    if len(sys.argv) < 3:
+        print('No coordinates on command line, using Coit Tower (CAISO_NORTH)')
+        latitude = 37.803
+        longitude = -122.406
+    else:
+        latitude = sys.argv[1]
+        longitude = sys.argv[2]
+
     # Load username and password
     username = load_credentials('username')
     password = load_credentials('password')
@@ -58,11 +68,8 @@ if __name__ == "__main__":
     # Get the token
     token = get_token(username, password)
     
-    # Get user input for latitude and longitude
-    coords = input("Please enter the coordinates (latitude, longitude): ")
-    latitude, longitude = map(str.strip, coords.split(','))
-
     # Fetch and print region information
+    print(f"latitude {latitude} longitude {longitude}")
     region_info = get_region_info(token, latitude, longitude)
     print(region_info)
 

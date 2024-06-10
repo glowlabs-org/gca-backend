@@ -1,19 +1,21 @@
 import csv
 import os
 import json
-import zipfile
 import requests
 import sys
 from requests.auth import HTTPBasicAuth
 from os import path
 from statistics import mean
 from collections import defaultdict
+from wt_api_hist_download import fetch_and_save_historical_data
 
 def prompt_for_coordinates():
     latitude = float(input("Please enter the latitude: "))
     longitude = float(input("Please enter the longitude: "))
     return latitude, longitude
 
+# fetch nasa All Sky Surface Shortwave Downward Irradiance (ALLSKY_SFC_SW_DWN) data for 2023
+# https://power.larc.nasa.gov/docs/gallery/solar-irradiance/
 def fetch_nasa_data(latitude, longitude):
     # Construct API endpoint and parameters
     url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
@@ -22,10 +24,11 @@ def fetch_nasa_data(latitude, longitude):
         "community": "RE",
         "longitude": longitude,
         "latitude": latitude,
-        "start": "20220101",
-        "end": "20221231",
+        "start": "20230101",
+        "end": "20231231",
         "format": "json"
     }
+    print(f"Using time range {params['start']} to {params['end']}")
     # Make request and return parsed response
     response = requests.get(url, params=params)
     return json.loads(response.text)
@@ -35,22 +38,22 @@ def load_credentials(filename):
         return f.read().strip()
 
 def get_token(username, password):
-    login_url = 'https://api2.watttime.org/v2/login'
+    login_url = 'https://api.watttime.org/login'
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
 def get_balancing_authority(token, latitude, longitude):
     # Define the URL and headers for the API request
-    region_url = 'https://api2.watttime.org/v2/ba-from-loc'
+    region_url = 'https://api.watttime.org/v3/region-from-loc'
     headers = {'Authorization': 'Bearer {}'.format(token)}
-    params = {'latitude': latitude, 'longitude': longitude}
+    params = {'latitude': latitude, 'longitude': longitude, 'signal_type': 'co2_moer'}
 
     # Make the API request
     response = requests.get(region_url, headers=headers, params=params)
 
     # Check if the API call was successful
     if response.status_code == 200:
-        return response.json()['abbrev']
+        return response.json()['region']
     elif response.status_code == 404:  # Location not supported
         print("Got 404")
         return None
@@ -61,71 +64,32 @@ def get_balancing_authority(token, latitude, longitude):
         print(f"Unexpected error: {response.content}")
         sys.exit("An unexpected error occurred while fetching the balancing authority.")
 
-def fetch_and_save_historical_data(token, ba):
+def load_json_files(region):
     """
-    Fetch and save historical data for a given balancing authority.
-    
-    Parameters:
-        token (str): WattTime API authorization token.
-        ba (str): Abbreviation of the balancing authority.
-
-    Returns:
-        None
-    """
-    data_path = path.join("data", ba)
-    if path.exists(data_path):
-        print(f"Data for {ba} already exists locally.")
-    else:
-        # Construct historical data URL and headers
-        historical_url = 'https://api2.watttime.org/v2/historical'
-        headers = {'Authorization': f'Bearer {token}'}
-        params = {'ba': ba}
-        
-        # Fetch historical data
-        rsp = requests.get(historical_url, headers=headers, params=params)
-        
-        # Create a directory for the balancing authority
-        if not os.path.exists(data_path):
-            os.mkdir(data_path)
-        
-        # Save the zip file
-        zip_path = path.join("data", ba, f'{ba}_historical.zip')
-        with open(zip_path, 'wb') as fp:
-            fp.write(rsp.content)
-        
-        # Extract the zip file
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(ba)
-        
-        print(f"Wrote and unzipped historical data for {ba} to the directory: {ba}")
-        
-def load_csv_files(ba):
-    """
-    Load CSV files in a folder with a specific prefix and return the MOER values organized by year and hour.
+    Load json files in a folder with a specific prefix and return the MOER values organized by year and hour.
     
     Args:
-        folder_path (str): The path to the folder containing the CSV files.
+        folder_path (str): The path to the folder containing the files.
     
     Returns:
         dict: A nested dictionary containing the MOER values organized by year and hour.
     """
     folder_path = os.path.join("data", ba)
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    prefix = f"{ba}_2022"
+    prefix = f"{ba}_2023"
     for filename in os.listdir(folder_path):
-        if filename.startswith(prefix) and filename.endswith('.csv'):
+        if filename.startswith(prefix) and filename.endswith('.json'):
             filepath = os.path.join(folder_path, filename)
-            with open(filepath, 'r') as csvfile:
-                reader = csv.reader(csvfile)
-                next(reader)  # Skip the header
-                for row in reader:
-                    timestamp, moer = row[0], float(row[1])
+            with open(filepath, 'r') as f:
+                dat = json.load(f)
+                for row in dat["data"]:
+                    timestamp, moer = row["point_time"], float(row["value"])
                     year, rest = timestamp.split('-', 1)
                     day, time = rest.split('T')
                     hour = time.split(':')[0]
                     data[year][day][hour].append(moer)
     return data
-    
+
 def calculate_carbon_credits(nasa_data, moer_data):
     total_kwh = 0
     total_hours = 0
@@ -209,6 +173,15 @@ def calculate_carbon_credits_b(nasa_data, moer_data):
     print(f"Total Carbon Credits for 1 kW of Solar Panels: {total_carbon_credits:.2f} metric tons CO2")
 
 if __name__ == "__main__":
+    # Command line: latitude longitude
+    if len(sys.argv) < 3:
+        print('No coordinates on command line, using Coit Tower (CAISO_NORTH)')
+        latitude = 37.803
+        longitude = -122.406
+    else:
+        latitude = sys.argv[1]
+        longitude = sys.argv[2]
+        
     # Load API credentials
     username = load_credentials('username')
     password = load_credentials('password')
@@ -216,12 +189,10 @@ if __name__ == "__main__":
     # Fetch WattTime API token
     token = get_token(username, password)
 
-    # Get latitude and longitude from the user
-    latitude, longitude = prompt_for_coordinates()
-
     # Fetch balancing authority
     ba = get_balancing_authority(token, latitude, longitude)
-    
+    print(f"Region {ba}")
+
     # Check if the balancing authority is available for the given location
     if ba is None:
         sys.exit("Location not supported")
@@ -231,7 +202,6 @@ if __name__ == "__main__":
     
     # Fetch NASA data and calculate average sunlight
     nasa_data = fetch_nasa_data(latitude, longitude)
-    moer_data = load_csv_files(ba)
+    moer_data = load_json_files(ba)
     combo_print = calculate_carbon_credits(nasa_data, moer_data)
     combo_print = calculate_carbon_credits_b(nasa_data, moer_data)
-

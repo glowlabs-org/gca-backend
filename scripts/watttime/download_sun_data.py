@@ -3,17 +3,25 @@ import json
 import requests
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+
+META_params = {
+        "parameters": "ALLSKY_SFC_SW_DWN",
+        "community": "RE",
+        "start": "20230101",
+        "end": "20231231",
+    }
 
 # Function to fetch data from NASA API
 def fetch_nasa_data(latitude, longitude):
     url = "https://power.larc.nasa.gov/api/temporal/hourly/point"
     params = {
-        "parameters": "ALLSKY_SFC_SW_DWN",
-        "community": "RE",
+        "parameters": META_params["parameters"],
+        "community": META_params["community"],
         "longitude": longitude,
         "latitude": latitude,
-        "start": "20220101",
-        "end": "20221231",
+        "start": META_params["start"],
+        "end": META_params["end"],
         "format": "json"
     }
     response = requests.get(url, params=params)
@@ -82,5 +90,21 @@ def frange(start, stop, step):
         start += step
 
 if __name__ == "__main__":
-    main()
+    # Downloads solar energy data from NASA Power. Output to data/nasa.
+    # Does not depend on any other script.
+    print(f"Downloading to data/nasa start {META_params['start']} end {META_params['end']}")
 
+    metadata = {
+        "generation_time": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "params" : META_params,
+    }
+
+    path = "data/nasa"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    path = os.path.join(path, "nasa_meta.json")
+    if not os.path.isfile(path):
+        with open(path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+    main()
