@@ -42,6 +42,12 @@ def process_device_stats(dev_data, equip_data):
 	
 	return ret
 
+def timeslot_to_datetime(s):
+	total_seconds = GENESIS_TIME + s * TIMESLOT_DURATION
+	dt = datetime.utcfromtimestamp(total_seconds)
+	formatted_datetime = dt.strftime('%m/%d %H:%M')
+	return formatted_datetime
+
 # Emit an entry, including a list of power outputs and impact rates, to allow visualizing the device stats.
 def emit_entry(entry, week):
 	print(f"{entry['ShortID']}:")
@@ -49,11 +55,11 @@ def emit_entry(entry, week):
 	print(f"  Week: {week} Starting Timeslot: {week*2016} {datetime.fromtimestamp(GENESIS_TIME+week*TIMESLOTS_PER_WEEK*TIMESLOT_DURATION, timezone.utc)}")
 	print("  PowerOutputs by Timeslot")
 	data_list = entry["PowerOutputs"]
-	prs = "\n".join([f"  {week*TIMESLOTS_PER_WEEK+i:5}: " + " ".join(map(lambda x: str(int(x)), data_list[i:i+16])) for i in range(0, len(data_list), 16)])
+	prs = "\n".join([f"  {timeslot_to_datetime(week*TIMESLOTS_PER_WEEK+i)}: " + " ".join(map(lambda x: str(int(x)), data_list[i:i+16])) for i in range(0, len(data_list), 16)])
 	print(prs)
 	print("  ImpactRates by Timeslot")
 	data_list = entry["ImpactRates"]
-	prs = "\n".join([f"  {week*TIMESLOTS_PER_WEEK+i:5}: " + " ".join(map(lambda x: str(int(x)), data_list[i:i+16])) for i in range(0, len(data_list), 16)])
+	prs = "\n".join([f"  {timeslot_to_datetime(week*TIMESLOTS_PER_WEEK+i)}: " + " ".join(map(lambda x: str(int(x)), data_list[i:i+16])) for i in range(0, len(data_list), 16)])
 	print(prs)
 
 if __name__ == "__main__":
