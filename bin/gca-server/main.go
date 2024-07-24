@@ -28,21 +28,11 @@ func main() {
 	// Create the server directory path within the user's home directory.
 	serverDir := filepath.Join(homeDir, "gca-server")
 
-	// Internal test mode enables internal APIs, and sets the logging level to Info.
-	var internalTestMode bool
-	if len(os.Args) == 2 && os.Args[1] == "--internal-test" {
-		internalTestMode = true
-	}
-
 	// Initialize a new GCAServer instance with the server directory.
-	gcaServer, err := server.NewGCAServer(serverDir, internalTestMode)
+	gcaServer, err := server.NewGCAServer(serverDir)
 	if err != nil {
 		fmt.Println("Unable to launch GCA server:", err)
 		os.Exit(1)
-	}
-
-	if internalTestMode {
-		fmt.Println("This server is using internal test mode, and should not be used in production.")
 	}
 
 	// Create a channel to listen for operating system signals.

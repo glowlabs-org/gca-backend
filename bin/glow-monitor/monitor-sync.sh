@@ -29,7 +29,10 @@ check_timestamp() {
             kill -USR1 "$pid"
         fi
 
-        # Reboot system
+        # Reboot system. This starts by power cycling the USBs.
+        echo "powering off usb devices to power cycle the usb bus"
+        echo 0 > /sys/devices/platform/soc/3f980000.usb/buspower
+        sleep 10
         echo "rebooting the system because there has not been a successful sync in the past 24 hours"
         echo $(date) >> /opt/glow-monitor/reboots.txt
         reboot
