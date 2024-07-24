@@ -94,10 +94,8 @@ type GCAServer struct {
 	httpServer     *http.Server   // Web server for handling API requests
 	httpPort       uint16         // Records the port that is being used to serve the api
 	mux            *http.ServeMux // Routing for HTTP requests
-	skipInvariants bool           // If set to true, 'CheckInvariants()' will not run on Close()
 	udpPort        uint16         // The port that the UDP conn is listening on
 	tcpPort        uint16         // The port that the TCP listener is using
-	allowIntApis   bool           // Enables bench testing the server with production settings
 	mu             sync.Mutex
 	tg             threadgroup.ThreadGroup
 
@@ -108,9 +106,8 @@ type GCAServer struct {
 // the GCAServer or an error.
 //
 // baseDir specifies the directory where all server files will be stored.
-// The function will create this directory if it does not exist. internalTestMode
-// sets a higher default logging level, and enables internal APIs.
-func NewGCAServer(baseDir string, internalTestMode bool) (*GCAServer, error) {
+// The function will create this directory if it does not exist.
+func NewGCAServer(baseDir string) (*GCAServer, error) {
 	// Create the directory if it doesn't exist
 	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(baseDir, 0755); err != nil {
@@ -129,7 +126,6 @@ func NewGCAServer(baseDir string, internalTestMode bool) (*GCAServer, error) {
 		equipmentReports:      make(map[uint32]*[4032]glow.EquipmentReport),
 		recentReports:         make([]glow.EquipmentReport, 0, maxRecentReports),
 		ApiArchiveRateLimiter: glow.NewRateLimiter(apiArchiveLimit, apiArchiveRate),
-		allowIntApis:          internalTestMode,
 	}
 	if testMode {
 		// Create a background thread that will print out the name of the
@@ -151,10 +147,6 @@ func NewGCAServer(baseDir string, internalTestMode bool) (*GCAServer, error) {
 		return logger.Close()
 	})
 	server.logger = logger
-
-	if internalTestMode {
-		server.logger.level = INFO
-	}
 
 	// Create the http server and provision its shutdown.
 	server.mux = http.NewServeMux()
@@ -271,9 +263,7 @@ func (server *GCAServer) Close() error {
 	// By placing this here, we know that every time a server is closed
 	// during testing, we are reviewing the state to make sure it's all in
 	// order.
-	if !server.skipInvariants {
-		server.CheckInvariants()
-	}
+	server.CheckInvariants()
 	return server.tg.Stop()
 }
 

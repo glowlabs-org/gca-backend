@@ -67,6 +67,7 @@ func (gcas *GCAServer) GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch the balancing authority for this coordinate.
 	ba, err := getBalancingAuthority(token, latitude, longitude)
 	if err != nil {
+		fmt.Println("Error fetching balancing authority:", err)
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
 	}
@@ -76,6 +77,7 @@ func (gcas *GCAServer) GeoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// of the historical data is already cached locally.
 	err = gcas.fetchAndSaveHistoricalBAData(token, ba)
 	if err != nil {
+		fmt.Println("Error fetching balancing authority:", err)
 		http.Error(w, "Error in fetching balancing authority", http.StatusInternalServerError)
 		return
 	}

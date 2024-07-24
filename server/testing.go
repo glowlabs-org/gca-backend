@@ -162,7 +162,7 @@ func gcaServerWithTempKey(dir string) (gcas *GCAServer, tempPrivKey glow.Private
 	}
 
 	// Initialize and launch the GCAServer.
-	gcas, err = NewGCAServer(dir, false)
+	gcas, err = NewGCAServer(dir)
 	if err != nil {
 		return nil, glow.PrivateKey{}, fmt.Errorf("failed to create gca server: %v", err)
 	}

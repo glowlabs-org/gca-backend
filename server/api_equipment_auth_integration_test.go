@@ -121,7 +121,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Restart the server and verify that the equipment persists after reboot.
 	server.Close()
-	server, err = NewGCAServer(dir, false)
+	server, err = NewGCAServer(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 
 	// Restart the server again, make sure that the equipment is still banned.
 	server.Close()
-	server, err = NewGCAServer(dir, false)
+	server, err = NewGCAServer(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestAuthorizeEquipmentIntegration(t *testing.T) {
 	// Restart the server again, make sure the state is maintained.
 	server.CheckInvariants()
 	server.Close()
-	server, err = NewGCAServer(dir, false)
+	server, err = NewGCAServer(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

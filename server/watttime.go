@@ -116,23 +116,38 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 
 	// Create the base url
 	client := &http.Client{}
-	url := "https://api.watttime.org/v3/signal-index"
+	url := "https://api.watttime.org/v3/historical"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("unable to get watttime index: %v", err)
 	}
 
+	// Get the historical dates associated with the current time. The
+	// WattTime API changed so that you have to get current information by
+	// requesting the historical endpoint but using the date range of the
+	// most recent finalized timeslot.
+	//
+	// Though technically it's only necessary to look back 8 minutes, there
+	// may be clock drift between the gca-server and the WattTime server.
+	// At worst, this will cause an extra result to be returned.
+	endTime := time.Now().UTC()
+	startTime := endTime.Add(-8 * time.Minute)
+	startTimeStr := startTime.Format("2006-01-02T15:04+00:00")
+	endTimeStr := endTime.Format("2006-01-02T15:04+00:00")
+
 	// Set the parameters
 	req.Header.Set("Authorization", "Bearer "+token)
 	q := req.URL.Query()
 	q.Add("region", region)
+	q.Add("start", startTimeStr)
+	q.Add("end", endTimeStr)
 	q.Add("signal_type", "co2_moer")
 	req.URL.RawQuery = q.Encode()
 
 	// Make the API request
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, 0, "", fmt.Errorf("unable to make watttime api request")
+		return 0, 0, "", fmt.Errorf("unable to make watttime api request: %v", err)
 	}
 	defer resp.Body.Close()
 	// Check for non-200 status code
@@ -147,16 +162,20 @@ func getWattTimeIndex(token string, latitude float64, longitude float64) (float6
 		return 0, 0, "", fmt.Errorf("unable to decode watttime historical data: %v", err)
 	}
 
-	// WattTime API should have a single point in the response
-	if len(jr.Data) != 1 {
-		return 0, 0, "", fmt.Errorf("invalid api return: %v data items", len(jr.Data))
+	// There might be multiple datapoints that get returned, because the
+	// timestamp might straddle two different available datapoints. We
+	// always select the latest.
+	if len(jr.Data) == 0 {
+		return 0, 0, "", fmt.Errorf("WattTime returned 0 data items for start time: %s and end time: %s", startTimeStr, endTimeStr)
 	}
+	latestMOER := jr.Data[len(jr.Data)-1]
+
 	// Parse the string time.
-	t, err := time.Parse("2006-01-02T15:04:05Z07:00", jr.Data[0].PointTime)
+	t, err := time.Parse("2006-01-02T15:04:05Z07:00", latestMOER.PointTime)
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("unable to parse watttime response time: %v", err)
 	}
-	moer := jr.Data[0].Value
+	moer := latestMOER.Value
 
 	// Convert the moer to grams per megawatt hour. Moer is provided in
 	// pounds per megawatt hour. We multiply by 453.59237 to get from

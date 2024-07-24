@@ -104,7 +104,7 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gcas, err = server.NewGCAServer(gcasDir, false)
+	gcas, err = server.NewGCAServer(gcasDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gcas, err = server.NewGCAServer(gcasDir, false)
+	gcas, err = server.NewGCAServer(gcasDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +385,7 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gcas, err = server.NewGCAServer(gcasDir, false)
+	gcas, err = server.NewGCAServer(gcasDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -523,7 +523,7 @@ func TestEquipmentHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gcas, err = server.NewGCAServer(gcasDir, false)
+	gcas, err = server.NewGCAServer(gcasDir)
 	if err != nil {
 		t.Fatal(err)
 	}
