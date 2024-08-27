@@ -4,6 +4,36 @@
 TIMESTAMP_FILE="/opt/glow-monitor/last-sync.txt"
 touch $TIMESTAMP_FILE
 
+reset_modem() {
+    # Define the GPIO pin
+    GPIO_PIN=12
+
+    # Export the GPIO pin if it hasn't been exported already
+    if [ ! -d "/sys/class/gpio/gpio$GPIO_PIN" ]; then
+      echo "$GPIO_PIN" > /sys/class/gpio/export
+    fi
+
+    # Set the GPIO pin direction to output
+    echo "out" > /sys/class/gpio/gpio$GPIO_PIN/direction
+
+    # Drive the GPIO pin low to reset the modem
+    echo "0" > /sys/class/gpio/gpio$GPIO_PIN/value
+
+    # Wait for 3 seconds
+    sleep 3
+
+    # Release the GPIO pin (set it back to high)
+    echo "1" > /sys/class/gpio/gpio$GPIO_PIN/value
+
+    # Optionally, set the GPIO direction back to input (clean up)
+    echo "in" > /sys/class/gpio/gpio$GPIO_PIN/direction
+
+    # Unexport the GPIO pin (optional cleanup)
+    echo "$GPIO_PIN" > /sys/class/gpio/unexport
+
+    echo "Modem reset complete."
+}
+
 # Write a function that will reboot the system if the timestamp is more than 24
 # hours old.
 check_timestamp() {
@@ -35,6 +65,7 @@ check_timestamp() {
         sleep 10
         echo "rebooting the system because there has not been a successful sync in the past 24 hours"
         echo $(date) >> /opt/glow-monitor/reboots.txt
+        reset_modem
         reboot
     fi
 }

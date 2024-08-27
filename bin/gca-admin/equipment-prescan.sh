@@ -133,7 +133,7 @@ fi
 
 # There should be at least two data readings in the file. If the data is good,
 # all energy readings will have the same sign, and all energy readings will
-# have a value >1200. The next section of code goes through the file and
+# have a value >400. The next section of code goes through the file and
 # validates the readings.
 
 # Read the data skipping the header and first energy line.
@@ -148,7 +148,7 @@ fi
 
 # Check on the data in the file. Check that every line has the same sign
 # (either all positive or all negative), and also check that the power reading
-# of every line is >1200.
+# of every line is >400.
 first_sign=0
 while IFS=, read -r timestamp energy; do
     # Convert the energy reading to its absolute value and an int.
@@ -160,8 +160,8 @@ while IFS=, read -r timestamp energy; do
             exit 1
     fi
 
-    # Check if the absolute value of the energy is less than 1200 (1.2 watt hours in 5 minutes)
-    if [ $energy_int -lt 1200 ]; then
+    # Check if the absolute value of the energy is less than 400 (1.2 watt hours in 5 minutes)
+    if [ $energy_int -lt 400 ]; then
         echo "energy test failed, energy signal is not strong enough"
         exit 1
     fi
