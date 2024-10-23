@@ -24,18 +24,46 @@ def get_token(username, password):
     response = requests.get(login_url, auth=HTTPBasicAuth(username, password))
     return response.json()['token']
 
-def list_regions_from_ba_maps(token):
+def load_ba_regions():
+    """
+    Load the BA regions from the JSON file.
+
+    Returns:
+        list: List of BA regions and their details.
+    """
     path = "data/ba_maps.json"
     if not os.path.exists(path):
         print("data/ba_maps.json not found")
-        return
+        return None
     with open(path, 'r') as f:
         mapdat = json.load(f)
     print(f"loaded {len(mapdat['features'])} ba regions")
+    return mapdat['features']
+
+def list_regions_from_ba_maps(features):
+    """
+    List all regions from the BA maps.
+
+    Parameters:
+        features (list): List of features from the BA map data.
+    """
     lmap = []
-    for feat in mapdat['features']:
+    for feat in features:
         coord = feat['geometry']['coordinates'][0][0][0]
         print(f"{feat['properties']['region']:21} {feat['properties']['region_full_name']} ({coord[1]} {coord[0]})") # print lat long coordinates from the polygon
+
+def fetch_all_ba_data(token, features):
+    """
+    Fetch data for all BA regions.
+
+    Parameters:
+        token (str): The API token.
+        features (list): List of BA regions.
+    """
+    for feat in features:
+        ba_region = feat['properties']['region']
+        print(f"Fetching data for {ba_region}...")
+        fetch_and_save_historical_data(token, ba_region)
 
 if __name__ == "__main__":
     # Load API credentials
@@ -45,11 +73,21 @@ if __name__ == "__main__":
     # Fetch WattTime API token
     token = get_token(username, password)
 
+    # Load BA regions from the map file
+    features = load_ba_regions()
+
+    if features is None:
+        sys.exit(1)
+
     # Command line: latitude longitude
     if len(sys.argv) < 2:
-        print("usage: [ba region] or list")
+        # If no argument is provided, fetch data for all regions
+        print("No arguments provided. Fetching data for all BA regions.")
+        fetch_all_ba_data(token, features)
     elif sys.argv[1] == "list":
-        list_regions_from_ba_maps(token)
-    else: 
+        # List all regions if "list" argument is provided
+        list_regions_from_ba_maps(features)
+    else:
+        # Fetch data for the specific BA region provided
         ba = sys.argv[1]
         fetch_and_save_historical_data(token, ba)
