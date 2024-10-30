@@ -1,161 +1,368 @@
 import geopandas as gpd
+import pandas as pd
+import numpy as np
 import os
-import csv
 import json
-from collections import defaultdict
-from shapely.geometry import Point
-import sys
+import csv
+from datetime import datetime, timezone
 
-# Function to load all BA history into memory
-def load_all_ba_history():
-    ba_histories = {}
+def load_ba_histories():
+    print("Starting to load BA histories")
+
+    ba_histories = {}  # Dictionary to hold BA name -> numpy array
     base_folder_path = os.path.join("data")
+
+    # Number of 5-minute intervals in a non-leap year
+    num_intervals = 105120  # (365 days * 24 hours * 12 intervals per hour)
+
     for ba_folder in os.listdir(base_folder_path):
+        if ba_folder == 'nasa':
+            continue
         ba_folder_path = os.path.join(base_folder_path, ba_folder)
         if os.path.isdir(ba_folder_path):
-            ba_histories[ba_folder] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-            for filename in os.listdir(ba_folder_path):
-                if filename.endswith('.csv'):
-                    filepath = os.path.join(ba_folder_path, filename)
-                    with open(filepath, 'r') as csvfile:
-                        reader = csv.reader(csvfile)
-                        next(reader)  # Skip the header
-                        for row in reader:
-                            timestamp, moer = row[0], float(row[1])
-                            year, rest = timestamp.split('-', 1)
-                            day, time = rest.split('T')
-                            hour = time.split(':')[0]
-                            ba_histories[ba_folder][year][day][hour].append(moer)
-    print("generated ba_histories for", ba_histories.keys())
+            print(f"Loading data for BA: {ba_folder}")
+
+            ba_array = np.zeros(num_intervals, dtype=np.float32)
+            total_value = 0.0
+            num_values = 0
+
+            # Collect all JSON file paths for the BA
+            ba_filepaths = [os.path.join(ba_folder_path, filename)
+                            for filename in os.listdir(ba_folder_path)
+                            if filename.endswith('.json')]
+
+            # Process each file
+            for filepath in ba_filepaths:
+                with open(filepath, 'r') as jsonfile:
+                    data = json.load(jsonfile)
+                    for entry in data['data']:
+                        timestamp = entry['point_time']  # e.g., '2023-01-01T00:00:00+00:00'
+                        value = float(entry['value'])
+
+                        # Parse timestamp to get the index into the array
+                        try:
+                            # Parse the timestamp with timezone information
+                            dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S%z')
+                        except ValueError:
+                            # Handle timestamps without timezone
+                            dt = datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S')
+
+                        # Calculate the index for the array
+                        year_start = datetime(dt.year, 1, 1, tzinfo=timezone.utc)
+                        delta = dt - year_start
+                        total_minutes = int(delta.total_seconds() // 60)
+                        index = total_minutes // 5  # Each interval is 5 minutes
+
+                        # Check index bounds
+                        if 0 <= index < num_intervals:
+                            ba_array[index] = value
+                            total_value += value
+                            num_values += 1
+                        else:
+                            print(f"Warning: timestamp {timestamp} out of bounds in file {os.path.basename(filepath)}")
+
+            # Compute average value
+            average_value = total_value / num_values if num_values > 0 else 0.0
+            print(f"Finished loading BA {ba_folder}, average value: {average_value:.4f}")
+
+            # Store the array in the dictionary
+            ba_histories[ba_folder] = ba_array
+
     return ba_histories
 
-# determines what BA is responsible for a specific coordinate.
-# Will return 'None' if there is no BA data for that coordinate.
-def get_ba_by_coords(gdf, latitude, longitude):
-    # Create a Shapely Point from the latitude and longitude
-    point = Point(longitude, latitude)  # Note: Point takes (longitude, latitude)
-
-    # Use the .contains method of the geometry to check if the point is within any of the BAs
-    for _, row in gdf.iterrows():
-        if row['geometry'].contains(point):
-            return row['region']
-    
-    return None  # If no BA contains the point
-
-# Loads all of the history that we have for a specific ba
-def load_ba_history(ba):
-    return ba_histories.get(ba)
-
-# loads solar data from disk
-def load_solar_history(latitude, longitude):
+def load_solar_history(lat, lon):
     """
-    Load solar data from disk for the given latitude and longitude coordinates.
-    
-    Parameters:
-    - latitude (float): Latitude of the location
-    - longitude (float): Longitude of the location
-    
+    Load solar data for the given NASA grid point.
+    Handles integer vs float folder/file names.
+
     Returns:
-    - data (dict): The solar data for the given coordinates, or None if the file does not exist.
+        solar_history (dict) or None if not found.
     """
-    file_path = f"data/nasa/{latitude}/{longitude}.json"
-    
-    # Check if the file exists
-    if os.path.isfile(file_path):
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-            return data
-    else:
-        print(f"No data found for latitude {latitude} and longitude {longitude}.")
+    base_dir = os.path.join('data', 'nasa')
+
+    # Possible folder names for latitude
+    lat_variants = {str(lat)}
+    if float(lat).is_integer():
+        lat_variants.add(str(int(lat)))
+        lat_variants.add(f"{int(lat)}.0")
+
+    # Possible file names for longitude
+    lon_variants = {str(lon) + '.json'}
+    if float(lon).is_integer():
+        lon_variants.add(str(int(lon)) + '.json')
+        lon_variants.add(f"{int(lon)}.0.json")
+
+    for lat_folder in lat_variants:
+        lat_folder_path = os.path.join(base_dir, lat_folder)
+        if not os.path.isdir(lat_folder_path):
+            continue
+        for lon_file in lon_variants:
+            file_path = os.path.join(lat_folder_path, lon_file)
+            if os.path.isfile(file_path):
+                try:
+                    with open(file_path, 'r') as file:
+                        data = json.load(file)
+                        return data
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding JSON from file: {file_path}. Error: {e}")
+                except Exception as e:
+                    print(f"An unexpected error occurred while reading file: {file_path}. Error: {e}")
+    # If not found
+    return None
+
+def compute_total_carbon_credits(ba_name, solar_history, ba_histories):
+    """
+    Computes the total_carbon_credits value for a given BA and solar history.
+
+    Returns:
+        total_carbon_credits (float) or None if computation cannot be performed.
+    """
+    ba_array = ba_histories.get(ba_name)
+    if ba_array is None:
         return None
 
-# save a row to the csv
-def save_to_csv(row, csvfile):
-    writer = csv.writer(csvfile)
-    writer.writerow(row)
- 
-# Helper function to generate a range of floating point numbers
-def frange(start, stop, step):
-    while start < stop:
-        yield start
-        start += step
+    total_kwh = 0.0
+    total_moer = 0.0
+    total_hours = 0
 
-# Open the file that has all of the BA map data.
-file_path = os.path.join('data', 'ba_maps.json')
-gdf = gpd.read_file(file_path)
-
-# Load all of the ba histories
-ba_histories = load_all_ba_history()
-
-# Set up a range of coordinates to loop over.
-latitudes = [round(lat, 1) for lat in frange(24, 50, 0.2)]
-longitudes = [round(lon, 1) for lon in frange(-125, -66, 0.2)]
-csvfile = open("data/solar_values.csv", 'a', newline='')
-for latitude in latitudes:
-    csvfile.flush()
-    for longitude in longitudes:
-
-        ba = get_ba_by_coords(gdf, latitude, longitude)
-        if ba is None:
+    allsky_sfc_sw_dwn = solar_history['properties']['parameter'].get('ALLSKY_SFC_SW_DWN', {})
+    for day_hour, sun_intensity in allsky_sfc_sw_dwn.items():
+        if sun_intensity is None:
             continue
 
-        # ensure that the region's historical data is available
-        if not ba in ba_histories:
+        # day_hour format is 'YYYYMMDDHH'
+        try:
+            dt = datetime.strptime(day_hour, '%Y%m%d%H')
+        except ValueError:
+            print(f"Invalid date format in solar data: {day_hour}")
             continue
-        
-        # Load the solar data for this coordinate.
-        print(latitude, longitude, ba)
-        solar_history = load_solar_history(latitude, longitude)
 
-        # We will produce a 4x4 grid for each solar data point. This
-        # is because BAs need higher resolution than solar map, and
-        # getting BA data is a lot cheaper than getting solar data.
-        for lat in frange(latitude, latitude+0.2, 0.04):
-            for lon in frange(longitude, longitude+0.2, 0.04):
-                # Get the ba for this coordinate
-                ba = get_ba_by_coords(gdf, lat, lon)
-                if ba is None:
-                    continue
-                # Load the history for the ba.
-                ba_history = ba_histories.get(ba)
-                if ba_history is None:
-                    continue
+        # Get the index in BA history array
+        year_start = datetime(dt.year, 1, 1, tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=timezone.utc)
+        delta = dt - year_start
+        total_minutes = int(delta.total_seconds() // 60)
+        index = total_minutes // 5  # Each interval is 5 minutes
 
-                # Process the data to determine the total carbon credits for this coordinate.
-                total_kwh = 0
-                total_moer = 0
-                total_hours = 0
-                for day_data, sun_intensity in solar_history['properties']['parameter']['ALLSKY_SFC_SW_DWN'].items():
-                    # Skip if there is no sunlight data
-                    if sun_intensity is None:
-                        continue
+        # Get the MOER values for the 12 intervals corresponding to this hour
+        indices = range(index, index + 12)
+        # Ensure indices are within bounds
+        indices = [i for i in indices if 0 <= i < len(ba_array)]
+        moer_values = ba_array[indices]
+        if len(moer_values) == 0:
+            continue
 
-                    # Extract the hour from the timestamp (last two characters of the 'hour_end' key)
-                    hour_f = f"{day_data[-2:]}"
-                    day_f = f"{day_data[4:6]}-{day_data[6:8]}"
-                    year_f = f"{day_data[:4]}"
-                    moer_values = ba_history[year_f][day_f][hour_f]
+        # Compute average MOER value for the hour
+        average_moer = np.mean(moer_values)
+        # Convert MOER from pounds to metric tons
+        average_moer_metric_tons = average_moer / 2204.62
+        # Convert sun intensity from W/m^2 to kW/m^2
+        sun_intensity_kw = sun_intensity / 1000
 
-                    # Skip if there is no MOER data for the hour
-                    if not moer_values:
-                        continue
+        # Accumulate totals
+        total_kwh += sun_intensity_kw
+        total_moer += average_moer_metric_tons * sun_intensity_kw
+        total_hours += 1
 
-                    # Calculate the average MOER value for the hour
-                    average_moer = sum(moer_values) / len(moer_values)
-                    # Convert the MOER value from pounds to metric tons
-                    average_moer_metric_tons = average_moer / 2204.62
-                    # Convert the sun intensity from w/m2 to kW/m2 
-                    sun_intensity_kw = sun_intensity / 1000
+    # Check if we have valid data to avoid division by zero
+    if total_kwh == 0 or total_hours == 0:
+        return None
 
-                    # Calculate the carbon credits for this hour and add it to the total
-                    total_kwh += sun_intensity_kw
+    # Calculate the average MOER value per megawatt hour
+    average_moer_per_mwh = (total_moer / total_kwh)
+    avg_hour = total_kwh / total_hours
+    total_carbon_credits = average_moer_per_mwh / 1000 * avg_hour * 8766
 
-                    # Accumulate MOER for average calculation
-                    total_moer += average_moer_metric_tons * sun_intensity_kw
-                    total_hours += 1
+    return total_carbon_credits
 
-                # Calculate the average MOER value per megawatt hour
-                average_moer_per_mwh = (total_moer / total_kwh)
-                avg_hour = total_kwh / total_hours
-                total_carbon_credits = average_moer_per_mwh/1000*avg_hour*8766
-                save_to_csv([lat, lon, total_carbon_credits], csvfile)
+def main():
+    print("loading BA grid")
+
+    # 1. Generate the grid of points
+    resolution = 0.0390625  # Updated resolution for BA data
+    latitudes = np.arange(-90, 90 + resolution, resolution)
+    longitudes = np.arange(-180, 180 + resolution, resolution)
+    num_lats = len(latitudes)
+    num_lons = len(longitudes)
+    total_points = num_lats * num_lons
+    print(f"Total number of points: {total_points}")
+
+    # Create empty ba_array
+    ba_array = np.zeros((num_lats, num_lons), dtype=np.int16)
+
+    # 2. Read in the BA polygons
+    file_path = os.path.join('data', 'ba_maps.json')
+    ba_gdf = gpd.read_file(file_path)
+    ba_gdf = ba_gdf.to_crs(epsg=4326)
+
+    # 3. Define number of chunks
+    num_chunks = 4
+    chunk_size = num_lats // num_chunks
+
+    # Initialize mapping from BA regions to integer IDs
+    ba_to_id = {}
+    id_to_ba = {}
+
+    # For counting total points with BA
+    num_points_with_ba = 0
+
+    # Process each chunk
+    for chunk_idx in range(num_chunks):
+        print(f"Processing chunk {chunk_idx+1} of {num_chunks}")
+
+        lat_start_idx = chunk_idx * chunk_size
+        if chunk_idx == num_chunks - 1:
+            lat_end_idx = num_lats  # Include remainder in last chunk
+        else:
+            lat_end_idx = (chunk_idx + 1) * chunk_size
+
+        # Get the latitudes for this chunk
+        lat_chunk = latitudes[lat_start_idx:lat_end_idx]
+
+        # Create meshgrid for this chunk
+        lon_grid, lat_grid = np.meshgrid(longitudes, lat_chunk)
+
+        # Flatten the grids and create points
+        lat_flat = lat_grid.ravel()
+        lon_flat = lon_grid.ravel()
+        points = gpd.points_from_xy(lon_flat, lat_flat)
+
+        # 4. Create a GeoDataFrame of points
+        points_gdf = gpd.GeoDataFrame(geometry=points, crs="EPSG:4326")
+
+        # 5. Perform spatial join
+        joined = gpd.sjoin(points_gdf, ba_gdf[['region', 'geometry']], how='left', predicate='within')
+
+        # 6. Update mapping from BA regions to integer IDs
+        ba_regions_array = joined['region'].values
+        unique_bas_in_chunk = pd.unique(ba_regions_array[pd.notna(ba_regions_array)])
+
+        for ba in unique_bas_in_chunk:
+            if ba not in ba_to_id:
+                ba_id = len(ba_to_id) + 1  # Start from 1
+                ba_to_id[ba] = ba_id
+                id_to_ba[ba_id] = ba
+
+        # Map BA regions to IDs
+        ba_region_ids = np.array([ba_to_id.get(ba, 0) if pd.notna(ba) else 0 for ba in ba_regions_array], dtype=np.int16)
+
+        # Map latitudes and longitudes to indices
+        # Compute local indices
+        local_lat_indices = ((joined.geometry.y.values - lat_chunk[0]) / resolution).round().astype(int)
+        lon_indices = ((joined.geometry.x.values + 180) / resolution).round().astype(int)
+
+        # Global indices in ba_array
+        lat_indices = lat_start_idx + local_lat_indices
+
+        # Ensure indices are within bounds
+        lat_indices = np.clip(lat_indices, 0, num_lats - 1)
+        lon_indices = np.clip(lon_indices, 0, num_lons - 1)
+
+        # Assign BA IDs to the array
+        ba_array[lat_indices, lon_indices] = ba_region_ids
+
+        # Update num_points_with_ba
+        num_points_with_ba += np.count_nonzero(ba_region_ids)
+
+    # 7. Print counts
+    print(f"Total number of points in the array: {ba_array.size}")
+    print(f"Number of points contained within a BA: {num_points_with_ba}")
+
+    # Now proceed to process the mini-grids
+    print("Processing mini-grids...")
+
+    # Define the NASA grid resolution (0.625 degrees)
+    nasa_resolution = 0.625  # No change here
+    nasa_latitudes = np.arange(-90, 90, nasa_resolution)
+    nasa_longitudes = np.arange(-180, 180, nasa_resolution)
+
+    ba_histories = load_ba_histories()
+
+    # Open the CSV file for writing
+    with open("data/solar_values.csv", 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        # Write header
+        writer.writerow(['latitude', 'longitude', 'total_carbon_credits', 'BA'])
+
+        num_mini_grids_with_ba = 0
+        total_mini_grids = 0
+
+        for lat in nasa_latitudes:
+            print(f"Processing mini-grids for latitude {lat}")
+            for lon in nasa_longitudes:
+                total_mini_grids += 1
+
+                # Determine the range of indices for this mini-grid
+                lat_start_idx = int(round((lat + 90) / resolution))
+                lat_end_idx = int(round((lat + nasa_resolution + 90) / resolution))
+                lon_start_idx = int(round((lon + 180) / resolution))
+                lon_end_idx = int(round((lon + nasa_resolution + 180) / resolution))
+
+                # Ensure indices are within bounds
+                lat_start_idx = max(0, lat_start_idx)
+                lat_end_idx = min(num_lats, lat_end_idx)
+                lon_start_idx = max(0, lon_start_idx)
+                lon_end_idx = min(num_lons, lon_end_idx)
+
+                # Extract the BA IDs for the mini-grid
+                mini_grid_bas = ba_array[lat_start_idx:lat_end_idx, lon_start_idx:lon_end_idx]
+
+                # Find unique BA IDs in the mini-grid
+                unique_ba_ids = np.unique(mini_grid_bas)
+                unique_ba_ids = unique_ba_ids[unique_ba_ids != 0]  # Exclude zero (no BA)
+
+                if unique_ba_ids.size == 0:
+                    continue  # No BA in this mini-grid
+
+                num_mini_grids_with_ba += 1
+                ba_cache = {}  # Cache for total_carbon_credits per BA in this mini-grid
+                solar_history = None  # Cache solar history
+
+                # Load solar history once per mini-grid
+                solar_history = load_solar_history(lat, lon)
+                if solar_history is None:
+                    print(f"Could not load solar history for lat {lat}, lon {lon}")
+                    continue  # Cannot proceed without solar data
+
+                for ba_id in unique_ba_ids:
+                    ba_region = id_to_ba[ba_id]
+                    if ba_region in ba_cache:
+                        total_carbon_credits = ba_cache[ba_region]
+                    else:
+                        total_carbon_credits = compute_total_carbon_credits(ba_region, solar_history, ba_histories)
+                        if total_carbon_credits is None:
+                            print(f"Could not compute total_carbon_credits for BA {ba_region}")
+                            continue
+                        ba_cache[ba_region] = total_carbon_credits
+
+                # Now loop over each datapoint in the mini-grid
+                mini_grid_latitudes = latitudes[lat_start_idx:lat_end_idx]
+                mini_grid_longitudes = longitudes[lon_start_idx:lon_end_idx]
+                lon_grid, lat_grid = np.meshgrid(mini_grid_longitudes, mini_grid_latitudes)
+                lat_flat = lat_grid.ravel()
+                lon_flat = lon_grid.ravel()
+                ba_ids_flat = mini_grid_bas.ravel()
+
+                for idx in range(len(ba_ids_flat)):
+                    ba_id = ba_ids_flat[idx]
+                    if ba_id == 0:
+                        continue  # No BA for this point
+                    ba_region = id_to_ba[ba_id]
+                    total_carbon_credits = ba_cache.get(ba_region)
+                    if total_carbon_credits is None:
+                        continue  # total_carbon_credits could not be computed
+                    lat_point = lat_flat[idx]
+                    lon_point = lon_flat[idx]
+                    writer.writerow([lat_point, lon_point, total_carbon_credits, ba_region])
+
+                # Print statement per mini-grid
+                print(f"Mini-grid at ({lat}, {lon}) processed with BAs: {', '.join(ba_cache.keys())}")
+
+                # Flush the CSV after each mini-grid
+                csvfile.flush()
+
+        print(f"Total number of mini-grids: {total_mini_grids}")
+        print(f"Number of mini-grids with at least one point in a BA: {num_mini_grids_with_ba}")
+
+if __name__ == '__main__':
+    main()
