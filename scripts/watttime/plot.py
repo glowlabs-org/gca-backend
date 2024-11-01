@@ -19,10 +19,14 @@ Requirements:
 - Each heatmap should have exactly one pixel per non-sparse data point.
 - The images cover the entire world, from -90 to 90 latitude, and -180 to 180 longitude.
 - The images should be saved as 'data/heatmap_n.png' where n is the pass number.
-- The images should not include any legends, color bars, or additional features.
+- The images should not include any legends, color bars, or additional features for passes below 7.
 - The pixels should be colored according to the data values, which range from 0 to 5.
 - The color gradient should transition through the colors: 'lime', 'yellow', 'orange', 'red', 'purple', 'black'.
-- The script should continue generating images until it runs out of memory and crashes (due to increasing resolution).
+- For passes 7 and above, a color bar with the unit 'carbon credits per year, per kilowatt' should be added at the top.
+    - Both the tick labels (scale numbers) and the label should be below the color bar.
+    - The color bar should not extend to the full width of the image, leaving a border around it.
+- The font size of the color bar label should scale appropriately with the resolution to maintain the same relative size.
+- Make the heatmaps look as professional as possible.
 
 """
 
@@ -30,14 +34,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 import csv
-import math
 
 # Define the colors for the custom colormap
-#colors = ['#E0FFE0', 'lime', 'yellow', 'gold', 'orange', 'darkorange', 'red', 'purple', 'black']
-#colors = ['#C0FFC0', '#77FF77', 'greenyellow', 'yellow', 'gold', 'orange', 'darkorange', 'red', 'purple', 'black']
-colors = ['#00FF00', '#55FF00', '#99FF00', '#FFFF00', '#FFAA00', '#FF7700', '#FF3300', '#FF0000', '#AA00AA', '#000000']
+colors = ['#AAFFFF', '#66FFFF', '#00FFFF', '#00FF00', '#BBFF00', '#FFFF00', '#FFBB00', '#FF9900', '#FF6600', '#FF0000', '#DD0022', '#BB0055', '#990077', '#880088', '#660066', '#440044', '#220022', '#000000']
+
+
 cmap_name = 'custom_colormap'
-n_bins = 600  # Number of bins in the colormap
+n_bins = 2400  # Number of bins in the colormap
 custom_colormap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
 
 # Value range for normalization
@@ -50,7 +53,12 @@ largest = 0
 
 csv_file_path = 'data/solar_values.csv'  # Path to your CSV file
 
-for pass_num in range(1, 10):
+# Base values for font size scaling
+base_pass_num = 7
+base_font_size = 12
+base_resolution = 10.0 / (2 ** (base_pass_num - 1))
+
+for pass_num in range(7, 10):
     print(f"Starting pass {pass_num}")
     try:
         # Calculate the resolution for the current pass
@@ -89,12 +97,12 @@ for pass_num in range(1, 10):
                                 data_array[idx_lat, idx_lon] = value
                                 if value > largest:
                                     largest = value
-                except Exception as e:
-                    # print(f"Error processing row {row}: {e}")
+                except Exception:
                     continue
 
-        # Create the figure and axis
+        # Create the figure and axis with margins
         fig, ax = plt.subplots(figsize=(num_longitudes / 100, num_latitudes / 100), dpi=100)
+        fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05)
 
         # Display the data array as an image
         # Flip the data array vertically to align with latitude increasing from bottom to top
@@ -104,9 +112,41 @@ for pass_num in range(1, 10):
         # Remove axes for a clean image
         ax.axis('off')
 
-        # Save the image
+        # Add a color bar with units only for passes 7 and above
+        if pass_num >= 7:
+            # Calculate font size scaling factor
+            scaling_factor = base_resolution / resolution
+            font_size = base_font_size * scaling_factor
+
+            # Create a colorbar axis above the main axis
+            cbar_width = 0.8  # Fraction of the figure width
+            cbar_height = 0.02  # Height of the colorbar
+            cbar_left = (1 - cbar_width) / 2  # Center the colorbar horizontally
+            cbar_bottom = 0.9  # Position of the bottom of the colorbar
+            cax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
+
+            # Create the color bar in the cax axis
+            cbar = fig.colorbar(img, cax=cax, orientation='horizontal')
+
+            # Move ticks and label below the color bar
+            cbar.ax.xaxis.set_ticks_position('bottom')
+            cbar.ax.xaxis.set_label_position('bottom')
+
+            # Set the label with increased spacing
+            cbar.set_label('Carbon credits per year, per kilowatt', fontsize=font_size, labelpad=font_size * 0.8)
+
+            # Adjust tick label font sizes
+            cbar.ax.tick_params(labelsize=font_size * 0.8)
+
+            # Remove colorbar outline for a cleaner look
+            cbar.outline.set_visible(False)
+
+            # Adjust the spacing between the color bar and the heatmap
+            fig.subplots_adjust(top=cbar_bottom - 0.05)
+
+        # Save the image with padding to add borders
         output_path = f'data/heatmap_{pass_num}.png'
-        plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
+        plt.savefig(output_path, bbox_inches='tight', pad_inches=0.1)
         plt.close(fig)
         print(f"Pass {pass_num} completed, image saved to {output_path}")
 
