@@ -32,8 +32,8 @@ def fetch_nasa_data(latitude, longitude):
         "community": "RE",
         "longitude": longitude,
         "latitude": latitude,
-        "start": "20200101",
-        "end": "20231231",
+        "start": "20240101",
+        "end": "20241231",
         "format": "json"
     }
 

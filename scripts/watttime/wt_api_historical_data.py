@@ -62,9 +62,9 @@ if __name__ == "__main__":
         region = sys.argv[1]
 
     if len(sys.argv) < 3:
-        print('No start and end dates on command line, using Aug 2023')
-        start = "2023-08-01T00:00:00Z"
-        end = "2023-08-31T23:59:59Z"
+        print('No start and end dates on command line, using Aug 2024')
+        start = "2024-08-01T00:00:00Z"
+        end = "2024-08-31T23:59:59Z"
     else:
         start = sys.argv[2]
         end = sys.argv[3]

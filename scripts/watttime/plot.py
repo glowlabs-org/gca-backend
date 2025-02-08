@@ -36,7 +36,8 @@ from matplotlib.colors import LinearSegmentedColormap, Normalize
 import csv
 
 # Define the colors for the custom colormap
-colors = ['#AAFFFF', '#66FFFF', '#00FFFF', '#00FF00', '#BBFF00', '#FFFF00', '#FFBB00', '#FF9900', '#FF6600', '#FF0000', '#DD0022', '#BB0055', '#990077', '#880088', '#660066', '#440044', '#220022', '#000000']
+#colors = ['#AAFFFF', '#66FFFF', '#00FFFF', '#00FF00', '#BBFF00', '#FFFF00', '#FFBB00', '#FF9900', '#FF6600', '#FF0000', '#DD0022', '#BB0055', '#990077', '#880088', '#660066', '#440044', '#220022', '#000000']
+colors = ['#AAFFFF', '#66FFFF', '#00FFFF', '#00FFAA', '#00FF77', '#00FF00', '#99FF00', '#CCFF00', '#D7FF00', '#FFFF00', '#FFD700', '#FFCC00', '#FFAA00', '#FF8800', '#FF0000', '#BB0055', '#880088', '#440044', '#000000']
 
 
 cmap_name = 'custom_colormap'
@@ -45,7 +46,7 @@ custom_colormap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
 
 # Value range for normalization
 vmin = 0.0
-vmax = 3.4
+vmax = 4.015
 norm = Normalize(vmin=vmin, vmax=vmax)
 
 epsilon = 1e-7  # Small tolerance for floating point comparison
@@ -133,7 +134,7 @@ for pass_num in range(7, 10):
             cbar.ax.xaxis.set_label_position('bottom')
 
             # Set the label with increased spacing
-            cbar.set_label('Carbon credits per year, per kilowatt', fontsize=font_size, labelpad=font_size * 0.8)
+            cbar.set_label('Glow Strength', fontsize=font_size, labelpad=font_size * 0.8)
 
             # Adjust tick label font sizes
             cbar.ax.tick_params(labelsize=font_size * 0.8)

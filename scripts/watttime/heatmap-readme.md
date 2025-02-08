@@ -4,9 +4,9 @@ steps required to get the heatmap built.
 
 The highres versions of the scripts require 30 GB of available RAM to complete.
 
-1. Download the nasa data. You can do this by running `python heatmap-nasa-grid.py`. This process will take around 24 hours to complete. You may need to run the script multiple times to collect datapoints that are missed on the first pass. Subsequent runs of the script will be significantly faster, as they will only collect missing datapoints.
+1. Download the WattTime balancing authority map. You can do this by running `python wt_api_maps.py`. This script should complete in a minute or two.
 
-2. Download the WattTime balancing authority map. You can do this by running `python wt_api_maps.py`. This script should complete in a minute or two.
+2. Download the nasa data. You can do this by running `python heatmap-nasa-grid.py`. This process will take around 24 hours to complete. You may need to run the script multiple times to collect datapoints that are missed on the first pass. Subsequent runs of the script will be significantly faster, as they will only collect missing datapoints.
 
 3. Download all of the historical data for WattTime. You can do this by running `python wt_api_hist_from_ba_map.py`. This script may take several hours to run, and may download 20+ GB of data.
 

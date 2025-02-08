@@ -14,7 +14,7 @@ def prompt_for_coordinates():
     longitude = float(input("Please enter the longitude: "))
     return latitude, longitude
 
-# fetch nasa All Sky Surface Shortwave Downward Irradiance (ALLSKY_SFC_SW_DWN) data for 2023
+# fetch nasa All Sky Surface Shortwave Downward Irradiance (ALLSKY_SFC_SW_DWN) data for 2024
 # https://power.larc.nasa.gov/docs/gallery/solar-irradiance/
 def fetch_nasa_data(latitude, longitude):
     # Construct API endpoint and parameters
@@ -24,8 +24,8 @@ def fetch_nasa_data(latitude, longitude):
         "community": "RE",
         "longitude": longitude,
         "latitude": latitude,
-        "start": "20230101",
-        "end": "20231231",
+        "start": "20240101",
+        "end": "20241231",
         "format": "json"
     }
     print(f"Using time range {params['start']} to {params['end']}")
@@ -76,7 +76,7 @@ def load_json_files(region):
     """
     folder_path = os.path.join("data", ba)
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    prefix = f"{ba}_2023"
+    prefix = f"{ba}_2024"
     for filename in os.listdir(folder_path):
         if filename.startswith(prefix) and filename.endswith('.json'):
             filepath = os.path.join(folder_path, filename)

@@ -9,8 +9,8 @@ import math
 META_params = {
     "parameters": "ALLSKY_SFC_SW_DWN",
     "community": "RE",
-    "start": "20230101",
-    "end": "20231231",
+    "start": "20240101",
+    "end": "20241231",
 }
 
 # Function to fetch data from NASA API

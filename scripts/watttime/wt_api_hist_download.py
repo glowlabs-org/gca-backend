@@ -24,12 +24,12 @@ def fetch_and_save_historical_data(token, ba):
         os.makedirs(data_path)
 
     for month in range(1, 13):
-        _, last = calendar.monthrange(2023, month)
+        _, last = calendar.monthrange(2024, month)
         # CAISO_NORTH_2022-05_MOER.json
-        fname = f"{ba}_2023-{month:02}_MOER.json"
-        # "2023-08-01T00:00:00Z"
-        start = f"2023-{month:02}-01T00:00:00Z"
-        end = f"2023-{month:02}-{last:02}T23:59:59Z"
+        fname = f"{ba}_2024-{month:02}_MOER.json"
+        # "2024-08-01T00:00:00Z"
+        start = f"2024-{month:02}-01T00:00:00Z"
+        end = f"2024-{month:02}-{last:02}T23:59:59Z"
         file_path = path.join(data_path, fname)
         if path.exists(file_path):
             pass
@@ -43,7 +43,7 @@ def fetch_and_save_historical_data(token, ba):
                 sys.exit(f"error downloading data")
             
 
-    print(f"Generated 2023 historical data for {ba} to the directory: {data_path}")
+    print(f"Generated 2024 historical data for {ba} to the directory: {data_path}")
 
 if __name__ == "__main__":
     # Command line: latitude longitude
